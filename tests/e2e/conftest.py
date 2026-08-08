@@ -53,10 +53,6 @@ def hub_url() -> Iterator[str]:
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
-    # Disable OTel for the autobooted hub — otherwise it tries to push
-    # spans to a non-existent localhost:4317 OTLP collector and logs
-    # connect-refused noise into the test log on every routed request.
-    env.setdefault("OTEL_SDK_DISABLED", "true")
     # The autostart sampler hits nvidia-smi every 2s. On a CI runner
     # without an NVIDIA GPU that's noisy but harmless.
     creationflags = 0
@@ -74,7 +70,7 @@ def hub_url() -> Iterator[str]:
         env=env,
         creationflags=creationflags,
     )
-    # Contain the hub and anything it spawns (e.g. an on-demand TTS backend
+    # Contain the hub and anything it spawns (e.g. an on-demand backend
     # loaded mid-test, #468) in one Job Object, so tearing this fixture down
     # reaps the whole tree instead of just the hub PID — a plain
     # ``proc.terminate()`` never reaches a grandchild, and an on-demand

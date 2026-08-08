@@ -9,16 +9,16 @@ the rest of the bearer-token coverage):
 2. ``anthropic-version`` echoed, defaulted when absent.
 3. ``anthropic-beta`` echoed but never reported as honoured.
 
-Unit tests run with ``OTEL_SDK_DISABLED=true`` (tests/conftest.py), so the
-no-span fallback path is the one under test here — which is exactly the
-path that would otherwise have left ``request-id`` silently absent.
+The lite fork has no tracing SDK, so the no-span fallback path is the one
+under test here — which is exactly the path that would otherwise have left
+``request-id`` silently absent.
 """
 
 from __future__ import annotations
 
 import os
 
-os.environ.setdefault("LOCAL_LLM_HUB_HOST", "tower")
+os.environ.setdefault("LOCAL_LLM_HUB_HOST", "local")
 
 from fastapi.testclient import TestClient
 

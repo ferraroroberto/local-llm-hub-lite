@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import os
 
-os.environ.setdefault("LOCAL_LLM_HUB_HOST", "tower")
+os.environ.setdefault("LOCAL_LLM_HUB_HOST", "local")
 
 import anthropic
 import pytest
@@ -32,10 +32,14 @@ def _client() -> TestClient:
     return TestClient(server_mod.app)
 
 
-def _empty_messages_request(client: TestClient):
+def _unknown_model_request(client: TestClient):
     return client.post(
         "/v1/messages",
-        json={"model": "claude-haiku-4-5", "max_tokens": 16, "messages": []},
+        json={
+            "model": "does-not-exist",
+            "max_tokens": 16,
+            "messages": [{"role": "user", "content": "hi"}],
+        },
     )
 
 
@@ -74,29 +78,27 @@ def test_only_anthropic_shape_paths_match():
 # ---- the wire ----
 
 def test_messages_400_uses_anthropic_envelope():
-    r = _empty_messages_request(_client())
+    r = _unknown_model_request(_client())
     assert r.status_code == 400
-    assert r.json() == {
-        "type": "error",
-        "error": {
-            "type": "invalid_request_error",
-            "message": "messages must not be empty",
-        },
-    }
+    body = r.json()
+    assert body["type"] == "error"
+    assert body["error"]["type"] == "invalid_request_error"
+    assert "unknown model 'does-not-exist'" in body["error"]["message"]
+    assert "detail" not in body
 
 
 def test_messages_502_maps_to_api_error(monkeypatch):
-    from src.claude_cli import ClaudeCLIError
+    from src.openai_upstream import UpstreamError
 
-    def fake_call(prompt, *, model=None, system=None, attachments=None, timeout=600.0):
-        raise ClaudeCLIError("upstream exploded")
+    def fake_call(base_url, model, messages, **kwargs):
+        raise UpstreamError("upstream exploded")
 
-    monkeypatch.setattr(chat_translation_mod, "call_claude", fake_call)
+    monkeypatch.setattr(chat_translation_mod, "call_openai_chat", fake_call)
 
     r = _client().post(
         "/v1/messages",
         json={
-            "model": "claude-haiku-4-5",
+            "model": "qwen3.5-4b",
             "max_tokens": 16,
             "messages": [{"role": "user", "content": "hi"}],
         },
@@ -157,7 +159,7 @@ def test_other_routes_keep_default_shape():
 def test_error_still_lands_in_the_observability_ring():
     from src.hub_observability import OBS
 
-    r = _empty_messages_request(_client())
+    r = _unknown_model_request(_client())
     assert r.status_code == 400
     # recent_errors() is newest-first.
     newest = OBS.recent_errors(limit=1)[0]
@@ -181,14 +183,14 @@ def test_anthropic_sdk_raises_typed_error_with_envelope():
         max_retries=0,
     )
     with pytest.raises(anthropic.BadRequestError) as excinfo:
-        sdk.messages.create(model="claude-haiku-4-5", max_tokens=16, messages=[])
+        sdk.messages.create(
+            model="does-not-exist",
+            max_tokens=16,
+            messages=[{"role": "user", "content": "hi"}],
+        )
 
     exc = excinfo.value
     assert exc.status_code == 400
-    assert exc.body == {
-        "type": "error",
-        "error": {
-            "type": "invalid_request_error",
-            "message": "messages must not be empty",
-        },
-    }
+    assert exc.body["type"] == "error"
+    assert exc.body["error"]["type"] == "invalid_request_error"
+    assert "unknown model 'does-not-exist'" in exc.body["error"]["message"]

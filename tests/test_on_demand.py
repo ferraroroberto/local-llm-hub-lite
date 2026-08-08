@@ -12,7 +12,7 @@ import logging
 import pytest
 
 from src import backend_process as bp
-from src import host_profile, model_registry, on_demand, remote_proxy
+from src import host_profile, model_registry, on_demand
 from src.model_registry import Model
 
 
@@ -54,22 +54,13 @@ def test_ensure_ready_noop_for_eager_rows(monkeypatch):
     on_demand.ensure_ready(_model(startup="eager"))
 
 
-def test_ensure_ready_noop_for_remote_owned(monkeypatch):
-    monkeypatch.setattr(remote_proxy, "remote_base_url", lambda m: "http://peer:8000")
-    _forbid(monkeypatch, bp, "is_reachable")
-    _forbid(monkeypatch, bp, "start")
-    on_demand.ensure_ready(_model())
-
-
 def test_ensure_ready_noop_when_already_reachable(monkeypatch):
-    monkeypatch.setattr(remote_proxy, "remote_base_url", lambda m: None)
     monkeypatch.setattr(bp, "is_reachable", lambda m, timeout=1.5: True)
     _forbid(monkeypatch, bp, "start")
     on_demand.ensure_ready(_model())
 
 
 def test_ensure_ready_spawns_and_waits_for_readiness(monkeypatch):
-    monkeypatch.setattr(remote_proxy, "remote_base_url", lambda m: None)
     monkeypatch.setattr(on_demand, "READY_POLL_S", 0.01)
     monkeypatch.setattr(host_profile, "resolve", lambda: _Profile(None))
 
@@ -89,7 +80,6 @@ def test_ensure_ready_spawns_and_waits_for_readiness(monkeypatch):
 
 
 def test_ensure_ready_raises_on_deadline(monkeypatch):
-    monkeypatch.setattr(remote_proxy, "remote_base_url", lambda m: None)
     monkeypatch.setattr(on_demand, "READY_POLL_S", 0.01)
     monkeypatch.setattr(host_profile, "resolve", lambda: _Profile(None))
     monkeypatch.setattr(bp, "is_reachable", lambda m, timeout=1.5: False)
@@ -101,7 +91,6 @@ def test_ensure_ready_raises_on_deadline(monkeypatch):
 
 
 def test_ensure_ready_raises_on_start_failure(monkeypatch):
-    monkeypatch.setattr(remote_proxy, "remote_base_url", lambda m: None)
     monkeypatch.setattr(host_profile, "resolve", lambda: _Profile(None))
     monkeypatch.setattr(bp, "is_reachable", lambda m, timeout=1.5: False)
     monkeypatch.setattr(bp, "running_backends", dict)
@@ -141,25 +130,6 @@ def test_vram_check_skips_ceilingless_hosts(monkeypatch):
     monkeypatch.setattr(host_profile, "resolve", lambda: _Profile(None))
     _forbid(monkeypatch, bp, "running_backends")
     assert on_demand._warn_on_vram_overcommit(_model()) is None
-
-
-def test_vram_check_excludes_cpu_resident_rows(monkeypatch, caplog):
-    """A running row that is CPU-resident on this host (piper — and whisper,
-    whose chain flags tower as a degraded ``cpu: true`` tier) holds no GPU
-    VRAM and must not eat headroom (#431). Here the GPU-resident set is
-    2100 + 13400 = 15500 ≤ 16384 — counting the CPU rows' 5000 would have
-    raised a false overcommit warning."""
-    monkeypatch.setattr(host_profile, "resolve", lambda: _Profile(16384))
-    running = {
-        "qwen35_4b": _model(id="qwen35_4b", startup="eager", est_vram_mb=2100),
-        "piper": _model(id="piper", startup="eager", est_vram_mb=2500),
-        "whisper": _model(id="whisper", startup="eager", est_vram_mb=2500),
-    }
-    monkeypatch.setattr(bp, "running_backends", lambda: running)
-
-    with caplog.at_level(logging.WARNING, logger="src.on_demand"):
-        assert on_demand._warn_on_vram_overcommit(_model(est_vram_mb=13400)) is None
-    assert not caplog.records
 
 
 # --------------------------------------------------------------------------- #

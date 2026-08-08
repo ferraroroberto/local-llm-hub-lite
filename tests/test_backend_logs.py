@@ -20,7 +20,7 @@ from __future__ import annotations
 import os
 import sys
 
-os.environ.setdefault("LOCAL_LLM_HUB_HOST", "tower")
+os.environ.setdefault("LOCAL_LLM_HUB_HOST", "local")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -38,11 +38,18 @@ def _echo_cmd(token: str) -> list[str]:
     return [sys.executable, "-c", f"import sys; sys.stdout.write({token!r} + '\\n')"]
 
 
+class _FakeModel:
+    """Minimal stand-in for a registry row on the spawn path — unowned
+    (``host=None``) so ``start()``'s ownership guard lets it through."""
+    host = None
+    port = None
+
+
 def _patch_spawn(monkeypatch, tmp_path, token: str) -> None:
     """Point LOG_DIR at a tmp dir and stub out registry/launch dependencies
     so ``start()`` spawns our echo command instead of a model binary."""
     monkeypatch.setattr(bp, "LOG_DIR", tmp_path)
-    monkeypatch.setattr(bp, "resolve_model_by_id", lambda mid: object())
+    monkeypatch.setattr(bp, "resolve_model_by_id", lambda mid: _FakeModel())
     monkeypatch.setattr(bp, "is_reachable", lambda *a, **k: False)
     monkeypatch.setattr(bp, "vendor_dir_for", lambda m: bp.PROJECT_ROOT)
     monkeypatch.setattr(bp, "build_command", lambda m: _echo_cmd(token))
@@ -129,18 +136,14 @@ def _admin_client() -> TestClient:
 
 
 def test_log_endpoint_returns_tail(monkeypatch):
-    # A TOWER-owned model id, deliberately: a remote-owned row (e.g. whisper,
-    # whisper_translate, whisper_vanilla, orpheus — all host: gaming since
-    # #323/#370) makes this endpoint forward to the owning peer's live hub —
-    # a unit test must never leave the box. piper stays tower-local.
     monkeypatch.setattr(bp, "log_lines", lambda mid, limit=400: ["line-a", "line-b"])
 
-    resp = _admin_client().get("/api/models/piper/log")
+    resp = _admin_client().get("/api/models/qwen35_4b/log")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["id"] == "piper"
+    assert body["id"] == "qwen35_4b"
     assert body["lines"] == ["line-a", "line-b"]
-    assert body["path"] == "data/logs/backend-piper.log"
+    assert body["path"] == "data/logs/backend-qwen35_4b.log"
 
 
 def test_log_endpoint_unknown_model_404():
