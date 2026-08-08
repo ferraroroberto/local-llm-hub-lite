@@ -242,13 +242,13 @@ def _check_whisper_cpp() -> Check:
 
 
 def _port_in_use(port: int) -> bool:
+    # Probe by connecting, not binding: on Windows a bind to 127.0.0.1
+    # succeeds even while another process listens on the same port's
+    # wildcard address (0.0.0.0), so a bind-probe reports a busy port as
+    # free. A successful connect is proof something is listening.
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(0.5)
-        try:
-            s.bind(("127.0.0.1", port))
-            return False
-        except OSError:
-            return True
+        return s.connect_ex(("127.0.0.1", port)) == 0
 
 
 def _check_ports() -> List[Check]:

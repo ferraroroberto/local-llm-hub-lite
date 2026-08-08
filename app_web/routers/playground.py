@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import base64
 import logging
-import mimetypes
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -15,14 +13,6 @@ from src.model_registry import enabled_models, resolve as resolve_model
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-_IMAGE_MEDIA_TYPES = {
-    "png": "image/png",
-    "jpg": "image/jpeg",
-    "jpeg": "image/jpeg",
-    "webp": "image/webp",
-    "gif": "image/gif",
-}
 
 
 @router.get("/api/playground/models")
@@ -57,7 +47,6 @@ async def playground_send(
     prompt: str = Form(...),
     max_tokens: int = Form(512),
     system: Optional[str] = Form(None),
-    attachment: Optional[UploadFile] = File(None),
 ) -> Dict[str, Any]:
     """Send a single-turn prompt through the hub. Returns text + usage.
 
@@ -74,36 +63,6 @@ async def playground_send(
         raise HTTPException(status_code=400, detail=f"unknown model {model!r}")
 
     content: List[Dict[str, Any]] = [{"type": "text", "text": prompt}]
-    if attachment is not None and attachment.filename:
-        raw = await attachment.read()
-        suffix = (attachment.filename.rsplit(".", 1)[-1] or "").lower()
-        b64 = base64.b64encode(raw).decode("ascii")
-        if suffix in _IMAGE_MEDIA_TYPES:
-            # Images route through the dedicated image block.
-            content.append(
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": _IMAGE_MEDIA_TYPES[suffix],
-                        "data": b64,
-                    },
-                }
-            )
-        else:
-            # Everything else (PDF, JSON, CSV, code, …) is a document
-            # block; the CLI attaches it as an @file the model can read.
-            media = (
-                mimetypes.guess_type(attachment.filename)[0]
-                or attachment.content_type
-                or "application/octet-stream"
-            )
-            content.append(
-                {
-                    "type": "document",
-                    "source": {"type": "base64", "media_type": media, "data": b64},
-                }
-            )
 
     payload: Dict[str, Any] = {
         "model": target.display_name,

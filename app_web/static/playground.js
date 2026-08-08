@@ -38,7 +38,6 @@ export function wirePlayground() {
   if (els.playgroundSendBtn) {
     els.playgroundSendBtn.addEventListener('click', sendPrompt);
   }
-  wireFilePicker(els.playgroundAttachment, els.playgroundAttachmentBtn, els.playgroundAttachmentName);
   wireTranscribe();
   if (els.playgroundClearBtn) {
     els.playgroundClearBtn.addEventListener('click', function () {
@@ -96,10 +95,6 @@ async function sendPrompt() {
   fd.append('max_tokens', String(parseInt(els.playgroundMaxTokens.value, 10) || 512));
   const system = (els.playgroundSystem.value || '').trim();
   if (system) fd.append('system', system);
-  if (els.playgroundAttachment && els.playgroundAttachment.files && els.playgroundAttachment.files[0]) {
-    fd.append('attachment', els.playgroundAttachment.files[0]);
-  }
-
   const t0 = performance.now();
   try {
     const res = await api('/admin/api/playground/send', { method: 'POST', body: fd });
