@@ -1,9 +1,9 @@
-# .fleet.toml — this repo's card on the fleet architecture map.
-# fleet-config's /system-map aggregates every repo's .fleet.toml. Keep current:
-# update in the same PR as any material change (layer, port, role, one-line
-# description, exposed services). Schema: fleet-config/architecture/README.md.
-layer       = "enabling"
-icon        = "🧠"
-port        = ":8000"
-description = "Shared LLM gateway — routes to local models or claude -p."
-chips       = ["claude -p", "agy gemini", "qwen35-4b :8088", "gemma-26b :8087", "voice → gaming+mac", "tts :8092+"]
+# .fleet.toml — this repo's architecture-map card.
+# Lite fork: single-machine, local-models-only edition of local-llm-hub.
+# Keep current: update in the same PR as any material change
+# (layer, port, role, one-line description, exposed services).
+layer        = "enabling"
+icon         = "🧠"
+port         = ":8000"
+display_name = "Local LLM Hub Lite"
+description  = "<b>Local LLM Hub Lite</b> — single-machine local-models hub, lite fork of local-llm-hub. Anthropic + OpenAI shapes on :8000 routed to llama-server (qwen3.5-4b :8081) and whisper-server (:8090); admin SPA with Hub · Models · Playground."
