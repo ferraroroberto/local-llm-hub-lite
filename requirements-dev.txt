@@ -4,3 +4,8 @@
 # End-to-end browser tests (Chromium-only).
 pytest-playwright>=0.5
 playwright>=1.45
+
+# SDK-fidelity tests: tests/test_anthropic_errors.py drives the real
+# anthropic SDK against the hub's error envelopes to prove drop-in
+# compatibility. Dev-only — the hub itself never imports it.
+anthropic>=0.40
