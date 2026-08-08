@@ -12,18 +12,11 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 
 from src import backend_process as bp
-from src import config_write
-from src import services as svc
-from src.host_profile import all_hosts, get_host, resolve as resolve_host
-from src.model_failover import effective_owner
 from src.model_registry import (
     Model,
-    cpu_resident_map,
     enabled_models,
     resolve as resolve_model,
 )
-from src.remote_proxy import remote_auth_token_for_model, remote_base_url
-from app_web.admin_forward import forward_admin_request
 from src.server_process import (
     OWNERSHIP_EXTERNAL,
     OWNERSHIP_NONE,
@@ -35,94 +28,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _remote_admin_headers(model: Model) -> Dict[str, str]:
-    token = remote_auth_token_for_model(model)
-    return {"Authorization": f"Bearer {token}"} if token else {}
+def _add_startup_fields(row: Dict[str, Any], m: Model) -> None:
+    """Annotate a tile row with its declared startup policy — the registry
+    fields the SPA's eager / on-demand badge renders.
 
-
-def _offline_remote_row(m: Model, host_id: str) -> Dict[str, Any]:
-    """Fallback row for a remote-owned model when its owning hub couldn't
-    be reached — shown as unreachable rather than silently dropped from
-    the list (a remote host being offline shouldn't hide the model that
-    normally lives there).
-    """
-    return {
-        "id": m.id,
-        "display_name": m.display_name,
-        "backend": m.backend,
-        "engine": m.engine,
-        "port": m.port,
-        "url": None,
-        "aliases": list(m.aliases or []),
-        "controllable": m.backend in ("openai", "whisper", "tts") and not m.virtual,
-        "ownership": OWNERSHIP_NONE,
-        "pid": None,
-        "reachable": False,
-        "model_path": m.model_path,
-        "host": host_id,
-        "host_unreachable": True,
-    }
-
-
-def _add_failover_fields(row: Dict[str, Any], m: Model, owner_id: str) -> None:
-    """Annotate a tile row with #342 chain state — only for multi-host rows.
-
-    ``preferred_host`` is the chain's first candidate; ``failover: true``
-    flags that the model is currently served off-preference (failed over),
-    which the SPA renders as an amber hint on the tile's meta line.
-    """
-    if len(m.host_chain) <= 1:
-        return
-    row["preferred_host"] = m.host_chain[0]
-    row["failover"] = owner_id != m.host_chain[0]
-
-
-def _add_placement_fields(
-    row: Dict[str, Any], m: Model, cpu_map: Dict[str, set]
-) -> None:
-    """Annotate a tile row with its declared placement *intent* (#423) — the
-    Phase 1 (#422) registry fields the read-only placement card renders.
-
-    Config-derived from the local registry, never trusted from a peer: the
-    YAML is the fleet-wide source of truth and every hub reads the same file,
-    so stamping it locally keeps the payload shape independent of the owning
-    hub's version. Subscription rows (claude/gemini) have no placement
-    concept — no chain, no process, no VRAM — so they carry no ``placement``
-    key at all rather than an empty shell the UI would have to special-case.
+    Subscription rows (claude/gemini) have no lifecycle concept — no process,
+    no VRAM — so they carry none of these keys rather than an empty shell the
+    UI would have to special-case.
     """
     if m.backend in ("claude", "gemini"):
         return
-    row["placement"] = {
-        # Declared chain in priority order; ``cpu`` marks the *effective*
-        # device on that host (#434) — sourced from
-        # ``model_registry.cpu_resident_map`` (the same source the fleet
-        # summary's device hints read), so an always-CPU row (piper, a
-        # whisper ``-ng`` row, #265) is tagged everywhere, not just a chain's
-        # degraded ``cpu: true`` tier (#342). A bare ``host:`` row is a
-        # 1-element chain.
-        "chain": [
-            {"id": h, "cpu": m.id in cpu_map.get(h, ())} for h in m.host_chain
-        ],
-        "startup": m.startup,
-        "idle_unload_minutes": m.idle_unload_minutes,
-        "est_vram_mb": m.est_vram_mb,
-        # #424: a virtual alias shares its parent row's process — its
-        # placement is the parent's, so the editor never opens on it.
-        "editable": not m.virtual,
-    }
-
-
-def _config_block() -> Dict[str, Any]:
-    """Config-as-code context for the Models tab (#424): the models.yaml
-    HEAD sha (the drift-visible config version), whether *this* hub may
-    write (single-writer contract — tower only), and the full fleet host
-    list the chain editor offers (with ceilings for context)."""
-    return {
-        "sha": config_write.config_sha(),
-        "write_enabled": config_write.is_write_host(),
-        "write_host": config_write.write_host_id(),
-        "fleet_hosts": [{"id": h.id, "vram_mb": h.vram_mb} for h in all_hosts()],
-    }
+    row["startup"] = m.startup
+    row["idle_unload_minutes"] = m.idle_unload_minutes
+    row["est_vram_mb"] = m.est_vram_mb
 
 
 def _require_model(model_id: str) -> Model:
@@ -134,28 +52,6 @@ def _require_model(model_id: str) -> Model:
     if target is None:
         raise HTTPException(status_code=404, detail=f"model {model_id!r} not enabled")
     return target
-
-
-async def _forward_admin_call(
-    target: Model, method: str, suffix: str, **kwargs: Any
-) -> Dict[str, Any]:
-    """Forward an admin models-API call to the host that actually owns
-    ``target`` (#178) — used by start/stop/force-stop/log when the
-    resolved model isn't local. Mirrors the local handlers' error shape
-    (404/400/409 from the remote surface verbatim; 502 if the remote
-    hub itself is unreachable) via the shared ``forward_admin_request``.
-    """
-    remote = remote_base_url(target)
-    assert remote is not None
-    owner = effective_owner(target) or target.host
-    return await forward_admin_request(
-        remote,
-        f"/admin/api/models/{target.id}{suffix}",
-        method=method,
-        headers=_remote_admin_headers(target),
-        unreachable_detail=f"host {owner!r} (owns {target.id!r}) unreachable",
-        **kwargs,
-    )
 
 
 def _ownership_from_snapshot(m: Model, listening: Dict[int, list]) -> tuple[str, Any]:
@@ -175,17 +71,9 @@ def _ownership_from_snapshot(m: Model, listening: Dict[int, list]) -> tuple[str,
 
 
 @router.get("/api/models")
-async def list_models_for_admin(local_only: bool = False) -> Dict[str, Any]:
-    """Per-tile state for every enabled model — local rows computed here,
-    plus (#178) any remote-owned rows merged in from the host that
-    actually runs them.
-
-    ``local_only=true`` skips the remote-merge step and returns just this
-    host's own rows — used when a peer hub fetches *this* endpoint to
-    build its own merge (``svc.remote_models``). Without it, two
-    bidirectionally cross-enabled hosts recurse into each other forever:
-    A's merge calls B's `/api/models`, which (unless told not to) tries to
-    merge in A's rows by calling A's `/api/models` again, and so on.
+async def list_models_for_admin() -> Dict[str, Any]:
+    """Per-tile state for every enabled model — all rows are local; every
+    model operates purely on this host's ``backend_process``.
 
     Two pieces are expensive: probing reachability over HTTP per backend
     (each costs up to 0.5 s) and resolving port → PID via netstat (one
@@ -197,16 +85,7 @@ async def list_models_for_admin(local_only: bool = False) -> Dict[str, Any]:
     A reachable TTS row also gets a second, equally-fanned-out probe for
     its resolved ``device`` (cuda/cpu/mps) — see ``_probe_device`` below.
     """
-    active = resolve_host()
-    all_enabled = list(enabled_models())
-    # Split by *effective* owner (#342): a multi-host-chain model counts as
-    # local while this host currently serves it (failover), and as remote
-    # while another candidate does — so the tiles always describe the host
-    # actually running the process. Single-host rows resolve statically to
-    # their ``host:`` exactly as before.
-    owner_by_id = {m.id: effective_owner(m) for m in all_enabled}
-    local_models = [m for m in all_enabled if owner_by_id[m.id] in (None, active.id)]
-    remote_owned = [m for m in all_enabled if owner_by_id[m.id] not in (None, active.id)]
+    local_models = list(enabled_models())
 
     # psutil gives us every listening port in ~2 ms — use it both for
     # ownership *and* as a cheap reachability gate so we never fire an
@@ -246,7 +125,6 @@ async def list_models_for_admin(local_only: bool = False) -> Dict[str, Any]:
     )
 
     rows: List[Dict[str, Any]] = []
-    cpu_map = cpu_resident_map()  # effective per-(model, host) device (#434)
     for m, reachable, device in zip(local_models, reach_results, device_results):
         # Virtual aliases share an existing backend's port and own no process,
         # so they're reachable but never independently start/stop-able.
@@ -268,112 +146,18 @@ async def list_models_for_admin(local_only: bool = False) -> Dict[str, Any]:
             "pid": pid,
             "reachable": bool(reachable),
             "model_path": m.model_path,
-            "host": active.id,
         }
-        _add_failover_fields(row, m, active.id)
-        _add_placement_fields(row, m, cpu_map)
+        _add_startup_fields(row, m)
         if device:
             row["device"] = device
         rows.append(row)
 
-    if local_only:
-        return {"models": rows, "config": _config_block()}
-
-    # Remote-owned rows: one fetch per distinct owning host, merged in.
-    # Trust the owner's own reachable/ownership/pid values — this hub has
-    # no local visibility into another machine's ports.
-    owners: Dict[str, List[Model]] = {}
-    for m in remote_owned:
-        owners.setdefault(owner_by_id[m.id], []).append(m)
-
-    for host_id, models_for_host in owners.items():
-        owner_profile = get_host(host_id)
-        fetched = await svc.remote_models(owner_profile) if owner_profile else None
-        by_id = {r.get("id"): r for r in fetched if isinstance(r, dict)} if fetched is not None else None
-        for m in models_for_host:
-            remote_row = by_id.get(m.id) if by_id is not None else None
-            if remote_row is not None:
-                row = dict(remote_row)
-                row.setdefault("host", host_id)
-            else:
-                row = _offline_remote_row(m, host_id)
-            _add_failover_fields(row, m, host_id)
-            _add_placement_fields(row, m, cpu_map)
-            rows.append(row)
-
-    return {"models": rows, "config": _config_block()}
-
-
-# --------------------------------------------------------------------- #
-# Editable placement (#424) — the write-through-to-git path. Tower-only;
-# validation + the git transaction live in src.config_write.
-# --------------------------------------------------------------------- #
-
-# Strong references to in-flight peer-sync tasks — a bare create_task result
-# is GC-eligible and the sync would silently die mid-flight.
-_PEER_SYNC_TASKS: set = set()
-
-
-def _schedule_peer_sync() -> None:
-    """Fire the #181 sync (git pull + hub restart) at every hub peer after a
-    successful config push — the immediate leg of propagation; the periodic
-    drift loop (``config_drift_sync_loop``) is the catch-up net."""
-    from src import remote_bootstrap
-    from src.model_registry import hub_peer_ids
-
-    async def _sync(peer: str) -> None:
-        try:
-            result = await remote_bootstrap.sync_host(peer)
-            logger.info("🔃 post-write sync of %s: %s", peer, result)
-        except Exception as exc:  # noqa: BLE001 — drift loop retries later
-            logger.warning("post-write sync of %s raised: %s", peer, exc)
-
-    for peer in hub_peer_ids():
-        task = asyncio.create_task(_sync(peer))
-        _PEER_SYNC_TASKS.add(task)
-        task.add_done_callback(_PEER_SYNC_TASKS.discard)
-
-
-@router.put("/api/models/{model_id}/placement")
-async def model_placement_update(model_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Update a model's placement in config/models.yaml via the git-backed
-    write path (#424): validate (schema + #375 VRAM budget, hard-reject) →
-    comment-preserving YAML edit → config-bot commit → push to origin main
-    → background peer sync. 403 on every host but the declared writer.
-    """
-    if not config_write.is_write_host():
-        writer = config_write.write_host_id() or "(none configured)"
-        raise HTTPException(
-            status_code=403,
-            detail=f"config writes are only allowed on host {writer!r} — "
-                   f"this hub is {resolve_host().id!r}",
-        )
-    if not isinstance(payload, dict):
-        raise HTTPException(status_code=400, detail="body must be a JSON object")
-    chain, shape_errors = config_write.normalize_chain(payload.get("hosts"))
-    if shape_errors:
-        raise HTTPException(status_code=400, detail="; ".join(shape_errors))
-    startup = str(payload.get("startup") or "").strip().lower()
-    raw_idle = payload.get("idle_unload_minutes")
-    idle: Any = raw_idle
-    if isinstance(raw_idle, float) and raw_idle.is_integer():
-        idle = int(raw_idle)
-    try:
-        result = await asyncio.to_thread(
-            config_write.apply_placement, model_id, chain, startup, idle
-        )
-    except config_write.ConfigWriteError as exc:
-        raise HTTPException(status_code=exc.status, detail=str(exc))
-    if result.get("changed"):
-        _schedule_peer_sync()
-    return result
+    return {"models": rows}
 
 
 @router.post("/api/models/{model_id}/start")
 async def model_start(model_id: str) -> Dict[str, Any]:
     target = _require_model(model_id)
-    if remote_base_url(target):
-        return await _forward_admin_call(target, "POST", "/start")
     if target.virtual:
         raise HTTPException(
             status_code=400,
@@ -394,8 +178,6 @@ async def model_start(model_id: str) -> Dict[str, Any]:
 @router.post("/api/models/{model_id}/stop")
 async def model_stop(model_id: str) -> Dict[str, Any]:
     target = _require_model(model_id)
-    if remote_base_url(target):
-        return await _forward_admin_call(target, "POST", "/stop")
     ok, msg = bp.stop(model_id)
     if not ok:
         raise HTTPException(status_code=409, detail=msg)
@@ -413,8 +195,6 @@ async def model_force_stop(model_id: str) -> Dict[str, Any]:
     is implicitly saying "I take responsibility for this PID".
     """
     target = _require_model(model_id)
-    if remote_base_url(target):
-        return await _forward_admin_call(target, "POST", "/force-stop")
     ok, msg = bp.force_stop_external(model_id)
     if not ok:
         raise HTTPException(status_code=409, detail=msg)
@@ -431,8 +211,6 @@ async def model_log(model_id: str, limit: int = 400) -> Dict[str, Any]:
     model that has no managed process.
     """
     target = _require_model(model_id)
-    if remote_base_url(target):
-        return await _forward_admin_call(target, "GET", "/log", params={"limit": limit})
     if not (target.backend in ("openai", "whisper", "tts")):
         raise HTTPException(
             status_code=400,

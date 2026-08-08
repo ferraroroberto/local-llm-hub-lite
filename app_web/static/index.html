@@ -18,11 +18,6 @@
   <link rel="stylesheet" href="/admin/static/_vendored/switch/switch.css">
   <link rel="stylesheet" href="/admin/static/_vendored/empty-state/empty-state.css">
   <link rel="stylesheet" href="/admin/static/_vendored/nav/nav-tabs.css">
-  <link rel="stylesheet" href="/admin/static/telemetry.css">
-  <link rel="stylesheet" href="/admin/static/code_usage.css">
-  <link rel="stylesheet" href="/admin/static/_vendored/modal/modal.css">
-  <link rel="stylesheet" href="/admin/static/_vendored/xterm/xterm.css">
-  <link rel="stylesheet" href="/admin/static/machines.css">
   <title>Local LLM Hub</title>
   <script>
     (function(){
@@ -49,18 +44,6 @@
       <svg class="icon tab-icon" aria-hidden="true"><use href="#i-flask-conical"></use></svg>
       <span class="tab-label">Play</span>
     </button>
-    <button id="tabTelemetry" type="button" class="tab" data-tab="telemetry" role="tab" aria-selected="false" aria-controls="paneTelemetry" tabindex="-1">
-      <svg class="icon tab-icon" aria-hidden="true"><use href="#i-activity"></use></svg>
-      <span class="tab-label">OTel</span>
-    </button>
-    <button id="tabCodeUsage" type="button" class="tab" data-tab="code-usage" role="tab" aria-selected="false" aria-controls="paneCodeUsage" tabindex="-1">
-      <svg class="icon tab-icon" aria-hidden="true"><use href="#i-code"></use></svg>
-      <span class="tab-label">Code</span>
-    </button>
-    <button id="tabMachines" type="button" class="tab" data-tab="machines" role="tab" aria-selected="false" aria-controls="paneMachines" tabindex="-1">
-      <svg class="icon tab-icon" aria-hidden="true"><use href="#i-server"></use></svg>
-      <span class="tab-label">Machines</span>
-    </button>
   </nav>
 
   <main class="app">
@@ -86,90 +69,6 @@
         </div>
         <div class="sparklines" id="hubSparklines"></div>
       </section>
-
-      <!-- Services: Docker + Langfuse status with one-click launch (issue #27) -->
-      <section class="card" id="servicesCard">
-        <div class="card-header">
-          <div class="hub-title-block">
-            <h2><svg class="icon" aria-hidden="true"><use href="#i-layers"></use></svg>Services</h2>
-            <span id="servicesOverall" class="hub-live-status" aria-live="polite">
-              <span class="dot"></span>
-              <span id="servicesOverallText">checking…</span>
-            </span>
-          </div>
-        </div>
-        <div class="services-rows">
-          <div class="services-row">
-            <span class="services-label"><svg class="icon" aria-hidden="true"><use href="#i-container"></use></svg>Docker</span>
-            <span id="dockerStatus" class="hub-live-status">
-              <span class="dot"></span><span id="dockerStatusText">—</span>
-            </span>
-            <span id="dockerDetail" class="muted small services-detail"></span>
-            <span class="services-actions">
-              <button id="dockerStartBtn" type="button" class="icon-btn" hidden title="Start" aria-label="Start Docker Desktop"><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg></button>
-              <button id="dockerStopBtn" type="button" class="icon-btn danger" hidden title="Stop" aria-label="Stop Docker Desktop"><svg class="icon" aria-hidden="true"><use href="#i-square"></use></svg></button>
-            </span>
-          </div>
-          <div class="services-row">
-            <span class="services-label"><svg class="icon" aria-hidden="true"><use href="#i-radio"></use></svg>Langfuse</span>
-            <span id="langfuseStatus" class="hub-live-status">
-              <span class="dot"></span><span id="langfuseStatusText">—</span>
-            </span>
-            <span id="langfuseDetail" class="muted small services-detail"></span>
-            <span class="services-actions">
-              <button id="langfuseStartBtn" type="button" class="icon-btn" hidden title="Start" aria-label="Start Langfuse"><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg></button>
-              <button id="langfuseStopBtn" type="button" class="icon-btn danger" hidden title="Stop" aria-label="Stop Langfuse"><svg class="icon" aria-hidden="true"><use href="#i-square"></use></svg></button>
-            </span>
-          </div>
-          <div class="services-row">
-            <span class="services-label"><svg class="icon" aria-hidden="true"><use href="#i-code"></use></svg>AgentsView</span>
-            <span id="agentsviewStatus" class="hub-live-status">
-              <span class="dot"></span><span id="agentsviewStatusText">—</span>
-            </span>
-            <span id="agentsviewDetail" class="muted small services-detail"></span>
-            <span class="services-actions">
-              <button id="agentsviewStartBtn" type="button" class="icon-btn" hidden title="Start" aria-label="Start AgentsView"><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg></button>
-              <button id="agentsviewStopBtn" type="button" class="icon-btn danger" hidden title="Stop" aria-label="Stop AgentsView"><svg class="icon" aria-hidden="true"><use href="#i-square"></use></svg></button>
-            </span>
-          </div>
-          <!-- Peer rows (#372): one per hub-running peer (mac-mini-m4, gaming,
-               any future satellite), rendered by hub.js's renderPeerRows()
-               from /admin/api/services/status's `peers` list — generalized
-               from the old hardcoded single Mac Mini row. -->
-          <div id="peerRows"></div>
-        </div>
-        <div class="card-actions" id="servicesActions" hidden>
-          <button id="servicesLaunchBtn" type="button" class="button-primary launch-btn"><svg class="icon" aria-hidden="true"><use href="#i-rocket"></use></svg>Launch Docker + Langfuse</button>
-        </div>
-        <p id="servicesHint" class="muted small" style="margin: 6px 0 0;" hidden></p>
-      </section>
-
-      <!-- Model decisions (#373): role -> model assignments + a per-host
-           placement summary. Folded by default and fetched only when
-           expanded — mirrors app-launcher's System Map lazy-load discipline
-           (a folded, homepage-visible, low-noise card), adapted for small
-           live JSON instead of a static image. Links to the Models tab's
-           Fleet summary card rather than duplicating it. -->
-      <details class="card card--collapsible" id="rolesCard">
-        <summary class="collapse-summary">
-          <span class="collapse-main">
-            <svg class="icon" aria-hidden="true"><use href="#i-boxes"></use></svg>
-            <h3 class="collapse-title">Model decisions</h3>
-            <span class="collapse-count">roles &amp; placement</span>
-          </span>
-          <span class="collapse-chevron" aria-hidden="true">›</span>
-        </summary>
-        <div class="collapse-body">
-          <p id="rolesStatus" class="muted small" hidden></p>
-          <h4 class="opt-group-title">Roles</h4>
-          <ul id="rolesList" class="startup-list" aria-label="Role to model assignments"></ul>
-          <h4 class="opt-group-title">Placement</h4>
-          <ul id="rolesPlacementList" class="startup-list" aria-label="Per-host placement summary"></ul>
-          <div class="card-actions">
-            <button id="rolesViewPlacementBtn" type="button" class="ghost-btn"><svg class="icon" aria-hidden="true"><use href="#i-external-link"></use></svg>View fleet summary</button>
-          </div>
-        </div>
-      </details>
 
       <!-- Health & install — vendored disclosure card (_vendored/disclosure) -->
       <details class="card card--collapsible" id="installCard">
@@ -262,27 +161,6 @@
     </section>
 
     <section id="paneModels" class="pane" hidden role="tabpanel">
-      <!-- Service startup (#265; services-only since #430, renamed #431).
-           Folded by default — a one-time setup surface, not something you
-           check every visit (#266). First in the tab: boot-time switches
-           above the live inventory. -->
-      <details class="card card--collapsible" id="startupCard">
-        <summary class="collapse-summary">
-          <span class="collapse-main">
-            <svg class="icon" aria-hidden="true"><use href="#i-rocket"></use></svg>
-            <h3 class="collapse-title">Service startup</h3>
-          </span>
-          <span class="collapse-chevron" aria-hidden="true">›</span>
-        </summary>
-        <div class="collapse-body">
-          <p class="muted small">Services that come up automatically every time the hub launches — toggle
-            any item on or off; the setting persists to <code>config/startup_profile.json</code>.
-            Model autostart is governed per model (<code>startup: eager|on_demand</code>) in the
-            placement cards below.</p>
-          <ul id="startupList" class="startup-list"></ul>
-        </div>
-      </details>
-
       <!-- Vendored disclosure card (_vendored/disclosure), open by default —
            the inventory is what you came to this tab to see (#266). -->
       <details class="card card--collapsible" id="modelsCard" open>
@@ -292,9 +170,6 @@
             <h3 class="collapse-title">Models</h3>
           </span>
           <span class="collapse-actions">
-            <!-- models.yaml config version (#424) — same sha on every
-                 converged hub; compare across /admin pages to spot drift. -->
-            <span id="modelsConfigSha" class="models-config-sha muted small"></span>
             <button id="modelsActiveToggle" type="button" class="icon-header-btn active" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="#i-activity"></use></svg></button>
             <span class="collapse-chevron" aria-hidden="true">›</span>
           </span>
@@ -308,33 +183,29 @@
         </div>
       </details>
 
-      <!-- Read-only fleet summary (#354, reworked #431): what each machine is
-           running and could load, with honest capacity numbers. Zero controls
-           beyond the collapse — placement is edited in the model cards above
-           or config/models.yaml. Folded by default. -->
-      <details class="card card--collapsible" id="fleetPlacementCard">
+      <!-- Model decisions (#373): role -> model assignments. Folded by
+           default and fetched only when expanded — mirrors app-launcher's
+           System Map lazy-load discipline (a folded, low-noise card),
+           adapted for small live JSON instead of a static image. -->
+      <details class="card card--collapsible" id="rolesCard">
         <summary class="collapse-summary">
           <span class="collapse-main">
-            <svg class="icon" aria-hidden="true"><use href="#i-layers"></use></svg>
-            <h3 class="collapse-title">Fleet summary</h3>
+            <svg class="icon" aria-hidden="true"><use href="#i-boxes"></use></svg>
+            <h3 class="collapse-title">Model decisions</h3>
+            <span class="collapse-count">roles</span>
           </span>
           <span class="collapse-chevron" aria-hidden="true">›</span>
         </summary>
         <div class="collapse-body">
-          <p class="muted small">Per machine: models running now (live state), models placeable but
-            not running (chain members, including on-demand rows), and estimated capacity — a
-            read-only summary derived from <code>config/models.yaml</code> plus live probes. To
-            change placement, edit a model's placement card above or <code>models.yaml</code>.</p>
-          <div id="fleetPlacementBody" class="fleet-placement">
-            <div class="empty-state"><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-server"></use></svg><p class="empty-state-message">Reading fleet summary…</p></div>
-          </div>
-          <p id="fleetPlacementStaleNote" class="muted small" role="status" aria-live="polite" hidden></p>
+          <p id="rolesStatus" class="muted small" hidden></p>
+          <h4 class="opt-group-title">Roles</h4>
+          <ul id="rolesList" class="startup-list" aria-label="Role to model assignments"></ul>
         </div>
       </details>
     </section>
 
     <section id="panePlayground" class="pane" hidden role="tabpanel">
-      <!-- The three testers are vendored disclosure cards, folded by default,
+      <!-- The testers are vendored disclosure cards, folded by default,
            so one opens at a time by choice (#217). -->
       <details class="card card--collapsible">
         <summary class="collapse-summary">
@@ -400,123 +271,33 @@
         </div>
       </details>
 
-      <details class="card card--collapsible" id="imageCard">
+      <details class="card card--collapsible" id="transcribeCard">
         <summary class="collapse-summary">
           <span class="collapse-main">
-            <svg class="icon" aria-hidden="true"><use href="#i-image"></use></svg>
-            <h3 class="collapse-title">Image generation</h3>
+            <svg class="icon" aria-hidden="true"><use href="#i-radio"></use></svg>
+            <h3 class="collapse-title">Transcribe</h3>
           </span>
           <span class="collapse-chevron" aria-hidden="true">›</span>
         </summary>
         <div class="collapse-body">
 
         <div class="opt-stack">
-          <label for="imageModel">Model</label>
-          <select id="imageModel" aria-label="Image model"></select>
-        </div>
-
-        <div class="opt-stack">
-          <label for="imagePrompt">Prompt</label>
-          <textarea id="imagePrompt" rows="4" placeholder="a red apple on a white background"></textarea>
-        </div>
-
-        <div class="opt-stack">
-          <label for="imageAttachment">Reference image <span class="muted small">(optional — edits the upload instead of generating; slow &amp; experimental, can take minutes)</span></label>
+          <label for="transcribeFile">Audio file</label>
           <div class="file-row">
-            <button id="imageAttachmentBtn" type="button" class="ghost-btn"><svg class="icon" aria-hidden="true"><use href="#i-paperclip"></use></svg>Choose file</button>
-            <span id="imageAttachmentName" class="file-name muted small">No file selected</span>
-            <input id="imageAttachment" type="file" accept="image/*" hidden aria-label="Reference image to edit (optional)">
+            <button id="transcribeFileBtn" type="button" class="ghost-btn"><svg class="icon" aria-hidden="true"><use href="#i-paperclip"></use></svg>Choose file</button>
+            <span id="transcribeFileName" class="file-name muted small">No file selected</span>
+            <input id="transcribeFile" type="file" accept="audio/*" hidden aria-label="Audio file to transcribe">
           </div>
-          <p class="muted small" style="margin: 4px 0 0;">Tip: dimensions are model-controlled — ask for an aspect ratio in the prompt (e.g. “16:9”).</p>
         </div>
 
         <div class="playground-send-row">
-          <button id="imageGenBtn" type="button" class="ghost-btn primary"><svg class="icon" aria-hidden="true"><use href="#i-sparkles"></use></svg>Generate</button>
-          <button id="imageClearBtn" type="button" class="ghost-btn">Clear</button>
+          <button id="transcribeBtn" type="button" class="ghost-btn primary" disabled><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg>Transcribe</button>
         </div>
-        <p id="imageLatency" class="muted small" style="margin: 8px 0 0;"></p>
+        <p id="transcribeLatency" class="muted small" style="margin: 8px 0 0;"></p>
 
-        <img id="imagePreview" alt="Generated image" style="max-width: 100%; margin-top: 10px; border-radius: 8px;" hidden>
-        <div class="playground-send-row" id="imageDownloadRow" hidden style="margin-top: 10px;">
-          <a id="imageDownload" class="ghost-btn primary" download="generated.png" role="button"><svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg>Download</a>
-        </div>
-        </div>
-      </details>
-
-      <details class="card card--collapsible" id="ttsCard">
-        <summary class="collapse-summary">
-          <span class="collapse-main">
-            <svg class="icon" aria-hidden="true"><use href="#i-volume-2"></use></svg>
-            <h3 class="collapse-title">Text-to-speech</h3>
-          </span>
-          <span class="collapse-chevron" aria-hidden="true">›</span>
-        </summary>
-        <div class="collapse-body">
-
-        <div class="opt-stack">
-          <label for="ttsModel">Voice model</label>
-          <select id="ttsModel" aria-label="TTS model"></select>
-          <p id="ttsAvailability" class="muted small" role="status" aria-live="polite"></p>
-        </div>
-
-        <div class="opt-stack">
-          <label for="ttsInput">Text</label>
-          <textarea id="ttsInput" rows="4" placeholder="Hey, listen to this."></textarea>
-        </div>
-
-        <div class="opt-stack">
-          <label for="ttsLanguage">Language</label>
-          <select id="ttsLanguage" aria-label="Language"></select>
-        </div>
-
-        <div class="opt-stack">
-          <label for="ttsVoice">Voice</label>
-          <select id="ttsVoice" aria-label="Voice"></select>
-        </div>
-
-        <div class="opt-stack" id="ttsStreamGroup">
-          <div class="opt-switch-row">
-            <span>Stream <span class="muted small">(play as it synthesizes when supported; off = buffered clip with a player)</span></span>
-            <button type="button" id="ttsStream" class="toggle on" role="switch" aria-checked="true" aria-label="Stream audio"><span class="knob"></span><span class="toggle-label">ON</span></button>
-          </div>
-        </div>
-
-        <details class="opt-stack" id="ttsMore">
-          <summary class="opt-group-title" style="cursor: pointer; list-style: revert;">More options</summary>
-
-          <div class="opt-stack">
-            <label for="ttsFormat">Format <span class="muted small">(buffered only — streaming uses PCM)</span></label>
-            <select id="ttsFormat" aria-label="Response format">
-              <option value="wav" selected>wav</option>
-              <option value="mp3">mp3</option>
-              <option value="flac">flac</option>
-              <option value="opus">opus</option>
-              <option value="pcm">pcm</option>
-            </select>
-          </div>
-
-          <div class="opt-stack" id="ttsSpeedGroup" hidden>
-            <label for="ttsSpeed">Speed · <span id="ttsSpeedVal">1.0</span>×</label>
-            <input id="ttsSpeed" type="range" min="0.5" max="2" step="0.05" value="1" aria-label="Speed">
-          </div>
-
-          <div class="opt-stack" id="ttsExaggerationGroup" hidden>
-            <label for="ttsExaggeration">Exaggeration <span class="muted small">(Chatterbox tone dial)</span> · <span id="ttsExaggerationVal">0.5</span></label>
-            <input id="ttsExaggeration" type="range" min="0" max="1" step="0.05" value="0.5" aria-label="Exaggeration">
-          </div>
-
-          <div class="opt-stack" id="ttsCfgWeightGroup" hidden>
-            <label for="ttsCfgWeight">CFG weight <span class="muted small">(pacing)</span> · <span id="ttsCfgWeightVal">0.5</span></label>
-            <input id="ttsCfgWeight" type="range" min="0" max="1" step="0.05" value="0.5" aria-label="CFG weight">
-          </div>
-        </details>
-
-        <div class="playground-send-row">
-          <button id="ttsSpeakBtn" type="button" class="ghost-btn primary"><svg class="icon" aria-hidden="true"><use href="#i-volume-2"></use></svg>Speak</button>
-        </div>
-        <p id="ttsLatency" class="muted small" style="margin: 8px 0 0;"></p>
-
-        <audio id="ttsAudio" controls style="width: 100%; margin-top: 10px;" hidden></audio>
+        <h3 class="opt-group-title">Transcript</h3>
+        <pre id="transcribeResult" class="logpane" aria-label="Transcript"></pre>
+        <p id="transcribeServedModel" class="muted small"></p>
         </div>
       </details>
     </section>

@@ -1,13 +1,15 @@
 """Resolve which host profile from config/models.yaml applies to this machine.
 
 The registry keeps per-host settings (which models are enabled, etc.)
-keyed by a short id. At runtime we pick the matching row based on
-`sys.platform` and hostname, with `default: true` as a tiebreaker and
-the `LOCAL_LLM_HUB_HOST` env var as an explicit override.
+keyed by a short id. Lite fork: the ``hosts:`` block holds exactly one
+row (with ``default: true``); at runtime we pick it by hostname /
+platform / default, with the `LOCAL_LLM_HUB_HOST` env var as an explicit
+override.
 
 ``_load_config()`` below is also the single cached YAML loader for
 ``config/models.yaml`` — ``src/model_registry.py`` imports it directly
-rather than keeping its own parallel cache of the same file.
+rather than keeping its own parallel cache of the same file, and the
+admin roles router reads the raw ``roles:`` block through it.
 """
 
 from __future__ import annotations
@@ -34,51 +36,15 @@ class HostProfile:
     hostname: Optional[str] = None
     default: bool = False
     source: str = ""  # human-readable description of how we picked it
-    # LAN address (IP or resolvable hostname) other hosts dial to reach this
-    # machine's own hub — e.g. "192.168.0.14". Unset on hosts nothing ever
-    # proxies to (today, that's fine; only a host that owns a remote-tagged
-    # model row needs one). See src/remote_proxy.py.
-    address: Optional[str] = None
-    # SSH login for the remote-bootstrap/sync endpoints (#181) — not a
-    # secret, just which account to log in as; the private key path lives
-    # in .env (LOCAL_LLM_HUB_SSH_KEY), never in this committed file. Unset
-    # on hosts nothing ever SSHes into. See src/remote_bootstrap.py.
-    ssh_user: Optional[str] = None
-    # --- Machines-tab console metadata (#309) — never touches model routing.
-    # A human label + one-line role + Lucide glyph id for the machine card.
+    # A human label + one-line role for display surfaces. Optional.
     display_name: Optional[str] = None
     role: Optional[str] = None
-    icon: Optional[str] = None
-    # A powered-down node: shown as a card but not live-probed on the LAN.
-    dormant: bool = False
-    # Tailscale magic-DNS hostname — peer reachability + off-LAN RDP target.
-    tailscale: Optional[str] = None
-    # Remote-Desktop launch target: {"address": ..., "user": ...}. Unset on
-    # hosts with no RDP path (e.g. the local host, or SSH/VNC-only peers).
-    rdp: Optional[Dict[str, str]] = None
-    # Wired-NIC MAC address for Wake-on-LAN (#356), e.g. "aa:bb:cc:dd:ee:ff".
-    # WiFi WOL is unsupported — unset on hosts with no wired NIC (e.g. a
-    # laptop) or that nothing ever wakes remotely.
-    mac: Optional[str] = None
-    # Discrete-GPU VRAM ceiling in MB (#375), promoted from docs/machines.md's
-    # prose hardware facts. The fleet placement grid sums a host's placed
-    # models' ``est_vram_mb`` and warns (advisory only, never blocks) when the
-    # total exceeds this. Unset on hosts with no discrete-VRAM notion to check
-    # against — the Apple-silicon Mac Mini (unified memory) and managed-only
-    # boxes that serve no models; a host with no ceiling never warns.
+    # Discrete-GPU VRAM ceiling in MB (#375). The on-demand lifecycle sums
+    # the running models' ``est_vram_mb`` and warns (advisory only, never
+    # blocks) when a load would exceed this. Unset disables the warning.
     vram_mb: Optional[int] = None
-    # Total system RAM in MB (#431), promoted from docs/machines.md's prose
-    # hardware facts like ``vram_mb`` above. Display-only context on the
-    # Models tab's fleet summary — never feeds a warning or a routing
-    # decision. Unset where the fact isn't documented.
+    # Total system RAM in MB (#431) — display-only context. Optional.
     ram_mb: Optional[int] = None
-
-    @property
-    def can_ssh(self) -> bool:
-        """True when this host has both an address and an ssh_user — the
-        prerequisite for the SSH-driven actions (remote uptime, reboot,
-        shutdown). The active host and any SSH-less peer return False."""
-        return bool(self.address and self.ssh_user)
 
 
 # Parsed-YAML cache, keyed by the resolved config path. The README's
@@ -110,15 +76,8 @@ def _row_to_profile(host_id: str, row: Dict[str, Any], *, source: str) -> HostPr
         hostname=row.get("hostname"),
         default=bool(row.get("default", False)),
         source=source,
-        address=row.get("address"),
-        ssh_user=row.get("ssh_user"),
         display_name=row.get("display_name"),
         role=row.get("role"),
-        icon=row.get("icon"),
-        dormant=bool(row.get("dormant", False)),
-        tailscale=row.get("tailscale"),
-        rdp=row.get("rdp"),
-        mac=row.get("mac"),
         vram_mb=int(row["vram_mb"]) if row.get("vram_mb") is not None else None,
         ram_mb=int(row["ram_mb"]) if row.get("ram_mb") is not None else None,
     )
@@ -167,34 +126,6 @@ def resolve() -> HostProfile:
         f"no host row matched platform={this_platform} "
         f"hostname={this_host} (available: {sorted(hosts.keys())})"
     )
-
-
-def get_host(host_id: str) -> Optional[HostProfile]:
-    """Look up any declared host row by id — including hosts other than the
-    one this process is running on. Used to resolve a remote model's owning
-    host's ``address`` (see src/remote_proxy.py); ``resolve()`` above only
-    ever returns the *active* host's profile, not an arbitrary one.
-    """
-    cfg = _load_config()
-    hosts: Dict[str, Any] = cfg.get("hosts") or {}
-    row = hosts.get(host_id)
-    if row is None:
-        return None
-    return _row_to_profile(host_id, row, source=f"lookup {host_id!r}")
-
-
-def all_hosts() -> List[HostProfile]:
-    """Every declared host row as a profile, in config order — the machine
-    console's inventory (#309). Unlike ``resolve()`` (the active host) or
-    ``get_host()`` (one by id), this returns the whole fleet, including
-    managed-only machines that serve no models (OpenClaw, gaming).
-    """
-    cfg = _load_config()
-    hosts: Dict[str, Any] = cfg.get("hosts") or {}
-    return [
-        _row_to_profile(host_id, row, source="all_hosts")
-        for host_id, row in hosts.items()
-    ]
 
 
 def hub_port() -> int:
