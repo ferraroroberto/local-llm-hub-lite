@@ -162,8 +162,8 @@ export function toast(msg, kind) {
 }
 
 // --------------------------------------------------------------- fmt
-/* Shared across hub.js / models.js / telemetry.js — one definition (the
- * sibling-dedup pass of local-llm-hub#211; the copies had drifted). */
+/* Shared across hub.js / models.js — one definition (the sibling-dedup
+ * pass of local-llm-hub#211; the copies had drifted). */
 export function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
     return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]);
@@ -187,10 +187,9 @@ export function modelLabelText(rec, fallback) {
   return out;
 }
 
-/* Escaped-HTML twin of modelLabelText, with the resolved parts muted. Shared
- * by the Hub tab's live-request / error lists and the Telemetry tab's trace
- * feed so a substitution can never be visible in one pane and invisible in
- * the other (#412). */
+/* Escaped-HTML twin of modelLabelText, with the resolved parts muted. Used
+ * by the Hub tab's live-request / error lists so a substitution renders
+ * consistently across both (#412). */
 export function modelLabel(rec, fallback) {
   const requested = (rec && rec.model) || '';
   const served = (rec && rec.served_model) || '';
@@ -204,8 +203,8 @@ export function modelLabel(rec, fallback) {
 }
 
 /* Trim the vendor prefix off an nvidia-smi GPU name ("NVIDIA GeForce RTX
- * 4080" -> "RTX 4080") — shared by the Hub sparkline labels and the
- * Machines-tab stats card (#309 sibling-dedup, same pattern as escapeHtml). */
+ * 4080" -> "RTX 4080") — used by the Hub sparkline labels (#309
+ * sibling-dedup, same pattern as escapeHtml). */
 export function shortGpu(name) {
   if (!name) return '';
   return name.replace('NVIDIA ', '').replace('GeForce ', '').trim();
@@ -219,8 +218,7 @@ export function fmtClock(ts) {
   return d.toTimeString().slice(0, 8);
 }
 
-/* Compact token count — 1.2k / 3.4M (shared by the Hub counters, OTel
- * leaderboard, and Code-usage tables; #215 dedup). */
+/* Compact token count — 1.2k / 3.4M (used by the Hub counters; #215 dedup). */
 export function fmtTok(n) {
   if (!n) return '—';
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
@@ -244,10 +242,8 @@ export function tokPair(inTok, outTok) {
 
 /* Fill a per-backend counter table's <tbody>: one empty-state row, else one
  * row per record with the same Backend/Model · Req · Err · p50 · p95 ·
- * I/O-tok cells. Shared by the Hub tab's /hub/counters table and the
- * Telemetry tab's per-model leaderboard, which had the whole scaffold
- * copy-pasted even though their cell formatters were already deduped here
- * (#470). No-op when the table (or its tbody) isn't in the DOM. */
+ * I/O-tok cells (#470). No-op when the table (or its tbody) isn't in the
+ * DOM. */
 export function renderCounterTable(table, rows) {
   if (!table) return;
   const tbody = table.querySelector('tbody');
@@ -274,8 +270,7 @@ export function renderCounterTable(table, rows) {
 }
 
 /* Equivalent metered-API dollar cost — "≈ $1.23" / "≈ <$0.01" / "" when
- * zero/absent (shared by Code-usage tables and the OTel tab's Claude Code
- * panel, #215-style dedup). */
+ * zero/absent (#215-style dedup). */
 export function fmtCost(n) {
   if (!n) return '';
   if (n < 0.01) return '≈ <$0.01';
@@ -291,16 +286,15 @@ export function fmtBytes(n) {
   return (n / 1024 / 1024 / 1024).toFixed(2) + ' GB';
 }
 
-/* MB (VRAM/RAM figure) -> compact "X.X GB" label, unit baked in. Shared by
- * the Models fleet-editor and Machines/Placement tabs (#448 dedup — was
- * defined verbatim in both). */
+/* MB (VRAM/RAM figure) -> compact "X.X GB" label, unit baked in (#448
+ * dedup — was defined verbatim in multiple tabs). */
 export function fmtGb(mb) {
   return (Number(mb || 0) / 1024).toFixed(1) + ' GB';
 }
 
 /* Bare "X.X" (no unit suffix) for a value already in GB — distinct contract
  * from fmtGb, which takes raw MB and bakes the unit in (design-drift audit
- * #384; #448 dedup — was defined verbatim in both Machines and Placement). */
+ * #384; #448 dedup). */
 export function fmtGbValue(n) {
   return Number.isFinite(n) ? n.toFixed(1) : '—';
 }

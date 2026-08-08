@@ -1,9 +1,8 @@
 @echo off
 REM ==========================================================
-REM  local-llm-hub - models hub (FastAPI)
+REM  local-llm-hub-lite - models hub (FastAPI)
 REM  Exposes /v1/messages + /v1/chat/completions on :8000
-REM  Routes by model name: claude -> `claude -p`;
-REM                        qwen*/glm* -> local llama-server
+REM  Routes by model name to local llama-server / whisper-server
 REM ==========================================================
 title Local LLM Hub - hub
 cd /d "%~dp0"

@@ -1,25 +1,18 @@
 """On-demand model lifecycle — spawn on first request, unload when idle (#422).
 
 A ``models.yaml`` row may declare ``startup: on_demand`` (default ``eager``,
-today's always-on behavior). Such a row is never started eagerly — not by
-hub autostart (``model_registry.desired_model_ids`` excludes it), not by
-the fleet reconcile loop (same derived set, #430), not by the failover
-engine (guards on ``Model.startup``). Instead:
+the always-on behavior). Such a row is never started eagerly — hub
+autostart (``model_registry.desired_model_ids``) excludes it. Instead:
 
 * **Load on first request** — the dispatch paths that reach a local backend
   (chat completions, the Anthropic-shape ``/v1/messages`` translation, and
-  the ``/v1/audio/speech`` proxy) call :func:`ensure_ready` before
-  forwarding. When the backend isn't up, the request spawns it via
-  ``backend_process.start`` and blocks polling ``is_reachable`` until the
-  process answers — the same request-waits-for-readiness pattern as the
-  lazy whisper proxy (``src/whisper_translate_proxy._ChildSupervisor``),
-  lifted from a per-process shim into the hub itself.
+  the audio proxy) call :func:`ensure_ready` before forwarding. When the
+  backend isn't up, the request spawns it via ``backend_process.start`` and
+  blocks polling ``is_reachable`` until the process answers.
 * **Idle unload** — ``idle_unload_minutes: <int>`` arms the watchdog loop
   (``server_lifecycle`` wires :func:`idle_unload_loop`): after that many
   minutes without a request the hub stops the backend. A model stopped this
-  way (or by hand via the admin API) stays down — the reconcile/failover
-  guards above are what keep the supervisor from resurrecting it, the
-  regression observed live in #422.
+  way (or by hand via the admin API) stays down.
 * **VRAM budget warning, not arbitration** — before an on-demand spawn, the
   sum of the running local models' ``est_vram_mb`` plus the candidate's is
   checked against the host's ``vram_mb`` ceiling (#375 grid math). Overcommit
@@ -178,7 +171,6 @@ def _warn_on_vram_overcommit(model: Model) -> Optional[int]:
     """
     from . import backend_process as bp
     from .host_profile import resolve as resolve_host
-    from .model_registry import cpu_resident_map
 
     try:
         host = resolve_host()
@@ -187,16 +179,12 @@ def _warn_on_vram_overcommit(model: Model) -> Optional[int]:
         ceiling = None
     if not ceiling:
         return None
-    # CPU-resident rows on this host (piper, -ng whisper rows, a chain's
-    # degraded cpu tier) hold no GPU VRAM — excluding them keeps the headroom
-    # math honest (#431), same exclusion as the fleet summary's capacity sum.
-    cpu = cpu_resident_map().get(host.id, set())
     running = bp.running_backends()
     projected = sum(
         m.est_vram_mb or 0
         for mid, m in running.items()
-        if mid != model.id and mid not in cpu
-    ) + (0 if model.id in cpu else model.est_vram_mb or 0)
+        if mid != model.id
+    ) + (model.est_vram_mb or 0)
     if projected <= ceiling:
         return None
     logger.warning(
@@ -211,19 +199,15 @@ def _warn_on_vram_overcommit(model: Model) -> Optional[int]:
 def ensure_ready(model: Model, deadline_s: float = READY_DEADLINE_S) -> None:
     """Make sure an on-demand local backend is up before a request hits it.
 
-    No-op for eager rows, virtual aliases, and models currently served by a
-    *remote* host (the owning hub runs its own on-demand lifecycle). For a
-    cold local on-demand backend this spawns it and blocks (the caller runs
-    in a worker thread / ``to_thread``) polling ``is_reachable`` until it
-    answers or ``deadline_s`` expires — raising :class:`OnDemandNotReady`
-    so the route can surface a distinct 503.
+    No-op for eager rows and virtual aliases. For a cold local on-demand
+    backend this spawns it and blocks (the caller runs in a worker thread /
+    ``to_thread``) polling ``is_reachable`` until it answers or
+    ``deadline_s`` expires — raising :class:`OnDemandNotReady` so the route
+    can surface a distinct 503.
     """
     from . import backend_process as bp
-    from .remote_proxy import remote_base_url
 
     if not is_on_demand(model) or model.virtual or not model.port:
-        return
-    if remote_base_url(model) is not None:
         return
     if bp.is_reachable(model, timeout=0.4):
         return

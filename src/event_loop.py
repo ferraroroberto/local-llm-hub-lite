@@ -9,12 +9,10 @@ a network hiccup) surfaces as exactly such an ``OSError`` (WinError 64,
 and the listener is gone; the process stays alive but every subsequent
 connection fails until a manual restart.
 
-This hub binds ``0.0.0.0`` (LAN-wide -- ``tower`` and a Mac Mini dial
-each other's hub over the LAN) and proxies long-running audio/LLM
+This hub binds ``0.0.0.0`` and proxies long-running audio/LLM
 streaming traffic, so the exposure here is broader than a single-host,
-phone-facing webapp: any LAN client dropping a connection mid-request can
-trigger the wedge on any of this repo's four uvicorn-served processes
-(the main hub plus the whisper/tts/parakeet proxy servers).
+phone-facing webapp: any LAN client dropping a connection mid-request
+can trigger the wedge.
 
 The selector event loop's accept path has no such failure mode -- verified
 empirically (in the sister app-launcher repo, issue #388): 800 concurrent
@@ -25,14 +23,10 @@ in-process (backends are launched via plain ``subprocess.Popen`` in
 ``src/backend_process.py``, never ``asyncio.create_subprocess_*``), so the
 selector loop's lack of subprocess support is a non-issue here.
 
-Wired into every ``uvicorn.run(...)`` call in this repo -- ``src/server.py``
-(the main hub), ``src/whisper_translate_proxy.py``,
-``src/tts_server.py``, and ``src/parakeet_server.py`` -- via
-``loop=LOOP_FACTORY``. Each of those is a programmatic ``uvicorn.run()``
+Wired into the ``uvicorn.run(...)`` call in ``src/server.py`` (the main
+hub) via ``loop=LOOP_FACTORY``. It is a programmatic ``uvicorn.run()``
 call (not a CLI ``-m uvicorn`` invocation), so this is the only wiring
-point needed; ``src/backend_process.py::build_command()`` just launches
-``python -m src.<module>``, and each module's own ``main()`` already sets
-the loop.
+point needed.
 
 For a *custom* ``loop=`` value (anything outside uvicorn's built-in
 ``none``/``auto``/``asyncio``/``uvloop`` names), uvicorn imports the

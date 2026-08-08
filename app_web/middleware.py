@@ -8,11 +8,10 @@ URLs use; the SPA strips it from ``window.location`` on first load).
 
 WebSocket handshakes are not seen by this middleware:
 ``BaseHTTPMiddleware`` only ever runs for ``http``-scope connections, so
-a ``@router.websocket(...)`` route gets no coverage from it at all. Any
-websocket route must therefore call :func:`authorize_websocket`
-explicitly before ``accept()`` — the middleware cannot do it for you.
-Most live-ops streams use SSE (plain HTTP, covered here); the Machines
-tab's terminal proxy is the one websocket route, and it calls the guard.
+a ``@router.websocket(...)`` route would get no coverage from it at all.
+This app has no websocket routes — every live-ops stream uses SSE
+(plain HTTP, covered here); any future websocket route must implement
+its own guard before ``accept()``.
 """
 
 from __future__ import annotations
@@ -101,18 +100,15 @@ def _caller_is_trusted(
 ) -> bool:
     """Core caller-identity decision, independent of ASGI scope type.
 
-    Shared by :func:`_authenticate` (``http`` scope, via the two
-    ``BaseHTTPMiddleware`` subclasses) and :func:`authorize_websocket`
-    (``websocket`` scope, which no middleware ever sees) so both scopes
-    resolve caller trust from exactly one implementation — a route reached
-    over a websocket must not be easier to reach than the same route over
-    HTTP. Returns ``True`` when the caller may proceed.
+    Used by :func:`_authenticate` (``http`` scope, via the two
+    ``BaseHTTPMiddleware`` subclasses); kept scope-agnostic so a future
+    websocket route can resolve caller trust from exactly one
+    implementation. Returns ``True`` when the caller may proceed.
 
     Every ``True`` below is an independent OR — the *order* they're checked
     in doesn't change the outcome, only whether a token check is reached.
     Exempt *paths* are deliberately not part of this: they're an HTTP-only
-    concern (login/static must load before a token exists), and a websocket
-    route is never exempt.
+    concern (login/static must load before a token exists).
     """
     token = (get_token() or "").strip()
     if not token:
@@ -139,35 +135,6 @@ def _caller_is_trusted(
         presented = query_params.get("token", "").strip()
 
     return bool(presented and hmac.compare_digest(presented, token))
-
-
-async def authorize_websocket(websocket, get_token) -> bool:
-    """Bearer gate for a websocket handshake — call before ``accept()``.
-
-    ``BaseHTTPMiddleware`` only runs for ``http``-scope connections, so
-    :class:`BearerTokenMiddleware` never sees a websocket handshake and a
-    ``@router.websocket(...)`` route is responsible for its own check.
-    Applies the same trust rules as the HTTP path via
-    :func:`_caller_is_trusted` (loopback bypass, proxied-loopback
-    detection, ``extra_allowlist``, then ``Authorization: Bearer`` or
-    ``?token=``).
-
-    Returns ``True`` when the caller may proceed. Otherwise closes the
-    socket with 1008 (policy violation) *without* accepting it and returns
-    ``False``, so the caller should simply ``return``.
-    """
-    client_host = websocket.client.host if websocket.client else ""
-    if _caller_is_trusted(
-        client_host=client_host,
-        headers=websocket.headers,
-        query_params=websocket.query_params,
-        app_state=websocket.app.state,
-        get_token=get_token,
-    ):
-        return True
-    logger.warning("⚠️ websocket handshake refused for %s", client_host or "?")
-    await websocket.close(code=1008)
-    return False
 
 
 def _authenticate(

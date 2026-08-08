@@ -13,7 +13,6 @@ from typing import Dict
 from fastapi import APIRouter, Request
 
 from src.build_info import git_sha
-from src.config_write import config_sha
 from src.static_versioning import asset_hash_for
 
 router = APIRouter()
@@ -28,8 +27,4 @@ async def version(request: Request) -> Dict[str, str]:
         "git_sha": git_sha(),
         "built_at": _BUILT_AT,
         "asset_hash": asset_hash_for(asset_hashes, "styles.css") or "",
-        # models.yaml HEAD sha (#424) — read live (unlike git_sha's
-        # process-identity memoization): the config converges by git pull
-        # without a restart, and the drift loop compares this across hubs.
-        "config_sha": config_sha(),
     }

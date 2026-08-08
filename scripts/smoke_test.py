@@ -8,10 +8,8 @@ Usage (in two terminals):
     # Terminal 2
     .venv\\Scripts\\python scripts/smoke_test.py
 
-Loops over every model enabled for this host:
-
-  - claude-* via raw /v1/messages and the anthropic SDK (proves drop-in fidelity).
-  - local openai-backed models via raw /v1/messages (routed through the hub).
+Loops over every chat model enabled for this host via raw /v1/messages
+(Anthropic shape, routed through the hub to the local llama-server backend).
 
 Any model whose backend is not reachable is skipped with a warning rather
 than failed — this is a smoke test, not a coverage gate.
@@ -29,8 +27,6 @@ log = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
-
-from anthropic import Anthropic  # noqa: E402
 
 from src import backend_process as lp  # noqa: E402
 from src.model_registry import enabled_models  # noqa: E402
@@ -57,21 +53,6 @@ def via_raw_http(model_name: str) -> str:
     return text
 
 
-def via_sdk(model_name: str) -> str:
-    log.info("-> anthropic SDK  model=%s", model_name)
-    client = Anthropic(api_key="local-dummy", base_url=BASE_URL)
-    msg = client.messages.create(
-        model=model_name,
-        max_tokens=64,
-        system="Answer in one word.",
-        messages=[{"role": "user", "content": "Capital of France?"}],
-    )
-    text = msg.content[0].text if msg.content else ""
-    log.info("   model=%s  in:%s out:%s", msg.model, msg.usage.input_tokens, msg.usage.output_tokens)
-    log.info("   text=%r", text)
-    return text
-
-
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     try:
@@ -90,28 +71,6 @@ def main() -> int:
             log.info("[skip] %s — audio backend, not a chat model", m.display_name)
             skipped.append(m.display_name)
             continue
-        if m.backend == "tts":
-            if not lp.is_reachable(m):
-                log.info("[skip] %s — TTS backend on :%s not reachable", m.display_name, m.port)
-                skipped.append(m.display_name)
-                continue
-            log.info("\n=== %s (tts) ===", m.display_name)
-            try:
-                r = httpx.post(
-                    f"{BASE_URL}/v1/audio/speech",
-                    json={"model": m.display_name, "input": "pong", "response_format": "wav"},
-                    timeout=300.0,
-                )
-                r.raise_for_status()
-                n = len(r.content)
-                log.info("   synthesized %d audio bytes (%s)", n, r.headers.get("content-type"))
-                if n > 44:  # bigger than a bare WAV header
-                    passed.append(m.display_name)
-                else:
-                    failures.append(f"{m.display_name}: empty audio ({n} bytes)")
-            except Exception as e:
-                failures.append(f"{m.display_name}: {e}")
-            continue
         if m.backend == "openai" and not lp.is_reachable(m):
             log.info("[skip] %s — backend on :%s not reachable", m.display_name, m.port)
             skipped.append(m.display_name)
@@ -122,11 +81,6 @@ def main() -> int:
             if not t:
                 failures.append(f"{m.display_name}: empty response")
                 continue
-            if m.backend == "claude":
-                t2 = via_sdk(m.display_name)
-                if not t2:
-                    failures.append(f"{m.display_name} (sdk): empty response")
-                    continue
             passed.append(m.display_name)
         except Exception as e:
             failures.append(f"{m.display_name}: {e}")

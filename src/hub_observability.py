@@ -1,12 +1,7 @@
 """In-memory live-ops surface for the hub.
 
-This is **not** the durable telemetry stack — that's the OpenTelemetry +
-Langfuse export in :mod:`src.observability`. This module is the
-complementary "is the kitchen on fire" pane that lives in-process,
-in-memory, and answers "what's happening right now?". Each record here
-carries the request's Langfuse ``trace_id`` (stashed by
-``stash_trace_id_on_ctx`` in :mod:`src.server_common`) so the live-ops view
-cross-links to the durable trace.
+The "is the kitchen on fire" pane that lives in-process, in-memory, and
+answers "what's happening right now?".
 
 Holds:
   * a ring buffer of the last ~200 routed requests
@@ -55,7 +50,7 @@ class RequestRecord:
     # hub reports when it answers with its own ``X-Hub-Served-Host``. Empty
     # when nothing resolved it (issue #412).
     served_host: str = ""
-    backend: str = ""         # "claude" | "gemini" | "openai" | "whisper" | ""
+    backend: str = ""         # "openai" | "whisper" | ""
     status: int = 0           # HTTP status of the response
     latency_ms: float = 0.0
     in_tok: int = 0
@@ -65,7 +60,7 @@ class RequestRecord:
     stop_reason: str = ""
     client: str = ""          # client IP (best-effort)
     error_detail: str = ""    # filled when status >= 400
-    trace_id: str = ""        # Langfuse trace id (set per routed request)
+    trace_id: str = ""        # trace id (when a route stamps one)
 
 
 @dataclass
@@ -276,10 +271,7 @@ from starlette.requests import Request  # noqa: E402
 OBSERVABLE_PATHS = (
     "/v1/messages",
     "/v1/chat/completions",
-    "/v1/images/generations",
-    "/v1/images/edits",
     "/v1/audio/transcriptions",
-    "/v1/audio/translations",
 )
 
 

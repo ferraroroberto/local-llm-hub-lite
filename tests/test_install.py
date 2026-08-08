@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import os
-import sys
-import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
-os.environ.setdefault("LOCAL_LLM_HUB_HOST", "tower")
+os.environ.setdefault("LOCAL_LLM_HUB_HOST", "local")
 
 from src import install as install_mod
 
@@ -17,7 +15,7 @@ def test_run_all_checks_returns_nonempty_report():
     report = install_mod.run_all_checks()
     assert len(report.checks) >= 5
     ids = {c.id for c in report.checks}
-    for expected in ("python", "deps", "host", "claude_cli", "gpu", "llama_cpp"):
+    for expected in ("python", "deps", "host", "gpu", "llama_cpp", "whisper_cpp"):
         assert expected in ids, f"missing check {expected!r}"
     # Every check has a known status glyph.
     for c in report.checks:
@@ -43,65 +41,10 @@ def test_fix_fn_for_known_ids():
     from src.install import Check
     assert install_mod.fix_fn_for(Check("x", "x", "missing", fix_id="deps")) is not None
     assert install_mod.fix_fn_for(Check("x", "x", "missing", fix_id="llama_cpp")) is not None
+    assert install_mod.fix_fn_for(Check("x", "x", "missing", fix_id="whisper_cpp")) is not None
     assert install_mod.fix_fn_for(Check("x", "x", "missing", fix_id="download_qwen")) is not None
-    assert install_mod.fix_fn_for(Check("x", "x", "missing", fix_id="systemd_unit")) is not None
     assert install_mod.fix_fn_for(Check("x", "x", "missing", fix_id=None)) is None
     assert install_mod.fix_fn_for(Check("x", "x", "ok")) is None
-
-
-# --------------------------------------------------------------- systemd unit (#368)
-
-
-def test_check_systemd_unit_missing_when_unit_absent(monkeypatch, tmp_path):
-    monkeypatch.setattr(install_mod, "_systemd_unit_path", lambda: tmp_path / "absent.service")
-    c = install_mod._check_systemd_unit()
-    assert c.status == "missing"
-    assert c.fix_id == "systemd_unit"
-
-
-def test_check_systemd_unit_warns_when_present_but_inactive(monkeypatch, tmp_path):
-    unit = tmp_path / "local-llm-hub.service"
-    unit.write_text("unit", encoding="utf-8")
-    monkeypatch.setattr(install_mod, "_systemd_unit_path", lambda: unit)
-
-    class _R:
-        def __init__(self, out):
-            self.stdout = out
-
-    def _fake_run(cmd, **kwargs):
-        # cmd = ["systemctl", "is-active"|"is-enabled", name]
-        return _R("inactive\n" if cmd[1] == "is-active" else "enabled\n")
-
-    monkeypatch.setattr(install_mod.subprocess, "run", _fake_run)
-    c = install_mod._check_systemd_unit()
-    assert c.status == "warn"
-    assert c.fix_id == "systemd_unit"
-    assert "is-active=inactive" in c.detail
-
-
-def test_check_systemd_unit_ok_when_active(monkeypatch, tmp_path):
-    unit = tmp_path / "local-llm-hub.service"
-    unit.write_text("unit", encoding="utf-8")
-    monkeypatch.setattr(install_mod, "_systemd_unit_path", lambda: unit)
-
-    class _R:
-        def __init__(self, out):
-            self.stdout = out
-
-    def _fake_run(cmd, **kwargs):
-        return _R("active\n" if cmd[1] == "is-active" else "enabled\n")
-
-    monkeypatch.setattr(install_mod.subprocess, "run", _fake_run)
-    c = install_mod._check_systemd_unit()
-    assert c.status == "ok"
-    assert c.fix_id is None
-
-
-def test_fix_systemd_unit_refuses_off_linux(monkeypatch):
-    monkeypatch.setattr(install_mod.sys, "platform", "win32")
-    import pytest
-    with pytest.raises(RuntimeError, match="only applies on Linux"):
-        install_mod._fix_systemd_unit()
 
 
 def test_gpu_check_uses_nvidia_smi_on_linux(monkeypatch):
@@ -371,36 +314,12 @@ def test_detect_cuda_arch_empty_without_nvidia_smi(monkeypatch):
     assert _lib.detect_cuda_arch() == ""
 
 
-def test_kokoro_installer_warms_spanish_voice_assets(tmp_path, monkeypatch):
-    from scripts import install_tts
+def test_detect_cuda_arch_reads_nvidia_smi(monkeypatch):
+    from scripts import _lib
 
-    model_path = tmp_path / "models" / "kokoro" / "kokoro-v1.0.int8.onnx"
-    model_path.parent.mkdir(parents=True)
-    model_path.write_bytes(b"onnx")
-    (model_path.parent / "voices-v1.0.bin").write_bytes(b"voices")
-    calls: list[dict] = []
+    class _R:
+        returncode = 0
+        stdout = "8.9\n"
 
-    class _FakeKokoro:
-        def __init__(self, model, voices):
-            assert model == str(model_path)
-            assert voices == str(model_path.parent / "voices-v1.0.bin")
-
-        def create(self, text, **kwargs):
-            calls.append({"text": text, **kwargs})
-            return [0.0], 24000
-
-    monkeypatch.setattr(install_tts, "PROJECT_ROOT", tmp_path)
-    monkeypatch.setattr(install_tts, "enabled_models", lambda: [SimpleNamespace(
-        backend="tts",
-        tts_engine="kokoro",
-        model_path="models/kokoro/kokoro-v1.0.int8.onnx",
-    )])
-    monkeypatch.setitem(sys.modules, "kokoro_onnx", SimpleNamespace(Kokoro=_FakeKokoro))
-
-    install_tts._warm_kokoro()
-
-    assert [(call["voice"], call["lang"]) for call in calls] == [
-        ("am_michael", "en-us"),
-        ("ef_dora", "es"),
-        ("em_alex", "es"),
-    ]
+    monkeypatch.setattr(_lib.subprocess, "run", lambda *a, **k: _R())
+    assert _lib.detect_cuda_arch() == "89"

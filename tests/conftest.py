@@ -1,27 +1,11 @@
-"""Shared test configuration.
-
-Disables OpenTelemetry SDK in unit tests so we don't:
-  * try to open a gRPC connection to a non-existent OTLP endpoint
-  * log "OTel initialised" / "OTLP export failed" lines that pollute test output
-  * leak background BatchSpanProcessor threads between test sessions
-
-The trace_id middleware + GenAI helpers are exercised independently via
-their own unit tests against the disabled-mode no-ops.
-"""
+"""Shared test configuration."""
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
-os.environ.setdefault("OTEL_SDK_DISABLED", "true")
-# Disable the optional AgentsView integration (issue #280): empty base URL
-# means no probe and no background refresh threads — hermetic even on a dev
-# box that has a real AgentsView serving on :8080.
-os.environ.setdefault("AGENTSVIEW_BASE_URL", "")
-
-import pytest  # noqa: E402
-import yaml  # noqa: E402
+import pytest
+import yaml
 
 
 @pytest.fixture
@@ -50,68 +34,6 @@ def write_config(tmp_path, monkeypatch):
         return cfg
 
     return _write
-
-
-@pytest.fixture(autouse=True)
-def _isolate_code_usage_history(tmp_path):
-    """Point the Code-tab history snapshot at a per-test temp file (#280).
-
-    ``get_summary()`` folds records into and reads synthetic records from
-    ``data/code_usage_history.json`` — without this, unit tests would write
-    into the repo's real snapshot and read the dev machine's history back
-    into their assertions.
-    """
-    from src import code_usage_history
-
-    code_usage_history._reset_for_tests(tmp_path / "code_usage_history.json")
-    yield
-    code_usage_history._reset_for_tests(None)
-
-
-@pytest.fixture(autouse=True)
-def _isolate_claude_code_otel_store(tmp_path, monkeypatch):
-    """Point the OTel usage store at a per-test temp file (#280 follow-up).
-
-    ``get_summary()`` tops Claude up with OTel deltas — without this, tests
-    would read the dev machine's real ``data/telemetry`` history into their
-    assertions.  Tests that want OTel data monkeypatch/write it themselves.
-    """
-    from src import claude_code_otel as cco
-
-    monkeypatch.setattr(cco, "_DATA_DIR", tmp_path / "telemetry")
-    monkeypatch.setattr(cco, "_DATA_FILE", tmp_path / "telemetry" / "usage.jsonl")
-    cco._reset_for_tests()
-    yield
-    cco._reset_for_tests()
-
-
-@pytest.fixture(autouse=True)
-def _hermetic_remote_probes(monkeypatch):
-    """Keep unit tests off the real network and remote-stats caches clean (#396).
-
-    ``remote_stats.dial_address`` now sits under every peer-connect path
-    (model proxy, SSH ops, peer health), and for a host with a ``tailscale:``
-    fallback a cache-miss resolve TCP-probes real addresses. Stubbing the
-    lowest-level ``_probe_port`` to "nothing answers" makes every unstubbed
-    resolve deterministically pick the LAN primary with zero sockets — tests
-    that exercise the fallback itself monkeypatch ``_probe_liveness_ports``
-    (or ``_probe_port``) on top of this. The per-host caches are cleared on
-    both sides so a cached liveness/dial route never leaks between tests.
-    """
-    from src import remote_stats
-
-    monkeypatch.setattr(remote_stats, "_probe_port", lambda address, port: False)
-    caches = (
-        remote_stats._cache,
-        remote_stats._liveness_cache,
-        remote_stats._dial_cache,
-        remote_stats._active_route,
-    )
-    for cache in caches:
-        cache.clear()
-    yield
-    for cache in caches:
-        cache.clear()
 
 
 @pytest.fixture(autouse=True)

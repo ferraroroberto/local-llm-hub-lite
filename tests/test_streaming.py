@@ -20,7 +20,7 @@ import json
 import os
 from typing import Iterator, List
 
-os.environ.setdefault("LOCAL_LLM_HUB_HOST", "tower")
+os.environ.setdefault("LOCAL_LLM_HUB_HOST", "local")
 
 from fastapi.testclient import TestClient
 
@@ -245,19 +245,13 @@ def test_chat_completions_streaming_proxies_sse(monkeypatch):
     assert saw_done
 
 
-def test_chat_completions_streaming_usage_populated_from_trailing_frame(monkeypatch):
-    """usage_in/usage_out must be captured from the trailing usage frame.
-
-    llama-server (--jinja mode) emits the usage object on a final chunk that
-    arrives *after* all content deltas, i.e. after first_token_ns is set.
-    This test verifies the fix: usage must be non-zero even when the usage
-    frame is not the first data frame.
-    """
+def test_chat_completions_streaming_passes_trailing_usage_frame(monkeypatch):
+    """llama-server (--jinja mode) emits the usage object on a final chunk
+    that arrives *after* all content deltas. The cleaned SSE passthrough
+    must forward that trailing frame intact so clients can read usage."""
 
     def fake_stream(base_url, model, messages, *, max_tokens=None, temperature=None,
                     timeout=600.0, extra=None, headers=None) -> Iterator[str]:
-        # Two content deltas first (these set first_token_ns), then a trailing
-        # usage-only chunk (no choices/delta, just a usage field).
         content_chunks = [_delta("Hello "), _delta("world!")]
         usage_chunk = {
             "id": "x", "object": "chat.completion.chunk", "model": model,
@@ -268,16 +262,6 @@ def test_chat_completions_streaming_usage_populated_from_trailing_frame(monkeypa
             yield line
 
     monkeypatch.setattr(server_mod, "call_openai_chat_stream", fake_stream)
-
-    # Patch record_genai_metrics to capture what usage values were recorded.
-    recorded: dict = {}
-
-    def fake_record(*, model, backend, route, client_id, duration_ms,
-                    input_tokens=0, output_tokens=0, error_type=""):
-        recorded["input_tokens"] = input_tokens
-        recorded["output_tokens"] = output_tokens
-
-    monkeypatch.setattr(server_mod, "record_genai_metrics", fake_record)
 
     client = TestClient(server_mod.app)
     with client.stream(
@@ -290,10 +274,19 @@ def test_chat_completions_streaming_usage_populated_from_trailing_frame(monkeypa
         },
     ) as r:
         assert r.status_code == 200
-        _ = "".join(r.iter_text())
+        body = "".join(r.iter_text())
 
-    assert recorded.get("input_tokens") == 12, f"input_tokens should be 12, got {recorded.get('input_tokens')}"
-    assert recorded.get("output_tokens") == 7, f"output_tokens should be 7, got {recorded.get('output_tokens')}"
+    usages = []
+    for line in body.splitlines():
+        if not line.startswith("data:"):
+            continue
+        payload = line[len("data:"):].strip()
+        if payload == "[DONE]":
+            continue
+        obj = json.loads(payload)
+        if obj.get("usage"):
+            usages.append(obj["usage"])
+    assert usages == [{"prompt_tokens": 12, "completion_tokens": 7, "total_tokens": 19}]
 
 
 def test_chat_completions_stream_upstream_error(monkeypatch):
@@ -427,8 +420,28 @@ def test_chat_completions_omits_structured_params_when_absent(monkeypatch):
 
 
 # ---- no-think virtual alias injection (issue #161) ----
-# These hit the real config/models.yaml (host tower set at module import),
-# so they also verify the qwen35_4b_nothink wiring end-to-end.
+# The lite config ships no virtual alias row, so these build one via the
+# write_config fixture: a `virtual` row sharing qwen's port with an
+# `inject_extra` overlay — the mechanism `Model.inject_extra` +
+# `_build_openai_extra` still implement.
+
+def _nothink_config(write_config, monkeypatch):
+    write_config({
+        "hub": {"port": 8000},
+        "hosts": {"pc": {"platform": "win32", "default": True,
+                         "enabled": ["qwen", "qwen_nothink"]}},
+        "models": {
+            "qwen": {"display_name": "qwen3.5-4b", "backend": "openai",
+                     "port": 8088, "aliases": ["agentic_light"]},
+            "qwen_nothink": {
+                "display_name": "qwen3.5-4b-nothink", "backend": "openai",
+                "port": 8088, "virtual": True,
+                "inject_extra": {"chat_template_kwargs": {"enable_thinking": False}},
+            },
+        },
+    })
+    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "pc")
+
 
 def _capture_call(captured: dict):
     def fake_call(base_url, model, messages, *, max_tokens=None, temperature=None,
@@ -447,10 +460,11 @@ def _capture_call(captured: dict):
     return fake_call
 
 
-def test_nothink_alias_injects_chat_template_kwargs(monkeypatch):
+def test_nothink_alias_injects_chat_template_kwargs(monkeypatch, write_config):
     """model=qwen3.5-4b-nothink folds enable_thinking:false into the upstream
     payload AND routes to qwen's :8088 backend — no second process."""
     captured: dict = {}
+    _nothink_config(write_config, monkeypatch)
     monkeypatch.setattr(server_mod, "call_openai_chat", _capture_call(captured))
 
     client = TestClient(server_mod.app)
@@ -466,9 +480,10 @@ def test_nothink_alias_injects_chat_template_kwargs(monkeypatch):
     assert captured["base_url"] == "http://127.0.0.1:8088/v1"   # shares qwen
 
 
-def test_plain_agentic_light_does_not_inject(monkeypatch):
+def test_plain_agentic_light_does_not_inject(monkeypatch, write_config):
     """Plain agentic_light (qwen3.5-4b) stays thinking-capable — no overlay."""
     captured: dict = {}
+    _nothink_config(write_config, monkeypatch)
     monkeypatch.setattr(server_mod, "call_openai_chat", _capture_call(captured))
 
     client = TestClient(server_mod.app)
@@ -485,10 +500,11 @@ def test_plain_agentic_light_does_not_inject(monkeypatch):
     assert captured["base_url"] == "http://127.0.0.1:8088/v1"
 
 
-def test_nothink_alias_caller_chat_template_kwargs_wins(monkeypatch):
+def test_nothink_alias_caller_chat_template_kwargs_wins(monkeypatch, write_config):
     """A caller that sends its own chat_template_kwargs overrides the injected
     default (caller wins)."""
     captured: dict = {}
+    _nothink_config(write_config, monkeypatch)
     monkeypatch.setattr(server_mod, "call_openai_chat", _capture_call(captured))
 
     client = TestClient(server_mod.app)

@@ -23,9 +23,8 @@ REM  sister-app trays (AppLauncher, PhotoOCR, VoiceTranscriber, ...) and any
 REM  other unrelated python processes are untouched.
 REM
 REM  The full detect -> kill -> reclaim -> start -> verify lifecycle lives in
-REM  the ONE shared, machine-local tray_lifecycle.ps1 owned by fleet-config
-REM  (project-scaffolding#153) -- exposed at %USERPROFILE%\.claude\tray\ by
-REM  fleet-config's install.ps1 junction, shelled to with -File, NOT in
+REM  the repo-local vendored scripts\tray_lifecycle.ps1 (lite fork: zero
+REM  external dependencies), shelled to with -File, NOT in
 REM  cmd-side `for /f` output capture or inline `powershell -Command "..."`.
 REM  Both cmd shapes have failed under non-interactive nested callers (Git Bash
 REM  -> `cmd /c "tray.bat --restart"`, or a finisher skill's Bash tool): detect
@@ -47,11 +46,10 @@ REM  still carries the .venv path. Matching the image path would miss the real
 REM  hub; the CommandLine scope keeps the sweep on THIS repo's children only.
 REM  See project-scaffolding#29.
 REM
-REM  IMPORTANT: port :8090 (whisper-server) is mutex-SHARED with the sibling
-REM  voice-transcriber/transcribe_voice, and the llama-server model ports
-REM  (8081/8082/8086/8087/8088) are separate native exes. None of these are
-REM  ever reclaimed here -- only :8000, which this tray definitively owns, is
-REM  in the reclaim list below.
+REM  IMPORTANT: the model backend ports (llama-server :8081, whisper-server
+REM  :8090) are separate native exes managed by the hub itself. They are
+REM  never reclaimed here -- only :8000, which this tray definitively owns,
+REM  is in the reclaim list below.
 REM ============================================================================
 
 setlocal EnableDelayedExpansion
@@ -81,13 +79,11 @@ REM === ADAPT (3/4): in the -TrayMatch below, a regex matching THIS app's tray
 REM     invocation ===
 set "PS=C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 set "TRAY_VENV=%SCRIPT_DIR%.venv"
-REM  ONE shared, machine-local copy owned by fleet-config (project-scaffolding#153)
-REM  -- junctioned by fleet-config's install.ps1, never vendored per-app.
-set "TRAY_PS=%USERPROFILE%/.claude/tray/tray_lifecycle.ps1"
+REM  Repo-local vendored copy (lite fork: zero external dependencies).
+set "TRAY_PS=%~dp0scripts\tray_lifecycle.ps1"
 if not exist "%TRAY_PS%" (
-    echo ERROR: missing shared tray helper "%TRAY_PS%"
-    echo        Fix: install fleet-config and run its install.ps1, then retry.
-    echo        See ferraroroberto/fleet-config's README for details.
+    echo ERROR: missing tray helper "%TRAY_PS%"
+    echo        Fix: restore scripts\tray_lifecycle.ps1 from this repo's git history.
     exit /b 1
 )
 

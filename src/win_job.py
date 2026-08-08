@@ -1,16 +1,9 @@
 """Windows Job Object containment for hub subprocesses (#468).
 
 The single implementation of "assign a child to a job that kills its whole
-membership when the last handle closes". Two callers (#470 folded the second
-in, which had grown its own ~70-line ctypes copy):
-
-* ``tests/e2e``'s ``hub_url`` fixture, containing a throwaway test hub and
-  every backend it spawns — the incident this module was written for, below.
-* The TTS engines that own an OS child (``tts_engines/piper.py``'s resident
-  ``piper.exe`` pool, ``tts_engines/orpheus.py``'s loopback ``llama-server``).
-  The hub stops a backend with ``TerminateProcess`` — no ``atexit``, no
-  ``finally`` — so a grandchild in its own process group would otherwise leak,
-  holding GPU VRAM and its internal port.
+membership when the last handle closes". Caller: ``tests/e2e``'s
+``hub_url`` fixture, containing a throwaway test hub and every backend it
+spawns — the incident this module was written for, below.
 
 A verification run (``tests/e2e``'s ``hub_url`` fixture) boots a throwaway
 hub as a plain ``subprocess.Popen``. If a test drives an ``on_demand``
@@ -22,8 +15,8 @@ own polite shutdown doesn't propagate to it. That's correct for the
 behaviour (``inherit_running_backends``). It's wrong for a throwaway test
 hub: the fixture's teardown only ``proc.terminate()``s the hub PID itself,
 which never reaches a grandchild in a different process group, so the
-backend (e.g. an on-demand ``kokoro`` ``tts_server``) outlives the hub that
-spawned it and pins the worktree it's rooted in (#468).
+backend outlives the hub that spawned it and pins the worktree it's
+rooted in (#468).
 
 A Windows Job Object fixes this without caring about process-group
 boundaries: assigning the hub's ``Popen`` to a job created with
@@ -34,8 +27,8 @@ guarantees fall out of that one flag:
 
 * :func:`terminate_and_close` kills every *current* member of the job, even
   ones whose immediate parent already exited — exactly the observed
-  incident (the hub PID's parent was gone, the ``tts_server`` grandchild
-  wasn't). Call it from the fixture's ``finally:`` block.
+  incident (the hub PID's parent was gone, the grandchild wasn't). Call
+  it from the fixture's ``finally:`` block.
 * If the process holding the job handle (the test harness itself) is
   killed before reaching that ``finally:``, Windows closes its handles for
   it — including the job handle — which fires ``KILL_ON_JOB_CLOSE`` and

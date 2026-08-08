@@ -34,7 +34,7 @@ import httpx
 
 from .host_profile import resolve as resolve_host
 from .http_client import get_sync_client
-from .model_registry import Model, enabled_models, local_models, resolve as resolve_model
+from .model_registry import Model, enabled_models, local_models
 from .process_supervisor import ProcessSupervisor, SpawnSpec
 from .server_process import (
     OWNERSHIP_NONE,
@@ -88,15 +88,7 @@ def whisper_server_binary() -> Path:
 
 
 def _is_whisper(model: Model) -> bool:
-    return (
-        model.engine == "whisper-server"
-        or model.engine == "whisper-server-lazy"
-        or model.backend == "whisper"
-    )
-
-
-def _is_lazy_whisper(model: Model) -> bool:
-    return model.engine == "whisper-server-lazy"
+    return model.engine == "whisper-server" or model.backend == "whisper"
 
 
 def vendor_dir_for(model: Model) -> Path:
@@ -163,17 +155,13 @@ def inherited_foreign(model_id: str) -> bool:
     """True iff this model is alive via an inherited PID whose process has
     **no tie to this repo** — an external sibling's server on a mutex-shared
     port, adopted for control but never spawned by the hub (#431). The
-    canonical case: voice-transcriber's own ``whisper-server`` holding :8090
-    on the tower — the hub can route to it, but the fleet summary must not
-    claim the hub runs it.
+    canonical case: a sibling app's own ``whisper-server`` holding the port —
+    the hub can route to it, but the admin UI must not claim the hub runs it.
 
-    Checks exe + command line + cwd for the repo path, not exe alone: a
-    hub-spawned python shim (``tts_server``) resolves its exe to the *base*
-    interpreter outside the repo (the venv redirector — one hub, two PIDs),
-    but its command line names ``<repo>\\.venv\\Scripts\\python(w).exe -m
-    src.tts_server``, so any repo-path mention marks it ours. Best-effort:
-    an unreadable process (access denied, racing exit) reads as not-foreign
-    rather than guessing.
+    Checks exe + command line + cwd for the repo path, not exe alone —
+    any repo-path mention marks it ours. Best-effort: an unreadable
+    process (access denied, racing exit) reads as not-foreign rather
+    than guessing.
     """
     state = _state_for(model_id)
     if not (state.proc is None and _inherited_alive(state)):
@@ -236,11 +224,8 @@ def is_reachable(model: Model, timeout: float = 1.5) -> bool:
     # takes a set of chars, so `"...:8091/v1".rstrip("/v1")` eats the port's
     # trailing "1" too and yields ":809" — a dead port. removesuffix is exact.
     base = model.url.removesuffix("/v1").rstrip("/")
-    if model.engine in ("whisper-server", "whisper-server-lazy"):
+    if model.engine == "whisper-server":
         # whisper.cpp server has no /health; GET / returns 200 once loaded.
-        # Engine-specific, not `_is_whisper` (backend == "whisper") — a
-        # whisper-*shaped* backend on a different engine (e.g. Parakeet's
-        # `engine: parakeet-server`, #138) has its own real /health route.
         try:
             r = get_sync_client().get(f"{base}/", timeout=timeout)
             return r.status_code == 200
@@ -265,9 +250,7 @@ def probe_health(model: Model, timeout: float = 1.5) -> Optional[Dict[str, Any]]
     ``None`` if unreachable / non-JSON.
 
     Unlike :func:`is_reachable` (a boolean liveness gate used everywhere),
-    this is for callers that need a field out of the body itself — e.g. the
-    admin Models tab reading ``tts_server.py``'s reported ``device``
-    (cuda/cpu/mps) off a running TTS backend's ``/health``.
+    this is for callers that need a field out of the body itself.
     """
     if not model.url:
         return None
@@ -309,68 +292,10 @@ def clear_log(model_id: str) -> None:
         pass
 
 
-def _whisper_boost_args(existing_args: list[str]) -> list[str]:
-    """Return extra whisper-server args to enable vocabulary boosting (#91).
-
-    When a whisper row opts into ``--carry-initial-prompt`` (which is only
-    honoured with ``--max-context > 0`` — proven on v1.8.6), source the
-    initial prompt from the committed dictionary's ``boost_terms`` so the
-    boosting vocabulary lives in one place
-    (``config/transcription_glossary.json``, shared with the #90
-    replacement rules). No-op if boosting isn't requested or the row
-    already supplies its own ``--prompt``.
-    """
-    if "--carry-initial-prompt" not in existing_args or "--prompt" in existing_args:
-        return []
-    from .transcription_glossary import load_boost_terms
-
-    terms = load_boost_terms()
-    if not terms:
-        return []
-    return ["--prompt", "Glossary: " + ", ".join(terms) + "."]
-
-
 def build_command(model: Model) -> list[str]:
-    # TTS rows run the in-repo FastAPI shim (src/tts_server), which owns the
-    # heavy engine (Chatterbox in-process / Orpheus via a llama-server child).
-    # Checked first: a chatterbox row has no model_path (weights come from the
-    # HF cache), so it must skip the model_path guard below.
-    if model.engine == "tts-server":
-        cmd = [sys.executable, "-m", "src.tts_server", "--model-id", model.id]
-        cmd.extend(model.args or [])
-        return cmd
-
-    # Parakeet (#138): the in-repo FastAPI shim (src/parakeet_server) owns a
-    # persistent FluidAudio Swift subprocess. No model_path — the CoreML
-    # weights are fetched/cached by FluidAudio itself on first load, not by
-    # this repo's download_models.py, so it must skip the model_path guard
-    # below same as the tts-server branch above.
-    if model.engine == "parakeet-server":
-        cmd = [sys.executable, "-m", "src.parakeet_server", "--model-id", model.id]
-        cmd.extend(model.args or [])
-        return cmd
-
     if not model.model_path:
         raise RuntimeError(f"model {model.id} has no model_path")
     model_path = (PROJECT_ROOT / model.model_path).resolve()
-
-    if _is_lazy_whisper(model):
-        # The proxy itself doesn't need the model on disk to start — it
-        # only needs whisper-server present. We still surface a clear
-        # error if the model is missing, since the first POST would fail.
-        bin_path = whisper_server_binary()
-        if not bin_path.exists():
-            raise RuntimeError(
-                f"whisper-server not found at {bin_path} - run scripts/install_whisper_cpp.py"
-            )
-        if not model_path.exists():
-            raise RuntimeError(
-                f"whisper model not found at {model_path} - run scripts/download_models.py --only {model.id}"
-            )
-        return [
-            sys.executable, "-m", "src.whisper_translate_proxy",
-            "--model-id", model.id,
-        ]
 
     if _is_whisper(model):
         bin_path = whisper_server_binary()
@@ -388,9 +313,7 @@ def build_command(model: Model) -> list[str]:
             "--port", str(model.port),
             "--model", str(model_path),
         ]
-        args = list(model.args or [])
-        cmd.extend(args)
-        cmd.extend(_whisper_boost_args(args))
+        cmd.extend(model.args or [])
         return cmd
 
     bin_path = llama_server_binary()
@@ -412,18 +335,13 @@ def start(model_id: str) -> tuple[bool, str]:
     model = resolve_model_by_id(model_id)
     if model is None:
         return False, f"model {model_id!r} not enabled on this host"
-    # Chain-aware ownership guard (#342): any host in the model's ordered
-    # ``hosts:`` chain may spawn it locally (the failover engine relies on
-    # this to bring a model up on a fallback candidate); a host *outside*
-    # the chain never does. A bare single-``host:`` row has a one-element
-    # chain, so the pre-#342 refusal is byte-identical.
-    chain = list(getattr(model, "hosts", None) or [])
+    # Ownership guard: a row that names a different ``host:`` is never
+    # spawned here.
     active = resolve_host()
-    if chain and active.id not in chain:
+    if model.host and model.host != active.id:
         return False, (
-            f"model {model_id!r} is owned by host(s) {chain!r} — "
-            "start it there, or via the admin API which proxies this "
-            "call automatically"
+            f"model {model_id!r} is owned by host {model.host!r} — "
+            "start it there"
         )
     if is_running(model_id):
         return False, "already running"
@@ -533,7 +451,7 @@ def inherit_running_backends() -> int:
     listening = snapshot_listening_pids()
     count = 0
     for m in local_models():
-        if m.backend not in ("openai", "whisper", "tts"):
+        if m.backend not in ("openai", "whisper"):
             continue
         if not m.port:
             continue
@@ -563,14 +481,10 @@ def inherit_running_backends() -> int:
 def _looks_like_backend_binary(exe: str, model: "Model") -> bool:
     """Heuristic: does this executable look like the binary we'd spawn for ``model``?"""
     exe = (exe or "").lower()
-    if model.engine in ("whisper-server", "whisper-server-lazy") or model.backend == "whisper":
+    if _is_whisper(model):
         return "whisper-server" in exe or exe.endswith("whisper-server.exe")
-    # Default: llama.cpp's llama-server. The lazy-whisper proxy runs as
-    # ``python -m src.whisper_translate_proxy`` — recognise pythonw too.
-    return (
-        "llama-server" in exe
-        or "python" in exe  # whisper_translate_proxy.py path
-    )
+    # Default: llama.cpp's llama-server.
+    return "llama-server" in exe
 
 
 def resolve_model_by_id(model_id: str) -> Optional[Model]:
@@ -580,36 +494,11 @@ def resolve_model_by_id(model_id: str) -> Optional[Model]:
     return None
 
 
-def resolve_model_for_engine(model_id: str, expected_engine: str) -> Model:
-    """Resolve ``model_id`` and assert it's wired to ``expected_engine``, or
-    raise ``SystemExit`` with a message naming the mismatch.
-
-    Shared by the shim servers each of which handles exactly one engine —
-    ``parakeet_server.py`` (``parakeet-server``), ``tts_server.py``
-    (``tts-server``), ``whisper_translate_proxy.py``
-    (``whisper-server-lazy``). ``SystemExit`` (not a plain exception) because
-    every caller is a ``build_app(model_id)`` bring-up path meant to abort
-    the process on a config mismatch, not to be caught and handled.
-    """
-    model = resolve_model_by_id(model_id)
-    if model is None:
-        raise SystemExit(
-            f"model {model_id!r} not enabled on this host — "
-            f"add it to the host's enabled list in config/models.yaml"
-        )
-    if model.engine != expected_engine:
-        raise SystemExit(
-            f"model {model_id!r} has engine={model.engine!r}; "
-            f"only engine={expected_engine} is supported here"
-        )
-    return model
-
-
 def running_backends() -> Dict[str, Model]:
     """Return {model_id: Model} for each local backend whose process is alive."""
     out: Dict[str, Model] = {}
     for m in local_models():
-        if m.backend in ("openai", "whisper", "tts") and is_running(m.id):
+        if m.backend in ("openai", "whisper") and is_running(m.id):
             out[m.id] = m
     return out
 

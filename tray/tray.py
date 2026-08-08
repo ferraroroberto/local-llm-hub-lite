@@ -1,16 +1,15 @@
-"""System-tray launcher — owns the hub process + (optional) Cloudflare tunnel.
+"""System-tray launcher — owns the hub process.
 
 Mobile-first design means there's no real desktop UI to surface; the
 tray exists so launching ``tray.bat`` brings the hub up alongside
 Windows login without keeping a console window open.
 
-Menu (mirrors app-launcher's tray):
+Menu:
 
     🛰 Hub  http://127.0.0.1:8000          — status header, disabled
     🚀 Open admin                          — opens /admin in the default browser
     📋 Copy local URL                      — clipboard the local URL
     📋 Copy LAN URL                        — clipboard http://<lan-ip>:8000
-    📋 Copy Cloudflare URL                 — clipboard https://<tunnel>?token=…
     🧠 Models ▸                            — toggle per-enabled-local-model
     🔄 Restart hub                         — stop + start so a new pull is picked up
     ℹ Status                               — popup with hub state
@@ -57,11 +56,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-# Webapp/cloudflared.yml is the canonical place a cloudflared
-# config lives — see app-launcher for the same convention. We don't
-# write it for the user; we only read the first ingress hostname.
-TUNNEL_CONFIG_PATH = PROJECT_ROOT / "webapp" / "cloudflared.yml"
 
 
 # --------------------------------------------------------------- TrayConfig
@@ -200,7 +194,6 @@ class HubProcess:
 EVT_OPEN_ADMIN = "open_admin"
 EVT_COPY_LOCAL = "copy_local"
 EVT_COPY_LAN = "copy_lan"
-EVT_COPY_TUNNEL = "copy_tunnel"
 EVT_RESTART_HUB = "restart_hub"
 EVT_TOGGLE_MODEL = "toggle_model"
 EVT_REFRESH = "refresh"
@@ -224,7 +217,7 @@ class TrayApp:
         # this machine; use the admin webapp's Models tab to control a
         # remote host's backend (it proxies there automatically).
         self._models: List[Model] = [
-            m for m in local_models() if m.backend in ("openai", "whisper", "tts")
+            m for m in local_models() if m.backend in ("openai", "whisper")
         ]
         # The webapp config holds the bearer token we append to copied URLs.
         # Generate one on first boot so we never have an unprotected non-
@@ -286,22 +279,11 @@ class TrayApp:
                 return f"🛰 Hub  {self.hub.base_url()}  (adopted)"
             return "🛰 Hub  (stopped)"
 
-        def tunnel_label(_item: pystray.MenuItem) -> str:
-            host = _read_tunnel_hostname(TUNNEL_CONFIG_PATH)
-            if host:
-                return f"📋 Copy Cloudflare URL  ({host})"
-            return "📋 Copy Cloudflare URL  (not configured)"
-
         return pystray.Menu(
             pystray.MenuItem(hub_label, None, enabled=False),
             pystray.MenuItem("🚀 Open admin", lambda: self._enqueue(EVT_OPEN_ADMIN), default=True),
             pystray.MenuItem("📋 Copy local URL", lambda: self._enqueue(EVT_COPY_LOCAL)),
             pystray.MenuItem("📋 Copy LAN URL", lambda: self._enqueue(EVT_COPY_LAN)),
-            pystray.MenuItem(
-                tunnel_label,
-                lambda: self._enqueue(EVT_COPY_TUNNEL),
-                enabled=lambda _i: _read_tunnel_hostname(TUNNEL_CONFIG_PATH) is not None,
-            ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("🧠 Models", models_submenu),
             pystray.Menu.SEPARATOR,
@@ -363,13 +345,6 @@ class TrayApp:
                 self._copy_url(f"http://{lan}:{hub_port()}/admin/")
             else:
                 self._notify("LAN", "⚠️ no LAN route detected")
-        elif kind == EVT_COPY_TUNNEL:
-            host = _read_tunnel_hostname(TUNNEL_CONFIG_PATH)
-            if not host:
-                self._notify("Cloudflare", "⚠️ cloudflared.yml not configured")
-                return
-            url = f"https://{host}/admin/"
-            self._copy_url(append_auth_token(url, self.webapp_cfg.auth_token))
         elif kind == EVT_RESTART_HUB:
             threading.Thread(target=self._restart_worker, daemon=True).start()
         elif kind == EVT_TOGGLE_MODEL:
@@ -601,30 +576,6 @@ def _tcp_reachable(host: str, port: int, timeout: float = 0.5) -> bool:
         return s.connect_ex((host, port)) == 0
     finally:
         s.close()
-
-
-def _read_tunnel_hostname(config_path: Path) -> Optional[str]:
-    """Pull the first ``ingress[].hostname`` out of a cloudflared config.
-
-    Returns ``None`` when the file is missing or unparseable — the tray
-    treats either as "no tunnel" and disables the menu item.
-    """
-    if not config_path.exists():
-        return None
-    try:
-        data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
-    except (OSError, yaml.YAMLError) as exc:
-        logger.debug("tunnel config unreadable: %s", exc)
-        return None
-    ingress = data.get("ingress")
-    if not isinstance(ingress, list):
-        return None
-    for entry in ingress:
-        if isinstance(entry, dict):
-            host = entry.get("hostname")
-            if host:
-                return str(host)
-    return None
 
 
 def _set_clipboard(text: str) -> None:
