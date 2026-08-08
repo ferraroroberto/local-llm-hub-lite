@@ -6,9 +6,8 @@ Used by the hub when routing to local Qwen / GLM backends. Helpers:
 - ``call_openai_chat_stream()``: POST with ``stream: true``, yield raw
   SSE byte chunks from the upstream (used to proxy SSE through the hub
   without translating shapes).
-- ``openai_to_anthropic_envelope()``: shape the response into the same
-  dict the existing claude-path code translates into an Anthropic
-  ``/v1/messages`` response.
+- ``openai_to_anthropic_envelope()``: shape the response into the dict
+  ``src.server`` translates into an Anthropic ``/v1/messages`` response.
 - ``strip_think_blocks()`` / ``ThinkStripper``: scrub ``<think>...``
   ``</think>`` segments from text or from streamed deltas, with carry
   over so a tag split across SSE chunks is still cleaned correctly.

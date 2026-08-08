@@ -34,7 +34,7 @@ import httpx
 
 from .host_profile import resolve as resolve_host
 from .http_client import get_sync_client
-from .model_registry import Model, enabled_models, local_models, resolve as resolve_model
+from .model_registry import Model, enabled_models, local_models
 from .process_supervisor import ProcessSupervisor, SpawnSpec
 from .server_process import (
     OWNERSHIP_NONE,
@@ -155,9 +155,8 @@ def inherited_foreign(model_id: str) -> bool:
     """True iff this model is alive via an inherited PID whose process has
     **no tie to this repo** — an external sibling's server on a mutex-shared
     port, adopted for control but never spawned by the hub (#431). The
-    canonical case: voice-transcriber's own ``whisper-server`` holding :8090
-    on the tower — the hub can route to it, but the fleet summary must not
-    claim the hub runs it.
+    canonical case: a sibling app's own ``whisper-server`` holding the port —
+    the hub can route to it, but the admin UI must not claim the hub runs it.
 
     Checks exe + command line + cwd for the repo path, not exe alone —
     any repo-path mention marks it ours. Best-effort: an unreadable
@@ -251,9 +250,7 @@ def probe_health(model: Model, timeout: float = 1.5) -> Optional[Dict[str, Any]]
     ``None`` if unreachable / non-JSON.
 
     Unlike :func:`is_reachable` (a boolean liveness gate used everywhere),
-    this is for callers that need a field out of the body itself — e.g. the
-    admin Models tab reading ``tts_server.py``'s reported ``device``
-    (cuda/cpu/mps) off a running TTS backend's ``/health``.
+    this is for callers that need a field out of the body itself.
     """
     if not model.url:
         return None

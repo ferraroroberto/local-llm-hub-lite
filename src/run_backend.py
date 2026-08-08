@@ -62,14 +62,13 @@ def _run_backend(model_id: str) -> int:
         known = [m.id for m in enabled_models()]
         log.error("model %r not enabled on host %s. known: %s", model_id, host.id, known)
         return 2
-    if model.backend not in ("openai", "whisper", "tts"):
+    if model.backend not in ("openai", "whisper"):
         log.error("model %r is backend=%s; nothing to spawn", model_id, model.backend)
         return 2
-    if model.host_chain and host.id not in model.host_chain:
+    if model.host and model.host != host.id:
         log.error(
-            "model %r is owned by host(s) %r, not %r — run it there "
-            "(this host proxies to it instead of spawning it locally)",
-            model_id, model.host_chain, host.id,
+            "model %r is owned by host %r, not %r — run it there",
+            model_id, model.host, host.id,
         )
         return 2
 
@@ -95,11 +94,10 @@ def _run_backend(model_id: str) -> int:
 # backend -> (window/box label, endpoint hint printed under the URL line).
 # ``None`` hint means the URL line already says everything (llama-server's
 # OpenAI-shape base already ends in ``/v1``).
-_BANNER_KIND = {"openai": "llama-server", "whisper": "whisper-server", "tts": "tts_server"}
+_BANNER_KIND = {"openai": "llama-server", "whisper": "whisper-server"}
 _BANNER_HINT = {
     "openai": None,
     "whisper": "POST WAV to /v1/audio/transcriptions",
-    "tts": "POST text to /v1/audio/speech",
 }
 
 
@@ -115,7 +113,7 @@ def _banner_lines(model_id: str) -> list[str]:
     elif model.backend == "openai":
         url = model.url or f"http://127.0.0.1:{model.port}/v1"
     else:
-        # whisper/tts banners show the bare base — the endpoint hint below
+        # whisper banners show the bare base — the endpoint hint below
         # spells out the actual POST path (matches the old per-model .bat text).
         url = (model.url or f"http://127.0.0.1:{model.port}").removesuffix("/v1").rstrip("/")
     lines = [f"Local LLM Hub - {model.display_name}", f"{kind}: {model.display_name} on {url}"]
