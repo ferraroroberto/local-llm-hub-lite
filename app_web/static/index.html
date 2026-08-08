@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="LLM Hub">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="/admin/static/manifest.webmanifest">
+  <link rel="icon" href="/admin/static/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/admin/static/icon-180.png">
+  <link rel="stylesheet" href="/admin/static/styles.css">
+  <link rel="stylesheet" href="/admin/static/_vendored/button/button.css">
+  <link rel="stylesheet" href="/admin/static/_vendored/card/card.css">
+  <link rel="stylesheet" href="/admin/static/_vendored/disclosure/disclosure.css">
+  <link rel="stylesheet" href="/admin/static/_vendored/switch/switch.css">
+  <link rel="stylesheet" href="/admin/static/_vendored/empty-state/empty-state.css">
+  <link rel="stylesheet" href="/admin/static/_vendored/nav/nav-tabs.css">
+  <link rel="stylesheet" href="/admin/static/telemetry.css">
+  <link rel="stylesheet" href="/admin/static/code_usage.css">
+  <link rel="stylesheet" href="/admin/static/_vendored/modal/modal.css">
+  <link rel="stylesheet" href="/admin/static/_vendored/xterm/xterm.css">
+  <link rel="stylesheet" href="/admin/static/machines.css">
+  <title>Local LLM Hub</title>
+  <script>
+    (function(){
+      var t = localStorage.getItem('llmhub.theme');
+      var dark = t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    })();
+  </script>
+</head>
+<body>
+  <!-- Primary nav — the vendored fleet component (_vendored/nav). Body-level
+       sibling of the scrolling <main class="app">: iOS captures position:fixed
+       descendants of scroll containers (see _vendored/nav/README.md). -->
+  <nav class="tabs" role="tablist" aria-label="Sections" data-active-tab="hub">
+    <button id="tabHub" type="button" class="tab active" data-tab="hub" role="tab" aria-selected="true" aria-controls="paneHub">
+      <svg class="icon tab-icon" aria-hidden="true"><use href="#i-house"></use></svg>
+      <span class="tab-label">Hub</span>
+    </button>
+    <button id="tabModels" type="button" class="tab" data-tab="models" role="tab" aria-selected="false" aria-controls="paneModels" tabindex="-1">
+      <svg class="icon tab-icon" aria-hidden="true"><use href="#i-boxes"></use></svg>
+      <span class="tab-label">Models</span>
+    </button>
+    <button id="tabPlayground" type="button" class="tab" data-tab="playground" role="tab" aria-selected="false" aria-controls="panePlayground" tabindex="-1">
+      <svg class="icon tab-icon" aria-hidden="true"><use href="#i-flask-conical"></use></svg>
+      <span class="tab-label">Play</span>
+    </button>
+    <button id="tabTelemetry" type="button" class="tab" data-tab="telemetry" role="tab" aria-selected="false" aria-controls="paneTelemetry" tabindex="-1">
+      <svg class="icon tab-icon" aria-hidden="true"><use href="#i-activity"></use></svg>
+      <span class="tab-label">OTel</span>
+    </button>
+    <button id="tabCodeUsage" type="button" class="tab" data-tab="code-usage" role="tab" aria-selected="false" aria-controls="paneCodeUsage" tabindex="-1">
+      <svg class="icon tab-icon" aria-hidden="true"><use href="#i-code"></use></svg>
+      <span class="tab-label">Code</span>
+    </button>
+    <button id="tabMachines" type="button" class="tab" data-tab="machines" role="tab" aria-selected="false" aria-controls="paneMachines" tabindex="-1">
+      <svg class="icon tab-icon" aria-hidden="true"><use href="#i-server"></use></svg>
+      <span class="tab-label">Machines</span>
+    </button>
+  </nav>
+
+  <main class="app">
+    <section id="paneHub" class="pane" role="tabpanel" aria-labelledby="tabHub">
+      <!-- Hub card: title + inline live status, PID + Uptime (one line),
+           sparklines. Theme toggle sits alone in the header, right-aligned. -->
+      <section class="card">
+        <div class="card-header">
+          <div class="hub-title-block">
+            <h2><svg class="icon" aria-hidden="true"><use href="#i-house"></use></svg>Hub</h2>
+            <span id="hubLiveStatus" class="hub-live-status" aria-live="polite">
+              <span class="dot"></span>
+              <span id="hubLiveStatusText">checking…</span>
+            </span>
+          </div>
+          <div class="card-header-actions">
+            <button id="themeToggleBtn" type="button" class="icon-header-btn" aria-label="Toggle dark mode" title="Toggle theme"><svg class="icon" aria-hidden="true"><use href="#i-moon"></use></svg></button>
+          </div>
+        </div>
+        <div class="hub-meta-row">
+          <span><span>PID</span><code id="hubPid">—</code></span>
+          <span><span>Uptime</span><span id="hubUptime">—</span></span>
+        </div>
+        <div class="sparklines" id="hubSparklines"></div>
+      </section>
+
+      <!-- Services: Docker + Langfuse status with one-click launch (issue #27) -->
+      <section class="card" id="servicesCard">
+        <div class="card-header">
+          <div class="hub-title-block">
+            <h2><svg class="icon" aria-hidden="true"><use href="#i-layers"></use></svg>Services</h2>
+            <span id="servicesOverall" class="hub-live-status" aria-live="polite">
+              <span class="dot"></span>
+              <span id="servicesOverallText">checking…</span>
+            </span>
+          </div>
+        </div>
+        <div class="services-rows">
+          <div class="services-row">
+            <span class="services-label"><svg class="icon" aria-hidden="true"><use href="#i-container"></use></svg>Docker</span>
+            <span id="dockerStatus" class="hub-live-status">
+              <span class="dot"></span><span id="dockerStatusText">—</span>
+            </span>
+            <span id="dockerDetail" class="muted small services-detail"></span>
+            <span class="services-actions">
+              <button id="dockerStartBtn" type="button" class="icon-btn" hidden title="Start" aria-label="Start Docker Desktop"><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg></button>
+              <button id="dockerStopBtn" type="button" class="icon-btn danger" hidden title="Stop" aria-label="Stop Docker Desktop"><svg class="icon" aria-hidden="true"><use href="#i-square"></use></svg></button>
+            </span>
+          </div>
+          <div class="services-row">
+            <span class="services-label"><svg class="icon" aria-hidden="true"><use href="#i-radio"></use></svg>Langfuse</span>
+            <span id="langfuseStatus" class="hub-live-status">
+              <span class="dot"></span><span id="langfuseStatusText">—</span>
+            </span>
+            <span id="langfuseDetail" class="muted small services-detail"></span>
+            <span class="services-actions">
+              <button id="langfuseStartBtn" type="button" class="icon-btn" hidden title="Start" aria-label="Start Langfuse"><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg></button>
+              <button id="langfuseStopBtn" type="button" class="icon-btn danger" hidden title="Stop" aria-label="Stop Langfuse"><svg class="icon" aria-hidden="true"><use href="#i-square"></use></svg></button>
+            </span>
+          </div>
+          <div class="services-row">
+            <span class="services-label"><svg class="icon" aria-hidden="true"><use href="#i-code"></use></svg>AgentsView</span>
+            <span id="agentsviewStatus" class="hub-live-status">
+              <span class="dot"></span><span id="agentsviewStatusText">—</span>
+            </span>
+            <span id="agentsviewDetail" class="muted small services-detail"></span>
+            <span class="services-actions">
+              <button id="agentsviewStartBtn" type="button" class="icon-btn" hidden title="Start" aria-label="Start AgentsView"><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg></button>
+              <button id="agentsviewStopBtn" type="button" class="icon-btn danger" hidden title="Stop" aria-label="Stop AgentsView"><svg class="icon" aria-hidden="true"><use href="#i-square"></use></svg></button>
+            </span>
+          </div>
+          <!-- Peer rows (#372): one per hub-running peer (mac-mini-m4, gaming,
+               any future satellite), rendered by hub.js's renderPeerRows()
+               from /admin/api/services/status's `peers` list — generalized
+               from the old hardcoded single Mac Mini row. -->
+          <div id="peerRows"></div>
+        </div>
+        <div class="card-actions" id="servicesActions" hidden>
+          <button id="servicesLaunchBtn" type="button" class="button-primary launch-btn"><svg class="icon" aria-hidden="true"><use href="#i-rocket"></use></svg>Launch Docker + Langfuse</button>
+        </div>
+        <p id="servicesHint" class="muted small" style="margin: 6px 0 0;" hidden></p>
+      </section>
+
+      <!-- Model decisions (#373): role -> model assignments + a per-host
+           placement summary. Folded by default and fetched only when
+           expanded — mirrors app-launcher's System Map lazy-load discipline
+           (a folded, homepage-visible, low-noise card), adapted for small
+           live JSON instead of a static image. Links to the Models tab's
+           Fleet summary card rather than duplicating it. -->
+      <details class="card card--collapsible" id="rolesCard">
+        <summary class="collapse-summary">
+          <span class="collapse-main">
+            <svg class="icon" aria-hidden="true"><use href="#i-boxes"></use></svg>
+            <h3 class="collapse-title">Model decisions</h3>
+            <span class="collapse-count">roles &amp; placement</span>
+          </span>
+          <span class="collapse-chevron" aria-hidden="true">›</span>
+        </summary>
+        <div class="collapse-body">
+          <p id="rolesStatus" class="muted small" hidden></p>
+          <h4 class="opt-group-title">Roles</h4>
+          <ul id="rolesList" class="startup-list" aria-label="Role to model assignments"></ul>
+          <h4 class="opt-group-title">Placement</h4>
+          <ul id="rolesPlacementList" class="startup-list" aria-label="Per-host placement summary"></ul>
+          <div class="card-actions">
+            <button id="rolesViewPlacementBtn" type="button" class="ghost-btn"><svg class="icon" aria-hidden="true"><use href="#i-external-link"></use></svg>View fleet summary</button>
+          </div>
+        </div>
+      </details>
+
+      <!-- Health & install — vendored disclosure card (_vendored/disclosure) -->
+      <details class="card card--collapsible" id="installCard">
+        <summary class="collapse-summary">
+          <span class="collapse-main">
+            <svg class="icon" aria-hidden="true"><use href="#i-stethoscope"></use></svg>
+            <h3 class="collapse-title">Health &amp; install</h3>
+            <span id="installSummary" class="collapse-count">checking…</span>
+          </span>
+          <span class="collapse-chevron" aria-hidden="true">›</span>
+        </summary>
+        <div class="collapse-body">
+          <div id="installRows"></div>
+          <div class="card-actions">
+            <button id="installFixAllBtn" type="button" class="button-primary launch-btn"><svg class="icon" aria-hidden="true"><use href="#i-wrench"></use></svg>Fix all</button>
+            <button id="installRefreshBtn" type="button" class="ghost-btn"><svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"></use></svg>Re-check</button>
+          </div>
+        </div>
+      </details>
+
+      <!-- Diagnostic surfaces (#215): four vendored disclosure cards
+           (_vendored/disclosure), folded by default — same pattern as
+           Health & install. The density toggle + compact tabbed pane are gone. -->
+      <details class="card card--collapsible">
+        <summary class="collapse-summary">
+          <span class="collapse-main">
+            <svg class="icon" aria-hidden="true"><use href="#i-radio"></use></svg>
+            <h3 class="collapse-title">Live requests</h3>
+            <span id="liveRequestsBadge" class="collapse-count">0</span>
+          </span>
+          <span class="collapse-chevron" aria-hidden="true">›</span>
+        </summary>
+        <div class="collapse-body">
+          <ul id="liveRequestsList" class="card-list dense" aria-label="Live request stream"></ul>
+          <div id="liveRequestsEmpty" class="empty-state"><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-radio"></use></svg><p class="empty-state-message">No requests yet — the ring fills as clients call the hub.</p></div>
+          <p class="muted small" style="margin: 8px 0 0;">Audio calls posted directly to <code>:8090</code> / <code>:8091</code> bypass the hub and don't show here.</p>
+        </div>
+      </details>
+
+      <details class="card card--collapsible">
+        <summary class="collapse-summary">
+          <span class="collapse-main">
+            <svg class="icon" aria-hidden="true"><use href="#i-chart-column"></use></svg>
+            <h3 class="collapse-title">Counters</h3>
+            <span class="collapse-count">since hub start</span>
+          </span>
+          <span class="collapse-chevron" aria-hidden="true">›</span>
+        </summary>
+        <div class="collapse-body">
+          <div class="counters-wrap">
+            <table id="countersTable" class="counters">
+              <thead><tr><th>Backend</th><th>Req</th><th>Err</th><th>p50</th><th>p95</th><th>I/O tok</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="muted small" style="margin: 8px 0 0;">Resets on hub restart. Audio calls posted directly to <code>:8090</code> / <code>:8091</code> bypass the hub and aren't counted.</p>
+        </div>
+      </details>
+
+      <details class="card card--collapsible">
+        <summary class="collapse-summary">
+          <span class="collapse-main">
+            <svg class="icon" aria-hidden="true"><use href="#i-triangle-alert"></use></svg>
+            <h3 class="collapse-title">Errors</h3>
+            <span id="recentErrorsBadge" class="collapse-count">0</span>
+          </span>
+          <span class="collapse-chevron" aria-hidden="true">›</span>
+        </summary>
+        <div class="collapse-body">
+          <ul id="recentErrorsList" class="card-list dense" aria-label="Recent errors"></ul>
+          <div id="recentErrorsEmpty" class="empty-state"><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-circle-check"></use></svg><p class="empty-state-message">No non-2xx responses in the ring.</p></div>
+        </div>
+      </details>
+
+      <details class="card card--collapsible">
+        <summary class="collapse-summary">
+          <span class="collapse-main">
+            <svg class="icon" aria-hidden="true"><use href="#i-scroll-text"></use></svg>
+            <h3 class="collapse-title">Log</h3>
+          </span>
+          <span class="collapse-chevron" aria-hidden="true">›</span>
+        </summary>
+        <div class="collapse-body">
+          <div class="logpane-actions">
+            <button id="hubLogPauseBtn" type="button" class="ghost-btn"><svg class="icon" aria-hidden="true"><use href="#i-pause"></use></svg>Pause</button>
+          </div>
+          <pre id="hubLog" class="logpane" aria-label="Hub server log"></pre>
+        </div>
+      </details>
+    </section>
+
+    <section id="paneModels" class="pane" hidden role="tabpanel">
+      <!-- Service startup (#265; services-only since #430, renamed #431).
+           Folded by default — a one-time setup surface, not something you
+           check every visit (#266). First in the tab: boot-time switches
+           above the live inventory. -->
+      <details class="card card--collapsible" id="startupCard">
+        <summary class="collapse-summary">
+          <span class="collapse-main">
+            <svg class="icon" aria-hidden="true"><use href="#i-rocket"></use></svg>
+            <h3 class="collapse-title">Service startup</h3>
+          </span>
+          <span class="collapse-chevron" aria-hidden="true">›</span>
+        </summary>
+        <div class="collapse-body">
+          <p class="muted small">Services that come up automatically every time the hub launches — toggle
+            any item on or off; the setting persists to <code>config/startup_profile.json</code>.
+            Model autostart is governed per model (<code>startup: eager|on_demand</code>) in the
+            placement cards below.</p>
+          <ul id="startupList" class="startup-list"></ul>
+        </div>
+      </details>
+
+      <!-- Vendored disclosure card (_vendored/disclosure), open by default —
+           the inventory is what you came to this tab to see (#266). -->
+      <details class="card card--collapsible" id="modelsCard" open>
+        <summary class="collapse-summary">
+          <span class="collapse-main">
+            <svg class="icon" aria-hidden="true"><use href="#i-boxes"></use></svg>
+            <h3 class="collapse-title">Models</h3>
+          </span>
+          <span class="collapse-actions">
+            <!-- models.yaml config version (#424) — same sha on every
+                 converged hub; compare across /admin pages to spot drift. -->
+            <span id="modelsConfigSha" class="models-config-sha muted small"></span>
+            <button id="modelsActiveToggle" type="button" class="icon-header-btn active" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="#i-activity"></use></svg></button>
+            <span class="collapse-chevron" aria-hidden="true">›</span>
+          </span>
+        </summary>
+        <div class="collapse-body">
+          <p class="muted small">One row per backend enabled for this host. Local <code>llama-server</code>
+            and <code>whisper-server</code> backends can be started or stopped individually; the
+            Claude and Gemini rows are subscription-backed and don't have a managed process.</p>
+          <ul id="modelsList" class="models-list"></ul>
+          <div id="modelsEmpty" class="empty-state" hidden><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-boxes"></use></svg><p class="empty-state-message">No models enabled for this host — check <code>config/models.yaml</code>.</p></div>
+        </div>
+      </details>
+
+      <!-- Read-only fleet summary (#354, reworked #431): what each machine is
+           running and could load, with honest capacity numbers. Zero controls
+           beyond the collapse — placement is edited in the model cards above
+           or config/models.yaml. Folded by default. -->
+      <details class="card card--collapsible" id="fleetPlacementCard">
+        <summary class="collapse-summary">
+          <span class="collapse-main">
+            <svg class="icon" aria-hidden="true"><use href="#i-layers"></use></svg>
+            <h3 class="collapse-title">Fleet summary</h3>
+          </span>
+          <span class="collapse-chevron" aria-hidden="true">›</span>
+        </summary>
+        <div class="collapse-body">
+          <p class="muted small">Per machine: models running now (live state), models placeable but
+            not running (chain members, including on-demand rows), and estimated capacity — a
+            read-only summary derived from <code>config/models.yaml</code> plus live probes. To
+            change placement, edit a model's placement card above or <code>models.yaml</code>.</p>
+          <div id="fleetPlacementBody" class="fleet-placement">
+            <div class="empty-state"><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-server"></use></svg><p class="empty-state-message">Reading fleet summary…</p></div>
+          </div>
+          <p id="fleetPlacementStaleNote" class="muted small" role="status" aria-live="polite" hidden></p>
+        </div>
+      </details>
+    </section>
+
+    <section id="panePlayground" class="pane" hidden role="tabpanel">
+      <!-- The three testers are vendored disclosure cards, folded by default,
+           so one opens at a time by choice (#217). -->
+      <details class="card card--collapsible">
+        <summary class="collapse-summary">
+          <span class="collapse-main">
+            <svg class="icon" aria-hidden="true"><use href="#i-flask-conical"></use></svg>
+            <h3 class="collapse-title">Playground</h3>
+          </span>
+          <span class="collapse-chevron" aria-hidden="true">›</span>
+        </summary>
+        <div class="collapse-body">
+
+        <div class="opt-stack">
+          <label for="playgroundModel">Model</label>
+          <select id="playgroundModel" aria-label="Model"></select>
+        </div>
+
+        <div class="opt-stack">
+          <label for="playgroundSystem">System</label>
+          <textarea id="playgroundSystem" rows="2" placeholder="optional system prompt"></textarea>
+        </div>
+
+        <div class="opt-stack">
+          <label for="playgroundPrompt">Prompt</label>
+          <textarea id="playgroundPrompt" rows="6" placeholder="Hello"></textarea>
+        </div>
+
+        <div class="opt-stack">
+          <label for="playgroundAttachment">Attachment <span class="muted small">(image / PDF / text — claude &amp; gemini only)</span></label>
+          <div class="file-row">
+            <button id="playgroundAttachmentBtn" type="button" class="ghost-btn"><svg class="icon" aria-hidden="true"><use href="#i-paperclip"></use></svg>Choose file</button>
+            <span id="playgroundAttachmentName" class="file-name muted small">No file selected</span>
+            <input id="playgroundAttachment" type="file" hidden aria-label="Attach a file — image, PDF, or any text/data file (claude/gemini only)">
+          </div>
+        </div>
+
+        <details class="opt-stack" id="playgroundMore">
+          <summary class="opt-group-title" style="cursor: pointer; list-style: revert;">More options</summary>
+
+          <div class="opt-stack">
+            <label>Max tokens</label>
+            <div class="maxtokens-row">
+              <div id="playgroundMaxTokensSeg" class="segmented stretch" role="tablist" aria-label="Max tokens preset">
+                <button type="button" data-value="256">256</button>
+                <button type="button" data-value="512" class="active">512</button>
+                <button type="button" data-value="2048">2048</button>
+                <button type="button" data-value="8192">8192</button>
+              </div>
+              <input id="playgroundMaxTokens" type="number" min="1" max="32000" value="512" aria-label="Max tokens override">
+            </div>
+          </div>
+        </details>
+
+        <div class="playground-send-row">
+          <button id="playgroundSendBtn" type="button" class="ghost-btn primary"><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg>Send</button>
+          <button id="playgroundClearBtn" type="button" class="ghost-btn">Clear</button>
+        </div>
+        <p id="playgroundLatency" class="muted small" style="margin: 8px 0 0;"></p>
+
+        <h3 class="opt-group-title">Reply</h3>
+        <pre id="playgroundReply" class="logpane" aria-label="Model reply"></pre>
+        <h3 class="opt-group-title">Usage</h3>
+        <div id="playgroundUsage" class="kv-grid usage"></div>
+        </div>
+      </details>
+
+      <details class="card card--collapsible" id="imageCard">
+        <summary class="collapse-summary">
+          <span class="collapse-main">
+            <svg class="icon" aria-hidden="true"><use href="#i-image"></use></svg>
+            <h3 class="collapse-title">Image generation</h3>
+          </span>
+          <span class="collapse-chevron" aria-hidden="true">›</span>
+        </summary>
+        <div class="collapse-body">
+
+        <div class="opt-stack">
+          <label for="imageModel">Model</label>
+          <select id="imageModel" aria-label="Image model"></select>
+        </div>
+
+        <div class="opt-stack">
+          <label for="imagePrompt">Prompt</label>
+          <textarea id="imagePrompt" rows="4" placeholder="a red apple on a white background"></textarea>
+        </div>
+
+        <div class="opt-stack">
+          <label for="imageAttachment">Reference image <span class="muted small">(optional — edits the upload instead of generating; slow &amp; experimental, can take minutes)</span></label>
+          <div class="file-row">
+            <button id="imageAttachmentBtn" type="button" class="ghost-btn"><svg class="icon" aria-hidden="true"><use href="#i-paperclip"></use></svg>Choose file</button>
+            <span id="imageAttachmentName" class="file-name muted small">No file selected</span>
+            <input id="imageAttachment" type="file" accept="image/*" hidden aria-label="Reference image to edit (optional)">
+          </div>
+          <p class="muted small" style="margin: 4px 0 0;">Tip: dimensions are model-controlled — ask for an aspect ratio in the prompt (e.g. “16:9”).</p>
+        </div>
+
+        <div class="playground-send-row">
+          <button id="imageGenBtn" type="button" class="ghost-btn primary"><svg class="icon" aria-hidden="true"><use href="#i-sparkles"></use></svg>Generate</button>
+          <button id="imageClearBtn" type="button" class="ghost-btn">Clear</button>
+        </div>
+        <p id="imageLatency" class="muted small" style="margin: 8px 0 0;"></p>
+
+        <img id="imagePreview" alt="Generated image" style="max-width: 100%; margin-top: 10px; border-radius: 8px;" hidden>
+        <div class="playground-send-row" id="imageDownloadRow" hidden style="margin-top: 10px;">
+          <a id="imageDownload" class="ghost-btn primary" download="generated.png" role="button"><svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg>Download</a>
+        </div>
+        </div>
+      </details>
+
+      <details class="card card--collapsible" id="ttsCard">
+        <summary class="collapse-summary">
+          <span class="collapse-main">
+            <svg class="icon" aria-hidden="true"><use href="#i-volume-2"></use></svg>
+            <h3 class="collapse-title">Text-to-speech</h3>
+          </span>
+          <span class="collapse-chevron" aria-hidden="true">›</span>
+        </summary>
+        <div class="collapse-body">
+
+        <div class="opt-stack">
+          <label for="ttsModel">Voice model</label>
+          <select id="ttsModel" aria-label="TTS model"></select>
+          <p id="ttsAvailability" class="muted small" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="opt-stack">
+          <label for="ttsInput">Text</label>
+          <textarea id="ttsInput" rows="4" placeholder="Hey, listen to this."></textarea>
+        </div>
+
+        <div class="opt-stack">
+          <label for="ttsLanguage">Language</label>
+          <select id="ttsLanguage" aria-label="Language"></select>
+        </div>
+
+        <div class="opt-stack">
+          <label for="ttsVoice">Voice</label>
+          <select id="ttsVoice" aria-label="Voice"></select>
+        </div>
+
+        <div class="opt-stack" id="ttsStreamGroup">
+          <div class="opt-switch-row">
+            <span>Stream <span class="muted small">(play as it synthesizes when supported; off = buffered clip with a player)</span></span>
+            <button type="button" id="ttsStream" class="toggle on" role="switch" aria-checked="true" aria-label="Stream audio"><span class="knob"></span><span class="toggle-label">ON</span></button>
+          </div>
+        </div>
+
+        <details class="opt-stack" id="ttsMore">
+          <summary class="opt-group-title" style="cursor: pointer; list-style: revert;">More options</summary>
+
+          <div class="opt-stack">
+            <label for="ttsFormat">Format <span class="muted small">(buffered only — streaming uses PCM)</span></label>
+            <select id="ttsFormat" aria-label="Response format">
+              <option value="wav" selected>wav</option>
+              <option value="mp3">mp3</option>
+              <option value="flac">flac</option>
+              <option value="opus">opus</option>
+              <option value="pcm">pcm</option>
+            </select>
+          </div>
+
+          <div class="opt-stack" id="ttsSpeedGroup" hidden>
+            <label for="ttsSpeed">Speed · <span id="ttsSpeedVal">1.0</span>×</label>
+            <input id="ttsSpeed" type="range" min="0.5" max="2" step="0.05" value="1" aria-label="Speed">
+          </div>
+
+          <div class="opt-stack" id="ttsExaggerationGroup" hidden>
+            <label for="ttsExaggeration">Exaggeration <span class="muted small">(Chatterbox tone dial)</span> · <span id="ttsExaggerationVal">0.5</span></label>
+            <input id="ttsExaggeration" type="range" min="0" max="1" step="0.05" value="0.5" aria-label="Exaggeration">
+          </div>
+
+          <div class="opt-stack" id="ttsCfgWeightGroup" hidden>
+            <label for="ttsCfgWeight">CFG weight <span class="muted small">(pacing)</span> · <span id="ttsCfgWeightVal">0.5</span></label>
+            <input id="ttsCfgWeight" type="range" min="0" max="1" step="0.05" value="0.5" aria-label="CFG weight">
+          </div>
+        </details>
+
+        <div class="playground-send-row">
+          <button id="ttsSpeakBtn" type="button" class="ghost-btn primary"><svg class="icon" aria-hidden="true"><use href="#i-volume-2"></use></svg>Speak</button>
+        </div>
+        <p id="ttsLatency" class="muted small" style="margin: 8px 0 0;"></p>
+
+        <audio id="ttsAudio" controls style="width: 100%; margin-top: 10px;" hidden></audio>
+        </div>
+      </details>
+    </section>
+
+    <section id="paneTelemetry" class="pane" hidden role="tabpanel">
+      <!-- Stack health strip: OTel SDK state + Langfuse reachability + PII mode -->
+      <section class="card">
+        <div class="card-header">
+          <div class="hub-title-block">
+            <h2><svg class="icon" aria-hidden="true"><use href="#i-activity"></use></svg>Telemetry</h2>
+            <span id="telHealth" class="hub-live-status" aria-live="polite">
+              <span class="dot"></span>
+              <span id="telHealthText">checking…</span>
+            </span>
+          </div>
+          <div class="card-header-actions">
+            <a id="telOpenLangfuse" class="icon-header-btn" href="http://localhost:3000" target="_blank" rel="noopener" aria-label="Open Langfuse UI" title="Open Langfuse UI"><svg class="icon" aria-hidden="true"><use href="#i-external-link"></use></svg></a>
+          </div>
+        </div>
+        <div id="telHealthMeta" class="hub-meta-row">
+          <span><span>OTel</span><code id="telOtelState">—</code></span>
+          <span><span>PII</span><code id="telHashMode">—</code></span>
+          <span><span>Endpoint</span><code id="telEndpoint">—</code></span>
+        </div>
+        <p id="telOfflineHint" class="muted small" style="margin: 4px 0 0;" hidden>
+          Langfuse stack offline — run <code>start_langfuse.bat</code>, open
+          <a href="http://localhost:3000" target="_blank" rel="noopener">localhost:3000</a>,
+          create a project, copy the keys into <code>.env</code>, then restart the hub.
+        </p>
+      </section>
+
+      <!-- Per-model leaderboard (reuses .counters table style) -->
+      <section class="card">
+        <div class="card-header">
+          <h2><svg class="icon" aria-hidden="true"><use href="#i-chart-line"></use></svg>Per-model leaderboard</h2>
+          <span id="telSummary" class="muted small">—</span>
+        </div>
+        <div class="counters-wrap">
+          <table id="telCountersTable" class="counters">
+            <thead><tr><th>Model</th><th>Req</th><th>Err</th><th>p50</th><th>p95</th><th>I/O tok</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="muted small" style="margin: 8px 0 0;">Window resets on hub restart. Open Langfuse for long-window analytics.</p>
+      </section>
+
+      <!-- Claude Code (host CLI) per-model usage incl. sub-agents — via OTel (issue #68) -->
+      <section class="card">
+        <div class="card-header">
+          <h2><svg class="icon" aria-hidden="true"><use href="#i-code"></use></svg>Claude Code (host CLI)</h2>
+          <span id="telCcSummary" class="muted small">—</span>
+        </div>
+        <div id="telCcPeriodSeg" class="segmented stretch" role="tablist" aria-label="Usage period" style="margin-bottom: 12px;">
+          <button type="button" data-period="today" class="active">Day</button>
+          <button type="button" data-period="week">Week</button>
+          <button type="button" data-period="month">Month</button>
+          <button type="button" data-period="all">All</button>
+        </div>
+        <div class="counters-wrap">
+          <table id="telCcTable" class="counters">
+            <thead><tr><th>Date</th><th>Project</th><th>Model</th><th>Source</th><th>In</th><th>Out</th><th>Cache rd</th><th>Cache cr</th><th>≈ $</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="telCcEmpty" class="empty-state" hidden><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-code"></use></svg><p class="empty-state-message">No sub-agent/Claude Code OTel usage yet — needs <code>CLAUDE_CODE_ENABLE_TELEMETRY</code> set on the host.</p></div>
+        <p class="muted small" style="margin: 8px 0 0;">Sourced from Claude Code's own OTel export (<code>POST /v1/metrics</code>) — the only channel that sees sub-agent (Task tool) usage. Persisted separately from the Code tab's JSONL totals, not summed into them, to avoid double-counting. Project is auto-tagged for sessions launched via the <code>claude</code> shell wrapper fleet-config wires into your PowerShell profile (from the invoking repo); "—" for anything else (a one-off <code>OTEL_RESOURCE_ATTRIBUTES=project.name=&lt;repo&gt;</code> covers those). (<a href="https://github.com/ferraroroberto/local-llm-hub/issues/68" target="_blank" rel="noopener">#68</a>, <a href="https://github.com/ferraroroberto/local-llm-hub/issues/234" target="_blank" rel="noopener">#234</a>)</p>
+      </section>
+
+      <!-- Live trace feed -->
+      <section class="card">
+        <div class="card-header">
+          <h2><svg class="icon" aria-hidden="true"><use href="#i-radio"></use></svg>Live traces</h2>
+          <span id="telTracesBadge" class="badge">0</span>
+        </div>
+        <ul id="telTracesList" class="card-list dense tel-traces" aria-label="Live trace feed"></ul>
+        <div id="telTracesEmpty" class="empty-state"><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-radio"></use></svg><p class="empty-state-message">No traces yet — the ring fills as clients call the hub.</p></div>
+        <p class="muted small" style="margin: 8px 0 0;">Tap a row to expand prompt/completion preview. <svg class="icon" aria-hidden="true"><use href="#i-thumbs-up"></use></svg>/<svg class="icon" aria-hidden="true"><use href="#i-thumbs-down"></use></svg> sends a Langfuse score; <svg class="icon" aria-hidden="true"><use href="#i-external-link"></use></svg> opens the full trace.</p>
+      </section>
+    </section>
+
+    <section id="paneCodeUsage" class="pane" hidden role="tabpanel">
+
+      <!-- Today / This week counters -->
+      <section class="card">
+        <div class="card-header">
+          <div class="hub-title-block">
+            <h2><svg class="icon" aria-hidden="true"><use href="#i-code"></use></svg>Coding agent usage</h2>
+            <span id="cldFreshness" class="muted small"></span>
+          </div>
+        </div>
+
+        <!-- Vendor selector (issue #71): one vendor or all at once -->
+        <div id="cldVendorSeg" class="segmented stretch" role="tablist" aria-label="Vendor" style="margin-bottom: 8px;">
+          <button type="button" data-vendor="all" class="active">All</button>
+          <button type="button" data-vendor="claude">Claude</button>
+          <button type="button" data-vendor="codex">Codex</button>
+          <button type="button" data-vendor="copilot">Copilot</button>
+        </div>
+        <!-- AgentsView gap-fill vendors (issue #280): extra buttons are
+             injected above when the optional AgentsView service reports
+             agents the hub has no native parser for. -->
+        <p id="cldAgentsviewHint" class="muted small" hidden style="margin: -4px 0 8px;">AgentsView offline — extra coding agents show last-fetched data.</p>
+
+        <!-- Period toggle -->
+        <div id="cldPeriodSeg" class="segmented stretch" role="tablist" aria-label="Usage period" style="margin-bottom: 12px;">
+          <button type="button" data-period="today" class="active">Day</button>
+          <button type="button" data-period="week">Week</button>
+          <button type="button" data-period="month">Month</button>
+          <button type="button" data-period="all">All</button>
+        </div>
+
+        <!-- Big counter grid -->
+        <div id="cldCounterGrid" class="cld-counter-grid">
+          <div class="cld-counter">
+            <div class="cld-counter-value" id="cldRequests">—</div>
+            <div class="cld-counter-cost" id="cldTotalCost" title="Total equivalent metered API cost (input + output + cache reads)"></div>
+            <div class="cld-counter-label">requests</div>
+            <span class="cld-delta" id="cldDeltaRequests" hidden></span>
+          </div>
+          <div class="cld-counter">
+            <div class="cld-counter-value" id="cldInputTok">—</div>
+            <div class="cld-counter-cost" id="cldInputCost" title="Equivalent metered API cost"></div>
+            <div class="cld-counter-label">input tokens</div>
+            <span class="cld-delta" id="cldDeltaInputTok" hidden></span>
+          </div>
+          <div class="cld-counter">
+            <div class="cld-counter-value" id="cldOutputTok">—</div>
+            <div class="cld-counter-cost" id="cldOutputCost" title="Equivalent metered API cost"></div>
+            <div class="cld-counter-label">output tokens</div>
+            <div class="cld-counter-sub" id="cldOutputReasoning" title="Codex reasoning tokens — a subset of output, shown for transparency"></div>
+            <span class="cld-delta" id="cldDeltaOutputTok" hidden></span>
+          </div>
+          <div class="cld-counter">
+            <div class="cld-counter-value" id="cldCacheRead">—</div>
+            <div class="cld-counter-cost" id="cldCacheCost" title="Equivalent metered API cost"></div>
+            <div class="cld-counter-label">cache reads</div>
+            <span class="cld-delta" id="cldDeltaCacheRead" hidden></span>
+          </div>
+        </div>
+        <p class="muted small" style="margin: 6px 0 0;">Input tokens = net new + cache creation (both billed).
+          Cache reads are served from the 5-min/1-hr prompt cache.
+          <span class="cld-counter-cost" style="display:inline">≈ $</span> lines show the equivalent
+          metered-API cost these tokens would have billed.</p>
+        <p class="muted small" style="margin: 4px 0 0;"><svg class="icon" aria-hidden="true"><use href="#i-triangle-alert"></use></svg> <strong>Claude figures undercount two ways</strong> — sessions bridged through claude.ai/code don't write usage to the local transcripts at all (the <strong>OTel tab's "Claude Code (host CLI)"</strong> panel captures those when telemetry is enabled), and Claude Code prunes transcripts after ~30 days — the hub snapshots daily rollups so "All" keeps growing from 2026-07-12 forward, but earlier pruned days are gone. Sub-agent (Task tool) usage <em>is</em> counted where the newer per-session transcript folders exist. (<a href="https://github.com/ferraroroberto/local-llm-hub/issues/68" target="_blank" rel="noopener">#68</a>, <a href="https://github.com/ferraroroberto/local-llm-hub/issues/280" target="_blank" rel="noopener">#280</a>)</p>
+      </section>
+
+      <!-- Per-vendor breakdown (issue #71) — shown only in "All" mode -->
+      <section class="card" id="cldVendorCard" hidden>
+        <div class="card-header">
+          <h2><svg class="icon" aria-hidden="true"><use href="#i-tag"></use></svg>Per-vendor</h2>
+        </div>
+        <div class="counters-wrap">
+          <table id="cldVendorTable" class="counters">
+            <thead>
+              <tr>
+                <th>Vendor</th><th>Req</th><th>I/O tok</th><th>Cache rd</th><th>≈ $</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="cldVendorEmpty" class="empty-state" hidden><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-tag"></use></svg><p class="empty-state-message">No vendor data for this period.</p></div>
+      </section>
+
+      <!-- Copilot official credits (issue #231, part B) — shown only when the
+           Copilot vendor is selected. Authoritative $ from the GitHub billing
+           API; independent of the session-shaped data above (day x model
+           granularity only, no project/session attribution). -->
+      <section class="card" id="cldCopilotBillingCard" hidden>
+        <div class="card-header">
+          <h2><svg class="icon" aria-hidden="true"><use href="#i-tag"></use></svg>Copilot credits (official)</h2>
+          <span class="muted small" id="cldCopilotBillingAsOf"></span>
+        </div>
+        <p class="muted small" style="margin: 0 0 8px;">Authoritative spend from the GitHub billing API — independent of the session data above.</p>
+        <div class="cld-counter-grid" style="grid-template-columns: 1fr;">
+          <div class="cld-counter">
+            <div class="cld-counter-value" id="cldCopilotBillingTotal">—</div>
+            <div class="cld-counter-label">total credits (last 14 days)</div>
+          </div>
+        </div>
+        <div class="counters-wrap">
+          <table id="cldCopilotBillingTable" class="counters">
+            <thead>
+              <tr><th>Date</th><th>Model</th><th>Credits</th><th>≈ $</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="cldCopilotBillingEmpty" class="empty-state" hidden>
+          <svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-tag"></use></svg>
+          <p class="empty-state-message" id="cldCopilotBillingEmptyMsg">No billing data.</p>
+        </div>
+      </section>
+
+      <!-- Per-model breakdown -->
+      <section class="card">
+        <div class="card-header">
+          <h2><svg class="icon" aria-hidden="true"><use href="#i-chart-line"></use></svg>Per-model</h2>
+        </div>
+        <div class="counters-wrap">
+          <table id="cldModelTable" class="counters">
+            <thead>
+              <tr>
+                <th>Model</th><th>Req</th><th>I/O tok</th><th>Cache rd</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="cldModelEmpty" class="empty-state" hidden><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-chart-line"></use></svg><p class="empty-state-message">No model data for today.</p></div>
+      </section>
+
+      <!-- Per-project breakdown -->
+      <section class="card">
+        <div class="card-header">
+          <h2><svg class="icon" aria-hidden="true"><use href="#i-folder"></use></svg>Per-project</h2>
+        </div>
+        <div class="counters-wrap">
+          <table id="cldProjectTable" class="counters">
+            <thead>
+              <tr>
+                <th>Project</th><th>Req</th><th>I/O tok</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="cldProjectEmpty" class="empty-state" hidden><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-folder"></use></svg><p class="empty-state-message">No project data for today.</p></div>
+        <p class="muted small" style="margin: 6px 0 0;">Projects under the <code>automation</code> workspace show just the folder name (the <code>automation-</code> prefix is stripped; the workspace root itself stays <code>automation</code>). Long names are truncated with “…” — hover for the full path.</p>
+      </section>
+
+      <!-- Usage trend charts (hidden in "All" mode) -->
+      <section class="card" id="cldChartsCard" hidden>
+        <div class="card-header">
+          <h2><svg class="icon" aria-hidden="true"><use href="#i-chart-column"></use></svg>Usage trend</h2>
+        </div>
+        <div class="cld-chart-wrap">
+          <div class="cld-chart-label">Input tokens</div>
+          <div class="cld-chart-inner"><canvas id="cldChartInput"></canvas></div>
+        </div>
+        <div class="cld-chart-wrap">
+          <div class="cld-chart-label">Output tokens</div>
+          <div class="cld-chart-inner"><canvas id="cldChartOutput"></canvas></div>
+        </div>
+        <div class="cld-chart-wrap">
+          <div class="cld-chart-label">Requests</div>
+          <div class="cld-chart-inner"><canvas id="cldChartReqs"></canvas></div>
+        </div>
+        <div class="cld-chart-wrap">
+          <div class="cld-chart-label">Cache reads</div>
+          <div class="cld-chart-inner"><canvas id="cldChartCache"></canvas></div>
+        </div>
+      </section>
+
+      <!-- Recent sessions -->
+      <section class="card">
+        <div class="card-header">
+          <h2><svg class="icon" aria-hidden="true"><use href="#i-clock"></use></svg>Recent sessions</h2>
+          <span id="cldSessionsBadge" class="badge">0</span>
+        </div>
+        <ul id="cldSessionsList" class="card-list dense cld-sessions" aria-label="Recent Claude Code sessions"></ul>
+        <div id="cldSessionsEmpty" class="empty-state"><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-clock"></use></svg><p class="empty-state-message">No sessions found in <code>~/.claude/projects/</code>.</p></div>
+      </section>
+
+    </section>
+
+    <section id="paneMachines" class="pane" hidden role="tabpanel" aria-labelledby="tabMachines">
+      <!-- Async lifecycle (design.md): loading / error empty-states, a stale
+           inline note, then one .card per machine in machinesList. Only one
+           of loading/error/the card list is visible at a time (issue #309). -->
+      <div id="machinesLoading" class="empty-state">
+        <svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-server"></use></svg>
+        <p class="empty-state-message">Reading machine status…</p>
+      </div>
+      <div id="machinesError" class="empty-state" hidden>
+        <svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-triangle-alert"></use></svg>
+        <p class="empty-state-message" id="machinesErrorMsg">Could not read machine status.</p>
+        <button id="machinesRetryBtn" type="button" class="empty-state-action">Retry</button>
+      </div>
+      <p id="machinesStaleNote" class="muted small" role="status" aria-live="polite" hidden></p>
+      <div id="machinesList" class="machines-list"></div>
+    </section>
+
+    <!-- Build identity: which build the PWA is running. Filled by main.js.
+         (Frontier report stays reachable at /admin/frontier by URL.) -->
+    <footer class="page-foot">
+      <p id="buildReadout" class="muted small"></p>
+    </footer>
+
+  </main>
+
+  <!-- Fixed layers live at body level, outside the .app scroller (the
+       standalone-PWA shell makes .app a fixed-inset element scroller —
+       fixed descendants of a scroller are an iOS capture hazard). -->
+  <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+
+  <div id="loginOverlay" class="overlay" hidden role="dialog" aria-modal="true" aria-label="Login">
+    <form id="loginForm" class="login-card">
+      <h2><svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg>Sign in</h2>
+      <p class="muted small">This hub is locked. Enter the configured password to receive a bearer token.</p>
+      <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" required>
+      <button type="submit" class="button-primary launch-btn">Sign in</button>
+      <p id="loginError" class="error" hidden></p>
+    </form>
+  </div>
+
+  <!-- Machines tab (issue #309): destructive-action confirm + the SSH
+       terminal overlay. Both use the vendored editor-modal shell
+       (_vendored/modal) — a native <dialog>, so the fleet nav auto-hides
+       itself while either is open (body:has(dialog[open])). -->
+  <dialog class="detail-dialog" id="machinesConfirmDialog">
+    <div class="detail-card">
+      <div class="detail-header">
+        <h2 id="machinesConfirmTitle">Confirm</h2>
+        <button type="button" class="detail-close" id="machinesConfirmCloseBtn" aria-label="Close">
+          <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+      <p id="machinesConfirmBody" class="machines-confirm-body"></p>
+      <div class="detail-actions">
+        <button type="button" class="detail-save-btn danger" id="machinesConfirmBtn">Confirm</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Diagnostics drill-in (issue #315): capture · runs · settings. Same
+       vendored dialog shell; read-heavy rather than an editor, so the body
+       scrolls and the footer primary is replaced by per-section actions. -->
+  <dialog class="detail-dialog machines-diag-dialog" id="diagDialog">
+    <div class="detail-card machines-diag-card">
+      <div class="detail-header">
+        <h2><svg class="icon" aria-hidden="true"><use href="#i-stethoscope"></use></svg><span>Diagnostics</span></h2>
+        <button type="button" class="detail-close" id="diagCloseBtn" aria-label="Close diagnostics">
+          <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+      <div id="diagBody" class="machines-diag-body"></div>
+    </div>
+  </dialog>
+
+  <dialog class="detail-dialog machines-terminal-dialog" id="machinesTerminalDialog">
+    <div class="detail-card machines-terminal-card">
+      <div class="detail-header">
+        <h2><svg class="icon" aria-hidden="true"><use href="#i-terminal"></use></svg><span id="machinesTerminalTitle">Terminal</span></h2>
+        <button type="button" class="detail-close" id="machinesTerminalCloseBtn" aria-label="Close terminal">
+          <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+      <div id="machinesTerminalUnavailable" class="empty-state" hidden>
+        <svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-triangle-alert"></use></svg>
+        <p class="empty-state-message" id="machinesTerminalUnavailableMsg">Terminal unavailable.</p>
+      </div>
+      <div id="machinesTerminalMount" class="machines-terminal-mount"></div>
+    </div>
+  </dialog>
+
+  <script src="/admin/static/_vendored/chartjs/chart.umd.min.js"></script>
+  <script src="/admin/static/_vendored/xterm/xterm.js"></script>
+  <script src="/admin/static/_vendored/xterm/addon-fit.js"></script>
+  <script type="module" src="/admin/static/main.js"></script>
+</body>
+</html>

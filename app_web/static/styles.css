@@ -1,0 +1,1243 @@
+/* Local LLM Hub admin — mobile-first PWA.
+ *
+ * ============================================================ design tokens
+ * Fleet design system (~/.claude/design.md + design.dark.md). Token *names*
+ * are this app's; their *values* are the spec's. Light = :root, dark =
+ * [data-theme="dark"] (stamped pre-paint by the boot script in index.html;
+ * the Hub-card sun/moon button flips it — local-llm-hub#211).
+ * P3 wide-gamut (oklch) twins override the saturated tokens behind
+ * @media (color-gamut: p3) below.
+ *
+ * Touch targets >= 36 px; primary actions >= 48 px; safe-area insets
+ * applied at the root container.
+ */
+
+:root {
+  /* colors — neutrals */
+  --bg: #ffffff;            /* canvas (page background) */
+  --card: #ffffff;          /* elevated card surface */
+  --card-off: #f6f8fa;      /* canvas-subtle (inset / off-card surfaces) */
+  --ink: #1f2328;            /* primary text */
+  --muted: #656d76;         /* fg-muted (secondary text) */
+  --line: #d1d9e0;          /* border (default hairline) */
+  --line-muted: #d8dee4;    /* border-muted (dividers inside a card) */
+  /* colors — accent + status (status colors signal state only, never decoration) */
+  --accent: #0969da;
+  --accent-fg: #ffffff;     /* text/icon on an accent fill */
+  --on: #1a7f37;
+  --danger: #cf222e;
+  --attention: #9a6700;
+  /* derived surface roles (mapped onto the neutral tokens above) */
+  --toggle-track: var(--line);  /* vendored switch: off-track */
+  --toggle-knob: #ffffff;       /* vendored switch: thumb */
+  --input-bg: var(--card-off);
+  --code-bg: var(--card-off);  /* logpane / trace-detail <pre> surfaces */
+  --close-bg: var(--card-off); /* vendored modal's × close-button fill (_vendored/modal) */
+  --scrim: rgba(0, 0, 0, 0.5); /* login-overlay dim — theme-invariant by design */
+  /* status-alpha composites — derived, so they re-theme for free */
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-border-soft: color-mix(in srgb, var(--accent) 24%, transparent);
+  --accent-border-strong: color-mix(in srgb, var(--accent) 28%, transparent);
+  --danger-soft: color-mix(in srgb, var(--danger) 12%, transparent);
+  --danger-strong: color-mix(in srgb, var(--danger) 18%, transparent);
+  --danger-border: color-mix(in srgb, var(--danger) 45%, transparent);
+  --success-border: color-mix(in srgb, var(--on) 45%, transparent);
+  --attention-border: color-mix(in srgb, var(--attention) 45%, transparent);
+  /* radii (rounded scale) */
+  --radius-sm: 8px;
+  --radius-md: 12px;        /* buttons / inputs */
+  --radius: 16px;           /* rounded.lg — cards */
+  --radius-pill: 9999px;
+  --radius-nav: 30px;       /* the floating bottom-tab bar */
+  /* spacing scale */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  /* uniform gutter between cards/tiles and from the page edges */
+  --gap: 12px;
+  /* shared height for inline controls (select / input) so they line up */
+  --control-h: 36px;
+  /* canonical icon-size steps (icons.size.* — consumed by the vendored
+     disclosure / empty-state components) */
+  --icon-title: 18px;
+  --icon-feature: 24px;
+  /* typography roles — system stack, weight (not case) for hierarchy.
+     The five roles cover every text need; no ad-hoc sizes. */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-heading-xl: 2rem;
+  --font-heading-lg: 1.5rem;
+  --font-body: 1rem;
+  --font-label: 0.92rem;
+  --font-caption: 0.78rem;
+  /* elevation — cards lean on surface + hairline border; only floating
+     elements (toast) carry a real shadow. */
+  --shadow: 0 8px 24px rgba(31, 35, 40, 0.12);
+  /* Mobile floating bottom tab bar — the phone-validated fleet geometry
+     (home-automation#118), consumed by _vendored/nav/nav-tabs.css. */
+  --bottom-tabs-height: 61px;
+  --bottom-tabs-margin: 21px;
+  --bottom-tabs-pill-height: 53px;
+  --bottom-tabs-padding: 4px;
+  --bottom-tabs-gap: 4px;
+  --bottom-tabs-icon: 20px;
+  --bottom-tabs-label: 11px;
+  --tabbar-bg: rgba(255, 255, 255, 0.85);
+  --tabbar-border: rgba(31, 35, 40, 0.12);
+  /* Follow the html[data-theme] stamp, not the OS: `light dark` here let the
+     UA paint native widgets (checkboxes, selects) by OS preference, so a
+     dark-mode phone showed black checkboxes on the light theme (#428). The
+     boot script always stamps data-theme pre-paint, so this never flashes. */
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;       /* native widgets match the stamped theme (#428) */
+  --bg: #0d1117;            /* canvas (GitHub dark canvas) */
+  --card: #161b22;          /* elevated card surface */
+  --card-off: #010409;      /* canvas-subtle (true black inset) */
+  --ink: #e6edf3;
+  --muted: #7d8590;
+  --line: #30363d;
+  --line-muted: #21262d;
+  --accent: #2f81f7;
+  --accent-fg: #ffffff;
+  --on: #3fb950;
+  --danger: #f85149;
+  --attention: #d29922;
+  --toggle-knob: var(--ink);
+  --close-bg: var(--line);   /* vendored modal's × close-button fill (_vendored/modal) */
+  /* Depth on a near-black canvas comes from surface lightness, not shadow. */
+  --shadow: 0 8px 24px rgba(1, 4, 9, 0.6);
+  --tabbar-bg: rgba(22, 27, 34, 0.86);
+  --tabbar-border: rgba(255, 255, 255, 0.13);
+}
+
+/* P3 wide-gamut twins — on a wide-gamut display the saturated tokens render
+   the richer oklch() value; sRGB displays keep the hex values above. Only
+   saturated tokens have twins; neutrals are sRGB-only by design. Values are
+   the fleet spec's exact oklch: light from design.md, dark from design.dark.md. */
+@media (color-gamut: p3) {
+  :root {
+    --accent: oklch(0.52 0.18 256);
+    --on: oklch(0.55 0.14 150);
+    --danger: oklch(0.55 0.20 25);
+    --attention: oklch(0.55 0.11 80);
+  }
+  [data-theme="dark"] {
+    --accent: oklch(0.64 0.18 256);
+    --on: oklch(0.72 0.18 150);
+    --danger: oklch(0.68 0.20 25);
+    --attention: oklch(0.77 0.13 85);
+  }
+}
+
+/* Motion is functional, not decorative — collapse authored animation to
+   near-instant (0.01ms, not 0: some engines skip *end events at 0s). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+* { box-sizing: border-box; }
+/* The HTML5 `hidden` attribute means `display: none`, but an explicit
+ * `display: flex|grid` on the same element wins. Force the standard
+ * semantics back so toggling `hidden` from JS hides overlays / panes. */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--font-body);
+  line-height: 1.5;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  /* No pinch / double-tap zoom — fixed-scale app, paired with the
+     maximum-scale=1, user-scalable=no viewport meta. */
+  touch-action: manipulation;
+  /* Kill rubber-band drag at the document edges — the vendored nav's
+     recommended app-level hardening (_vendored/nav/README.md). */
+  overscroll-behavior: none;
+  /* Reserve the scrollbar gutter so the centred .app container doesn't
+   * shift ~8 px sideways when one tab needs a vertical scrollbar and
+   * another doesn't — visible as a "tabs aren't aligned" jitter on
+   * desktop when switching Hub ↔ Models ↔ Playground. */
+  scrollbar-gutter: stable;
+  min-height: 100vh;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+/* One app font everywhere (#215): monospace only where console output
+ * genuinely lives — <pre> panes (log tail, model reply, trace bodies) and the
+ * Recent-sessions id/token line (code_usage.css). Inline <code> chips render
+ * in the app font. */
+pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+code { font-family: inherit; }   /* beat the UA's default monospace */
+pre code { font-family: inherit; } /* …but code inside a pre stays mono */
+.muted { color: var(--muted); }
+.small { font-size: var(--font-caption); }
+/* "requested → served @host" tail on a request row whose model was resolved to
+ * a different one (role chain / fallback) and/or served by another machine —
+ * see api.js modelLabel (#412). */
+.model-served { color: var(--muted); }
+.model-host { color: var(--muted); }
+
+/* ---------- icons (vendored Lucide sprite — _vendored/icons) ----------
+ * The `.icon` rule is the required CSS contract from the vendored component's
+ * README: glyphs inherit `currentColor`, so they recolor for free. Size them
+ * with `font-size`/`width`/`height` at the call site (1em tracks the text). */
+.icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  flex: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -0.15em;
+}
+/* Section headings carry a leading Lucide glyph inline with the title text. */
+h2 { display: flex; align-items: center; gap: 8px; }
+/* Other inline icon+label contexts: service rows. */
+.services-label { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; font-size: var(--font-label); }
+
+.app {
+  /* Centered phone-first measure — the spec's 772px desktop cap. */
+  max-width: 772px;
+  margin: 0 auto;
+  /* Bottom padding equals the side gutter, so the build footer sits as
+   * close to the bottom edge as the cards do to the sides (#217). */
+  padding: env(safe-area-inset-top, 0) var(--gap) calc(env(safe-area-inset-bottom, 0) + var(--gap));
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+/* ---------- focus ring (keyboard nav) ---------- */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- tabs ----------
+ * Primary nav is the vendored fleet component (_vendored/nav/nav-tabs.css +
+ * nav-tabs.js) — desktop sticky segmented control, floating bottom-tab pill
+ * on coarse pointers. Never restyle .tabs/.tab here; the component owns them
+ * and reads only the tokens above. */
+
+/* ---------- panes ---------- */
+.pane { display: flex; flex-direction: column; gap: var(--gap); }
+
+/* ---------- cards ----------
+ * The base .card contract is the vendored component (_vendored/card/card.css);
+ * only the hub's own header/action patterns live here. Collapsible cards use
+ * the vendored disclosure (.card--collapsible — _vendored/disclosure). */
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+/* One card-title scale app-wide (#215): --font-body, matching the vendored
+ * disclosure's .collapse-title and home-automation's card-identity scale.
+ * The leading glyph is pinned to icons.size.title (18px) so plain card
+ * headers match the disclosure summaries' icon size too (#217). */
+.card-header h2 { margin: 0; font-size: var(--font-body); font-weight: 600; }
+.card-header h2 .icon { width: var(--icon-title); height: var(--icon-title); }
+.card-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.card-actions {
+  display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-top: 10px;
+  align-items: center;
+}
+/* Header-mounted icon action. Smaller than .icon-btn so it doesn't
+ * dominate the card header. */
+.icon-header-btn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+/* Invisible hit-area expansion — keeps the compact 36px visual while the
+ * effective pointer target reaches the 44px floor (36 + 2×4px), per
+ * design.md Touch targets. Each .icon-header-btn is solo in its card header,
+ * so the expanded rect never overlaps a neighbour. */
+.icon-header-btn::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
+.icon-header-btn:hover { color: var(--ink); background: var(--card-off); }
+.icon-header-btn:active { background: var(--bg); }
+/* Toggled-on state — same accent-tint recipe as .app-item .app-icons
+ * .icon-btn.active (#266's Models "Active only" filter). */
+.icon-header-btn.active { color: var(--accent); background: var(--accent-soft); }
+
+/* Hub card header — title + inline live status (dot + word), then
+ * the action buttons on the right. */
+.hub-title-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+/* Services card: the header's overall pill ("all up") sits in the same
+   column as the four row pills below it — same first-column floor and
+   column gap as .services-row (#280 follow-up, user-flagged). */
+#servicesCard .hub-title-block {
+  display: grid;
+  grid-template-columns: minmax(110px, auto) auto;
+  gap: 12px;
+}
+.hub-live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-caption);
+  color: var(--muted);
+  font-weight: 500;
+}
+.hub-live-status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+.hub-live-status.good   { color: var(--on); }
+.hub-live-status.good   .dot { background: var(--on); }
+.hub-live-status.warn   { color: var(--attention); }
+.hub-live-status.warn   .dot { background: var(--attention); }
+.hub-live-status.danger { color: var(--danger); }
+.hub-live-status.danger .dot { background: var(--danger); }
+
+/* Hub-card PID + Uptime sit on a single row, side by side. */
+.hub-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  align-items: baseline;
+  font-size: var(--font-caption);
+  margin-bottom: 4px;
+}
+.hub-meta-row > span { display: inline-flex; gap: 6px; align-items: baseline; min-width: 0; }
+.hub-meta-row > span > span:first-child { color: var(--muted); }
+/* Long single-token values (the OTel endpoint URL) wrap instead of
+ * overflowing the card edge. */
+.hub-meta-row code { word-break: break-all; }
+
+/* ---------- buttons ---------- */
+/* Primary per-card action layout — fill, border, radius, weight, and the
+   48px min-height come from the vendored .button-primary
+   (_vendored/button/button.css); this rule only owns the icon+label flex
+   layout, full-width sizing, and the local active-press feedback. */
+.launch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 18px;
+  font-size: var(--font-label);
+}
+.launch-btn:active { filter: brightness(0.9); }
+
+/* Secondary text-style button — Clear, Re-check, Pause, etc. */
+.ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--control-h);
+  padding: 8px 14px;
+  font: inherit;
+  font-size: var(--font-label);
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.ghost-btn:hover { color: var(--ink); }
+.ghost-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.ghost-btn.danger { color: var(--danger); border-color: var(--danger-border); }
+.ghost-btn.danger:hover { background: var(--danger-soft); }
+/* Accent-tint variant — same size as .ghost-btn but the primary action
+ * (Playground Send / Generate / Speak / Download). Transparent accent tint,
+ * never a solid fill — home-automation's .range-tab.active recipe (#215). */
+.ghost-btn.primary {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-border-strong);
+  font-weight: 600;
+}
+.ghost-btn.primary:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.ghost-btn.primary:active {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+/* Row-level icon button (Models tab). Lives inside .row-actions. */
+.icon-btn {
+  width: 52px;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-size: 16px;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+}
+.icon-btn:active { background: var(--card-off); color: var(--ink); }
+.icon-btn[disabled] { opacity: 0.35; cursor: not-allowed; }
+.icon-btn.danger:active { color: var(--danger); background: var(--danger-strong); }
+
+/* ---------- segmented control (Code vendor/period, Playground max tokens) ----------
+ * Home-automation's ghost .range-tabs pattern (#215): transparent container,
+ * each option a card-off pill, the active one a subtle accent tint — never a
+ * solid fill. The ::before extends the tap target to >=44px vertically. */
+.segmented {
+  display: inline-flex;
+  gap: 5px;
+}
+/* flex-wrap: a button row that outgrows the card wraps to a second line
+   instead of driving page-level horizontal overflow (issue #280: the vendor
+   selector gained a fifth button); min-width lets a button shrink below its
+   label's min-content before the row wraps. */
+.segmented.stretch { display: flex; width: 100%; flex-wrap: wrap; }
+.segmented button {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--control-h);
+  background: var(--card-off);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 0 10px;
+  font: inherit;
+  font-size: var(--font-label);
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.segmented button::before { content: ""; position: absolute; inset: -4px 0; }
+.segmented button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-border-strong);
+}
+
+/* ---------- key/value grid ---------- */
+.kv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px 14px;
+}
+.kv-grid > div { display: flex; gap: 8px; align-items: baseline; }
+.kv-grid > div > span:first-child { min-width: 60px; color: var(--muted); font-size: var(--font-caption); }
+.kv-grid > div > a,
+.kv-grid > div > code,
+.kv-grid > div > span:last-child {
+  font-size: var(--font-caption);
+}
+.kv-grid.usage > div > span:last-child {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ---------- card lists (Hub: live requests, recent errors) ---------- */
+.card-list { list-style: none; padding: 0; margin: 0; }
+.card-list.dense > li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line-muted);
+  font-size: var(--font-caption);
+  display: grid;
+  grid-template-columns: 60px 1fr auto auto;
+  gap: 8px;
+}
+.card-list.dense > li:last-child { border-bottom: 0; }
+.card-list .req-status.ok { color: var(--on); }
+.card-list .req-status.err { color: var(--danger); }
+.card-list .req-status.warn { color: var(--attention); }
+
+/* ---------- counters table (scrollable wrap on phone) ---------- */
+.counters-wrap { overflow-x: auto; }
+.counters {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-caption);
+}
+.counters th, .counters td {
+  padding: 6px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--line-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.counters th:first-child, .counters td:first-child { text-align: left; }
+.counters thead th { color: var(--muted); font-weight: 500; font-size: var(--font-caption); }
+/* Long first-column names (model ids, project paths) ellipsise instead of
+ * forcing a horizontal scroll on phone; full name via the title tooltip.
+ * .counters td is nowrap, so the ellipsis needs an explicit max-width cap. */
+.counters td.td-trunc {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 480px) {
+  .counters td.td-trunc { max-width: 42vw; }
+}
+
+/* ---------- log panes ---------- */
+.logpane {
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin: 0;
+  height: 240px;
+  overflow: auto;
+  font-size: var(--font-caption);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink);
+}
+/* Row above a logpane holding its Pause/Resume control (inside a disclosure
+ * body — a button can't live in the <summary> without toggling it). */
+.logpane-actions { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+
+/* ---------- sparklines (RAM / VRAM / GPU) ----------
+ * Energy-tab chart look (#215): a 2px line over a translucent accent area. */
+.sparklines {
+  display: flex; gap: var(--gap); flex-wrap: wrap; margin-top: 10px;
+}
+.sparkline {
+  background: var(--card-off);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  min-width: 140px;
+  flex: 1;
+}
+.sparkline-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-caption);
+  color: var(--muted);
+}
+.sparkline svg { display: block; width: 100%; height: 64px; margin-top: 4px; }
+
+/* ---------- Models tab: .app-item rows (canonical pattern) ----------
+ * Flat full-bleed rows inside one wrapping `.card` (design.md `list-row`
+ * contract, #265) — never nested per-item cards. The card's own
+ * `spacing.md` padding supplies the horizontal inset; rows only need
+ * `list-row.rowPadding` (12px 0) and a top hairline on every row after
+ * the first. */
+
+/* Card-header actions cluster for a `.card--collapsible` summary (#266) —
+ * the toggle button sits before the chevron rather than its own row, so
+ * per-app markup nests both inside grid-column 2 (the vendored
+ * .collapse-chevron's own `grid-column: 2` is then a no-op, since it's no
+ * longer a direct grid child — harmless). */
+.collapse-actions {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  /* Same 14px as disclosure.summaryPadding — the gap from the card's left
+   * edge to the .collapse-main icon, mirrored here between the action
+   * button and the chevron (#266: 2px read as the icon crowding the arrow). */
+  gap: 14px;
+}
+.models-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-item {
+  display: block;
+}
+.app-item + .app-item {
+  border-top: 1px solid var(--line-muted);
+}
+.app-item .app-main {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0;
+  gap: 4px;
+  width: 100%;
+}
+.app-item .app-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.app-item .app-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-label);
+  font-weight: 600;
+}
+/* Only the name ellipsises on narrow viewports; the status badge and the
+ * adopted-PID note sit beside .app-title as title-row siblings, so they
+ * are never clipped regardless of display-name length. */
+.app-item .app-name {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-item .badge { flex-shrink: 0; }
+.app-item .app-icons {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  /* Push the action icons to the right edge now that .app-title no longer
+   * grows to fill the row. */
+  margin-left: auto;
+}
+.app-item .app-icons .icon-btn {
+  width: 36px;
+  min-height: 36px;
+  border-radius: var(--radius-sm);
+}
+.app-item .app-meta {
+  font-size: var(--font-caption);
+  color: var(--muted);
+  word-break: break-all;
+}
+.app-item .app-icons .icon-btn.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ---------- Models tab: read-only placement cards (#423) ----------
+ * A per-row intent section under the runtime meta line: host-chain pills in
+ * priority order (owner = the accent-soft "selected" tint, same recipe as
+ * .segmented button.active), a startup-policy .badge, the static VRAM
+ * estimate, and the owner host's budget bar. All caption-scale — placement
+ * is context, never louder than the row's own title/status. */
+.placement {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+.placement-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-caption);
+}
+.placement-chain {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.placement-arrow { color: var(--muted); }
+.place-pill {
+  background: var(--card-off);
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+  font-size: var(--font-caption);
+  white-space: nowrap;
+}
+.place-pill.owner {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent-border-strong);
+  font-weight: 600;
+}
+/* Edit affordance (#424) — compact inline icon control on the placement
+ * line, same sub-row scale as the glossary REPL row's delete button. */
+.placement-line .placement-edit-btn { width: 26px; min-height: 26px; }
+
+/* ---------- placement editor (#424, inline panel under a model row) ----------
+ * Same sibling-panel recipe as .glossary-panel — the panel sits next to
+ * .app-main so it (and its unsaved draft) survives the 5 s poll. */
+.placement-editor {
+  border-top: 1px solid var(--line);
+  background: var(--card-off);
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.placement-editor .opt-group-title { margin: 4px 0 0; }
+.pe-note { margin: 0; }
+.pe-chain { display: flex; flex-direction: column; gap: 6px; }
+.pe-host-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.pe-host-name { flex: 1 1 0; min-width: 0; font-size: var(--font-label); }
+.pe-cpu-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+/* Compact inline chain controls — sub-row icon scale, same rationale as
+ * .glossary-repl-row .icon-btn. */
+.pe-host-row .icon-btn { width: 30px; min-height: 30px; flex-shrink: 0; }
+.pe-add-row { display: flex; gap: 8px; align-items: stretch; }
+.pe-add-row select {
+  flex: 1 1 0;
+  min-width: 0;
+  background: var(--input-bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 7px 9px;
+  font: inherit;
+  font-size: var(--font-label);
+}
+.pe-add-row .ghost-btn { flex-shrink: 0; }
+.pe-policy { display: flex; gap: 10px; flex-wrap: wrap; }
+.pe-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--font-caption);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.pe-field select,
+.pe-field input {
+  background: var(--input-bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 7px 9px;
+  font: inherit;
+  font-size: var(--font-label);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.pe-field input[type="number"] { width: 110px; }
+.pe-field input[disabled] { opacity: 0.5; }
+/* Inline rejection detail — state color (danger), matching the login
+ * error's tone: the validation arithmetic is the message, keep it legible. */
+.pe-error {
+  margin: 0;
+  font-size: var(--font-caption);
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+}
+.pe-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Config-version chip (#424) in the Models card header. Same typography as
+ * the build sha in the page footer (#buildReadout: plain .muted.small) —
+ * the monospace face clashed with the header type (#431). */
+.models-config-sha {
+  white-space: nowrap;
+}
+
+/* ---------- transcription dictionary editor (inline whisper-row panel) ---------- */
+.glossary-panel {
+  border-top: 1px solid var(--line);
+  background: var(--card-off);
+  padding: 12px 14px 14px;
+}
+.glossary-editor { display: flex; flex-direction: column; gap: var(--gap); }
+.glossary-shared-note {
+  margin: 0;
+  font-size: var(--font-caption);
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border-soft);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+}
+.glossary-status { margin: 0; }
+.glossary-section { display: flex; flex-direction: column; gap: 6px; }
+.glossary-section .opt-group-title { margin: 0; }
+.glossary-section p { margin: 0; }
+.glossary-repl-list { display: flex; flex-direction: column; gap: 6px; }
+.glossary-repl-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.glossary-repl-row input {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 7px 9px;
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: var(--font-label);
+}
+.glossary-arrow { color: var(--muted); flex-shrink: 0; }
+/* Compact inline delete action nested inside a REPL row — deliberately below
+ * the 44/52/60 rows scale, which governs list-row containers, not the icon
+ * controls sitting in them (design.md Components list-row). */
+.glossary-repl-row .icon-btn { width: 30px; min-height: 30px; flex-shrink: 0; }
+.glossary-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.glossary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-label);
+  color: var(--ink);
+}
+.glossary-chip-x {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  font-size: var(--font-caption);
+  line-height: 1;
+}
+.glossary-chip-x:hover { color: var(--danger); }
+.glossary-chip-suggest {
+  cursor: pointer;
+  border-color: var(--accent-border-strong);
+  color: var(--accent);
+}
+.glossary-chip-suggest:hover { background: var(--accent-soft); }
+.glossary-add-row { display: flex; gap: 6px; }
+.glossary-add-row input {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 7px 9px;
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: var(--font-label);
+}
+.glossary-suggest {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+}
+.glossary-suggest-head { font-size: var(--font-label); font-weight: 600; }
+.glossary-sublabel { margin-top: 2px; }
+.glossary-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- playground ---------- */
+.opt-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 10px 0;
+}
+.opt-stack > label {
+  font-size: var(--font-caption);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.opt-stack > textarea,
+.opt-stack > input,
+.opt-stack > select {
+  background: var(--input-bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font: inherit;
+  font-size: var(--font-label);
+  min-height: var(--control-h);
+  width: 100%;
+}
+.opt-stack > textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+/* File pickers (#215): the native input is hidden; a ghost "Choose file"
+ * button + the selected filename to its right stand in — no bordered box. */
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.file-row .ghost-btn { flex-shrink: 0; }
+.file-row .file-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Label + vendored switch on one row (the switch itself is _vendored/switch). */
+.opt-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.opt-group-title {
+  font-size: var(--font-caption);
+  color: var(--muted);
+  margin: 14px 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+.maxtokens-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.maxtokens-row .segmented { flex: 1; }
+.maxtokens-row input[type="number"] {
+  width: 90px;
+  background: var(--input-bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  font: inherit;
+  font-size: var(--font-label);
+  min-height: var(--control-h);
+}
+.playground-send-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  margin-top: 10px;
+}
+.playground-send-row > button { flex: 1; min-width: 0; }
+/* ---------- badges ---------- */
+.badge {
+  background: var(--card-off);
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  font-size: var(--font-caption);
+  white-space: nowrap;
+}
+.badge.good   { color: var(--on);   border-color: var(--success-border); }
+.badge.warn   { color: var(--attention); border-color: var(--attention-border); }
+.badge.danger { color: var(--danger);    border-color: var(--danger-border); }
+
+/* ---------- services card (Docker + Langfuse) ---------- */
+.services-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 0;
+}
+.services-row {
+  display: grid;
+  /* 4th column: the compact Wake/Sync action sits inline at the row's end,
+   * on the same line as the "out of sync" detail (#215). */
+  grid-template-columns: minmax(110px, auto) auto 1fr auto;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: var(--font-caption);
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line-muted);
+}
+.services-row:last-child { border-bottom: 0; }
+/* Peer rows (#372) render into this anchor via innerHTML — `display:
+ * contents` keeps it out of the flex box model so its .services-row
+ * children lay out as direct siblings of the static Docker/Langfuse/
+ * AgentsView rows above, with the same gap rhythm. */
+#peerRows { display: contents; }
+.services-detail {
+  word-break: break-word;
+  min-width: 0;
+}
+/* Row-level service action (Wake / Sync) — compact, never a big block. */
+.services-row .ghost-btn {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: var(--font-caption);
+}
+/* Docker/Langfuse/AgentsView start+stop pair (#284) — same compact
+ * icon-btn sizing as .glossary-repl-row, scaled down from the Models
+ * tab's 36px touch target to fit this row's 28px ghost-btn rhythm. */
+.services-row .services-actions {
+  display: flex;
+  gap: 2px;
+}
+.services-row .services-actions .icon-btn {
+  width: 28px;
+  min-height: 28px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- Startup card — per-item toggle rows (#265) ---------- */
+.startup-list {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+}
+.startup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+}
+.startup-row + .startup-row {
+  border-top: 1px solid var(--line-muted);
+}
+.startup-row-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--font-label);
+}
+.startup-row-label .badge { flex-shrink: 0; }
+/* Section labels reuse .opt-group-title (playground's existing group-label
+ * pattern) rather than a new one-off class. */
+
+/* ---------- Fleet summary card — per-machine read-only summary (#354/#431) ----------
+ * The fleet-wide sibling of the Service startup card: summary lines reuse
+ * .startup-row / .startup-list and the roles card's .roles-row-value; only
+ * the per-host grouping (header + status chip + offline note) is new here. */
+.fleet-placement {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+}
+.fleet-host + .fleet-host {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-muted);
+}
+.fleet-host-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.fleet-host-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--font-label);
+  font-weight: 600;
+}
+.fleet-host-name > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fleet-host-name .icon {
+  width: var(--icon-title);
+  height: var(--icon-title);
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.fleet-host-head .hub-live-status { flex-shrink: 0; }
+.fleet-host-note { margin: 6px 0 0; }
+/* Advisory VRAM-overcommit warning (#375) — a tinted host note with a leading
+ * glyph, matching the .badge.warn colour token. */
+.fleet-capacity-warn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--attention);
+}
+.fleet-capacity-warn .icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+/* The .startup-list under a host group has no extra top margin — the head +
+ * note already own the spacing above it. */
+.fleet-host .startup-list { margin-top: 2px; }
+/* Multi-line Running/Loadable values (#434): the label tops-out against the
+ * first model line instead of floating mid-list. */
+.fleet-host .startup-row { align-items: flex-start; }
+.fleet-model-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+/* One model per line (#434) — right-aligned by the parent .roles-row-value;
+ * both Running and Loadable read at the caption size (the old inline
+ * `·`-joined Running flow wrapped awkwardly on phones). */
+.fleet-model-line {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+/* Single-line values (Capacity, an honest "none") are inline spans inside
+ * .roles-row-value: without a matching font-size their anonymous line box is
+ * struck at the inherited body size, seating the caption-sized text below
+ * the label's baseline (#436) — block .fleet-model-line values never had
+ * the problem. Scoped to the fleet card; the roles card keeps its own
+ * rhythm. */
+.fleet-host .roles-row-value { font-size: var(--font-caption); }
+
+/* ---------- Model decisions card — role/placement summary rows (#373) ----------
+ * Same .startup-row/.startup-list rhythm as the Startup + Fleet placement
+ * cards; only the right-hand value column is new (those two cards put a
+ * switch there instead of text). Right-aligned, allowed to wrap onto a
+ * second line for a long fallback/placed-models list rather than overflow. */
+.roles-row-value {
+  text-align: right;
+  min-width: 0;
+  flex-shrink: 1;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- install panel rows ---------- */
+.install-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-muted);
+  font-size: var(--font-caption);
+}
+.install-row:last-of-type { border-bottom: 0; }
+.install-row .install-detail { grid-column: 2 / -1; font-size: var(--font-caption); }
+/* Status glyph (Lucide) inherits currentColor — tint it per check status. */
+.install-glyph .icon { font-size: 16px; }
+.install-ok .install-glyph { color: var(--on); }
+.install-warn .install-glyph { color: var(--attention); }
+.install-missing .install-glyph { color: var(--muted); }
+.install-error .install-glyph { color: var(--danger); }
+
+/* ---------- empty state ----------
+ * The canonical zero-items block is the vendored component
+ * (_vendored/empty-state) — no app-side .empty style anymore. */
+
+/* ---------- footer ----------
+ * Build-identity line only (which build the PWA is running) — home-automation's
+ * .page-foot: one centered muted caption, no links, no separator (#215). */
+.page-foot {
+  /* No bottom margin — .app's bottom padding (one --gap) is the whole gap
+   * below the build line (#217). */
+  margin: var(--space-xs) var(--space-xs) 0;
+  text-align: center;
+}
+.page-foot p { margin: 2px 0; }
+
+/* ---------- toast ---------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0) + 20px);
+  transform: translateX(-50%);
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  font-size: var(--font-label);
+  max-width: calc(100vw - 32px);
+  box-shadow: var(--shadow);
+  /* Clear the vendored floating mobile nav (z-index: 120) so command
+   * progress and results remain readable after the nav migration. */
+  z-index: 130;
+}
+.toast.good  { border-color: var(--on); }
+.toast.error { border-color: var(--danger); }
+
+/* ---------- login overlay ---------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+  padding: 16px;
+}
+.login-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+.login-card h2 { margin: 0; font-size: var(--font-heading-lg); }
+.login-card input {
+  background: var(--input-bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  font-size: var(--font-body);
+  min-height: 44px;
+}
+.login-card .error {
+  background: var(--danger-soft);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-caption);
+  margin: 0;
+}

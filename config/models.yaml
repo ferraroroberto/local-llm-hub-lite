@@ -1,0 +1,935 @@
+# Models registry for the local-llm-hub hub.
+#
+# - `hosts` lists each machine this repo runs on. `platform` matches
+#   sys.platform ("win32" or "darwin"); `default: true` lets the first
+#   matching row win when no hostname matches exactly. Override with
+#   the LOCAL_LLM_HUB_HOST env var.
+# - `enabled` is the whitelist of model ids this host is willing to
+#   serve locally. The installer only downloads GGUFs for enabled ids.
+# - `models` defines every model the hub knows about, across all hosts.
+#   An entry not present in the active host's `enabled` list is treated
+#   as absent (not shown in UI, not downloaded, not startable).
+
+hub:
+  port: 8000
+  bind_host: "0.0.0.0"
+  # Single-writer contract for the editable placement cards (#424): only the
+  # hub running as this host id may mutate this file from the admin UI (the
+  # write endpoints 403 everywhere else; satellites render read-only cards
+  # and converge by git pull). Unset = config writes disabled fleet-wide.
+  config_write_host: tower
+
+# System-tray launcher (`tray.bat` → `python -m tray`).
+# Drives what `tray/app.py` does on startup. All keys are optional.
+#
+# Which local models come up with the hub is derived from the rows below
+# (#430): a `startup: eager` row autostarts on its preferred chain host
+# (`model_registry.desired_model_ids`); a `startup: on_demand` row loads on
+# first request. Service autostart (Docker/Langfuse/AgentsView) lives in
+# config/startup_profile.json (issue #265) — the admin SPA's Startup card.
+tray:
+  autostart_hub: true
+  hub_ready_timeout_s: 30
+
+# Each host row also carries optional **machine-console** metadata (issue
+# #309) surfaced by the admin SPA's Machines tab — a fleet machine console.
+# These fields never affect model routing (resolve()/enabled_models key off
+# the *active* host only); they only describe a box for the console:
+#   display_name  human label for the card
+#   role          one-line description under the name
+#   icon          Lucide glyph id (bare name; the SPA prefixes `i-`)
+#   dormant       true = a powered-down node shown but not live-probed
+#   tailscale     Tailscale magic-DNS hostname (peer reachability + RDP)
+#   rdp           {address, user} for the Remote-Desktop launch action
+# Human-readable fleet inventory + Tailscale identities: docs/machines.md
+# Reboot/shutdown are offered for any peer with both `address` + `ssh_user`
+# (never the active host — that's the hub, excluded as destructive).
+#
+# `vram_mb` (issue #375) is the host's discrete-GPU VRAM ceiling in MB —
+# promoted here from docs/machines.md's prose hardware facts so the fleet
+# placement grid can flag an *overcommit* (sum of a host's placed models'
+# `est_vram_mb` exceeding this ceiling). It is advisory only: the placement
+# PATCH is never blocked, the grid just warns. Omit it on a host with no
+# discrete-VRAM notion to check against — the Apple-silicon Mac Mini
+# (unified memory, no fixed VRAM partition) and any managed-only box that
+# serves no models. A host with no `vram_mb` never raises a capacity warning.
+# OpenClaw + gaming are enrolled here as managed machines even though they
+# serve no models yet (empty `enabled`); gaming is a live Linux satellite
+# (#323), no longer a dormant RDP-only node.
+hosts:
+  tower:
+    platform: win32
+    default: true
+    display_name: tower
+    role: "Windows workstation · CUDA GPU · the hub runs here"
+    icon: monitor
+    # Tailscale magic-DNS name — this box also serves Langfuse at
+    # tower.tail1121fd.ts.net:3000 (see docs/telemetry-langfuse.md).
+    tailscale: tower.tail1121fd.ts.net
+    # LAN address other hosts dial to reach this host's own hub (:8000) when
+    # proxying to a model this host owns (`host: tower` in a models: row).
+    address: 192.168.0.13
+    # Wired-NIC MAC used for Wake-on-LAN (#356) — WiFi WOL is unsupported.
+    mac: 34:5a:60:d3:59:53
+    # RTX 5060 Ti 16 GB (docs/machines.md) — the placement grid's VRAM ceiling
+    # for overcommit warnings (#375).
+    vram_mb: 16384
+    # 128 GB system RAM (docs/machines.md) — display-only context on the
+    # fleet summary (#431), never a warning input.
+    ram_mb: 131072
+    # glm is kept defined below as a candidate for ad-hoc bring-up, but is
+    # out of the active rotation. To bring it up: add its id back to this
+    # list and run `python -m src.install --fix`, or just launch it directly
+    # via `launchers/run_model.bat <id>`.
+    #
+    # `qwen` (host: mac-mini-m4) is cross-enabled here, not owned — #178
+    # lets tower *resolve* it and proxy to the Mac's own hub instead of
+    # spawning it locally. install.py's local_models() filter (only rows
+    # this host actually owns) keeps this from triggering a download/port
+    # check for a model tower will never run itself.
+    enabled: [qwen35_4b, qwen35_4b_nothink, gemma4_e4b, gemma4_26b, whisper, whisper_translate, whisper_vanilla, piper, chatterbox, orpheus, kokoro, qwen, parakeet]
+
+  mac-mini-m4:
+    platform: darwin
+    default: true
+    display_name: Mac Mini M4
+    role: "Apple-silicon hub peer · SSH + passwordless sudo"
+    icon: server
+    # LAN address the tower host dials to reach this host's own hub when
+    # proxying to a model this host owns (`host: mac-mini-m4`) — e.g. qwen,
+    # parakeet. Mac-native TTS (mac_say) is a follow-up, not yet enrolled.
+    address: 192.168.0.14
+    # Wired-NIC MAC used for Wake-on-LAN (#356) — WiFi WOL is unsupported.
+    mac: 1c:f6:4c:56:05:da
+    # Tailscale magic-DNS name — the tailnet node is `mac-mini` (100.82.9.41,
+    # verified via `tailscale status` 2026-07-23). Besides reachability/RDP,
+    # every `tailscale:` name is now the peer-connect fallback (#396): the
+    # wired LAN `address:` above is primary, and when it stops answering
+    # (Wi-Fi failover moves the box to an unreserved DHCP pool address) the
+    # hub's proxy/SSH/stats paths dial this name instead — it is
+    # NIC-independent and survives any failover.
+    tailscale: mac-mini.tail1121fd.ts.net
+    # No `vram_mb` (#375): Apple-silicon unified memory has no fixed VRAM
+    # partition to check a model set against, so the placement grid skips the
+    # capacity warning for this host rather than inventing a misleading ceiling.
+    # 16 GB unified memory (docs/machines.md) — display-only context on the
+    # fleet summary (#431/#434): doubles as the unified-memory ceiling shown
+    # against the GPU estimate, never a warning input.
+    ram_mb: 16384
+    # SSH login used for the remote-bootstrap/sync endpoints (#181) — not a
+    # secret, just which account the forced-command key logs in as. The
+    # private key itself lives outside git (LOCAL_LLM_HUB_SSH_KEY in .env).
+    ssh_user: roberto
+    # Same cross-enable pattern as tower's list above, reversed: every
+    # tower-owned model is listed here too so the Mac's hub can resolve
+    # and proxy to it — genuinely bidirectional (#178), not Windows-only.
+    enabled: [qwen, parakeet, qwen35_4b, qwen35_4b_nothink, gemma4_e4b, gemma4_26b, whisper, whisper_translate, whisper_vanilla, piper, chatterbox, orpheus, kokoro]
+
+  # --- Managed + satellite machines (issue #309) ---
+  # openclaw serves no models (no `enabled` list) and never runs the hub — it
+  # is enrolled purely so the fleet machine console can show and act on it.
+  # gaming graduated from managed-only to a model-serving satellite in #323
+  # (systemd-supervised hub, owns the voice pair below).
+
+  openclaw:
+    platform: linux
+    display_name: OpenClaw
+    role: "Ubuntu laptop · SSH + passwordless sudo · future inference node"
+    icon: laptop
+    # LAN address for SSH (reboot/shutdown, remote uptime) + RDP. Same
+    # ssh_user/address contract as the Mac Mini peer above; reboot/shutdown
+    # run over the hub user's own general SSH (passwordless sudo), so they
+    # work as soon as OpenClaw is reachable — no key deploy needed (#311).
+    address: 192.168.0.11
+    ssh_user: openclaw
+    # No `mac:` — the laptop has no wired NIC, so Wake-on-LAN is impossible
+    # (#356/#357 recon).
+    # Tailscale magic-DNS name — used for reachability + RDP when off-LAN.
+    # This box is the tailnet node `asus-linux` (confirmed 2026-07-21).
+    tailscale: asus-linux.tail1121fd.ts.net
+    # Server (headless, multi-user.target) is the systemd default; Desktop
+    # (graphical.target/GNOME) is a one-boot GRUB override via `grub-reboot`
+    # — done + verified 2026-07-21, see docs/machines.md.
+    rdp:
+      address: 192.168.0.11
+      user: openclaw
+
+  gaming:
+    platform: linux
+    # Ryzen 9 5900X gaming PC, brought online as a live Linux inference
+    # satellite (#323) — reinstalled from the old dormant Windows node that
+    # used to hold the fleet `tower` id (that id is now the hub box, #335).
+    # It has SSH + passwordless sudo (user `gaming`, static 192.168.0.16), so
+    # it gets reboot/shutdown/terminal like the other peers. Tailscale is
+    # installed and live as `gaming-linux.tail1121fd.ts.net` (confirmed
+    # 2026-07-21); the `tower.tail1121fd.ts.net` name belongs to the hub box
+    # (id `tower`), not this satellite. RDP targets xrdp on the LAN IP.
+    # Headless `multi-user.target` is now the systemd default (Server mode);
+    # GRUB adds a one-boot Desktop-mode override via `grub-reboot` — done +
+    # verified 2026-07-21, see docs/machines.md and #323.
+    display_name: gaming
+    role: "Ryzen 9 5900X · Ubuntu · 8 GB VRAM · SSH + passwordless sudo · STT/TTS offload satellite"
+    icon: monitor
+    address: 192.168.0.16
+    ssh_user: gaming
+    # Owns the whisper STT trio (#323/#370): whisper + whisper_translate +
+    # whisper_vanilla moved here from the tower to free its VRAM for the
+    # agentic lanes. Orpheus moved BACK to tower in #422 (the 1070 renders it
+    # at 0.71x real-time — unusable for streamed playback); gaming stays in
+    # its chain as the degraded fallback, so it keeps orpheus in `enabled`
+    # and pre-stages the weights. A non-empty list also makes this host
+    # placeable from the fleet grid (its hub runs under the #341 systemd
+    # unit; LOCAL_LLM_HUB_HOST=gaming pinned in its local .env).
+    enabled: [whisper, orpheus, whisper_translate, whisper_vanilla]
+    # GTX 1070 8 GB (docs/machines.md) — the tightest ceiling in the fleet and
+    # the reason #375 exists: it carries the whisper trio (2000 + 0 + 2000 =
+    # 4000 MB) with orpheus (2200 MB) only as a failover tenant — 6200 MB
+    # worst-case, under the 8192 ceiling. The grid sums their `est_vram_mb`
+    # against this and warns if the set exceeds 8 GB (#375).
+    vram_mb: 8192
+    # 16 GB system RAM, single stick (docs/machines.md) — display-only context
+    # on the fleet summary (#431), never a warning input.
+    ram_mb: 16384
+    # Wired-NIC MAC used for Wake-on-LAN (#356) — WiFi WOL is unsupported.
+    mac: d4:5d:64:d6:7e:a0
+    tailscale: gaming-linux.tail1121fd.ts.net
+    rdp:
+      address: 192.168.0.16
+      user: gaming
+
+# --- Dynamic model fallback (issue #342) ---
+# A models: row may replace its single `host:` with an ordered preference
+# chain `hosts: [a, b, c]` — entries are bare host ids or `{id: <host>,
+# cpu: true}` dicts (`cpu` marks a degraded last-resort tier: the hub
+# rewrites that host's launch args to CPU-only — llama-server `-ngl 0`,
+# whisper `-ng`, tts `--device cpu`). The model is owned by the first
+# candidate that is reachable and lists it in its `enabled:`; when the
+# owner dies the model fails over down the chain, and when a more-preferred
+# host returns the failback policy below decides whether ownership hands
+# back. A bare `host:` stays valid and equals a one-element chain — no
+# probing, no dynamics. Every chain member must cross-list the model in its
+# `enabled:` AND pre-stage its weights (`python -m src.install --fix` there).
+# Example:
+#   whisper:
+#     hosts: [gaming, mac-mini-m4, {id: tower, cpu: true}]
+#
+# The optional top-level `failover:` block tunes the engine (defaults shown):
+#   failover:
+#     probe_interval_s: 30     # peer-hub probe cadence
+#     fail_after_s: 90         # owner continuously down this long -> fail over
+#     failback_after_s: 600    # preferred host continuously up this long -> hand back
+#     policy: auto             # auto = hand back after the window; sticky = stay put
+#
+# fail_after_s races fleet_reconcile.py's own always-on resurrection of a down
+# peer (#411) — arm src.fleet_maintenance for the target host (via
+# /admin/api/fleet-maintenance) before inducing an outage, or reconcile wakes
+# the peer before this window is satisfied. See docs/fleet-maintenance.md.
+
+# `est_vram_mb` (issue #375) is a rough, static per-model GPU-VRAM footprint
+# estimate in MB — enough for the placement grid to flag a host overcommit
+# (sum of a host's placed models vs its `vram_mb` ceiling), NOT live telemetry.
+# Each value carries a one-line rationale next to it (weights quant + KV + any
+# CPU-offload). CPU-only backends (whisper_translate, piper) and off-GPU paths
+# (parakeet on the Mac ANE, virtual aliases sharing another backend) are 0 —
+# they cost RAM/ANE, not discrete VRAM. Subscription rows (claude/gemini) have
+# no field at all. A row with no `est_vram_mb` contributes 0 to the sum.
+#
+# --- On-demand lifecycle (issue #422) ---
+# A row may declare `startup: on_demand` (default `eager` — always-on, the
+# pre-#422 behavior). An on-demand model is never started eagerly: not by hub
+# autostart, not by the fleet reconcile loop, not by the failover engine. The
+# first request that routes to it spawns the backend and waits for readiness
+# (src/on_demand.py — the hub-level generalization of the whisper-server-lazy
+# proxy pattern); `idle_unload_minutes: <int>` then arms the idle watchdog,
+# which stops the backend after that many minutes without a request. A model
+# stopped that way (or by hand) STAYS down until the next request. Before an
+# on-demand load, the hub checks the #375 budget math (running est_vram_mb sum
+# + the candidate vs the host's vram_mb ceiling) and logs a loud warning on
+# overcommit — warning only, never a block: WDDM overcommit degrades
+# transiently and idle unload recovers it.
+#
+# Since #430 the eager/on_demand split IS the fleet's desired state: a
+# `startup: eager` row autostarts and is kept resident on its preferred chain
+# host (first `hosts:`/`host:` member that enables it), derived by
+# model_registry.desired_model_ids() — there is no separate placement file or
+# autostart list to keep in sync. Moving a model = editing its chain here.
+models:
+  # --- Claude subscription path (`claude -p` CLI) ---
+  # One row per Claude model the CLI exposes. The hub routes the
+  # version-free alias (e.g. `claude_haiku`) to display_name and passes
+  # display_name as `--model` to the CLI — so when Anthropic ships
+  # claude-haiku-5 (or whatever's next), only `display_name` needs
+  # updating and clients keep working unchanged.
+  claude_haiku:
+    display_name: claude-haiku-4-5
+    backend: claude
+    aliases: ["claude_haiku"]
+
+  claude_sonnet:
+    display_name: claude-sonnet-4-6
+    backend: claude
+    aliases: ["claude_sonnet"]
+
+  claude_opus:
+    display_name: claude-opus-4-8
+    backend: claude
+    aliases: ["claude_opus"]
+
+  claude_fable:
+    display_name: claude-fable-5
+    backend: claude
+    aliases: ["claude_fable"]
+
+  # --- Gemini subscription path (Google AI Pro via the Antigravity CLI) ---
+  # Google deprecated the standalone `gemini` CLI (service ends
+  # 2026-06-18); the hub now drives the Antigravity CLI (`agy`). `agy`
+  # has no per-call model flag — `display_name` is the exact label from
+  # its interactive `/model` picker, and src/gemini_cli.py switches the
+  # globally-selected model to that label before each call.
+  #
+  # Same contract as the Claude rows: a stable short alias per row. The
+  # aliases never change, so downstream callers keep working when the
+  # display_name underneath is repointed to a newer picker entry.
+  #
+  # `agy` >=1.1.8 dropped the effort suffix from each row's label (effort
+  # is now a separate Low/Medium/High slider, not part of the row text) —
+  # confirmed live 2026-07-29 (issue #440). `display_name` below is the
+  # bare picker label; do not append an effort suffix, it won't match.
+  #
+  # Flash/Lite hit the same 502 (issue #442): the picker also gained a
+  # second Flash generation ("Gemini 3.6 Flash" alongside "Gemini 3.5
+  # Flash"), with no separate High/Medium row per model anymore. Live
+  # picker confirmed 2026-07-30 offers exactly those two Flash rows plus
+  # Gemini 3.1 Pro, Claude Sonnet/Opus 4.6 (Thinking), GPT-OSS 120B
+  # (Medium) — no bare "Flash" row was dropped from the offering. To keep
+  # the two-tier distinction downstream callers rely on (Lite = cheaper/
+  # simpler than Flash) instead of collapsing both aliases onto one row,
+  # gemini_flash takes the newest generation and gemini_flash_lite keeps
+  # the now-previous-gen row — latest-vs-previous-gen instead of
+  # effort-vs-effort.
+  gemini_pro:
+    display_name: "Gemini 3.1 Pro"
+    backend: gemini
+    aliases: ["gemini_pro"]
+
+  gemini_flash:
+    display_name: "Gemini 3.6 Flash"
+    backend: gemini
+    aliases: ["gemini_flash"]
+
+  gemini_flash_lite:
+    display_name: "Gemini 3.5 Flash"
+    backend: gemini
+    aliases: ["gemini_lite"]
+
+  # --- Image generation (Imagen via the Antigravity CLI) ---
+  # `agy` exposes no Nano Banana / image model in its `/model` picker; its
+  # only image backend is Google's **Imagen**, reachable as an agentic tool
+  # from inside any ordinary Gemini text session. So this is NOT a picker
+  # model — `display_name` is purely descriptive. The hub routes the
+  # `gemini_image` alias through POST /v1/images/generations, which drives
+  # src/gemini_cli.call_gemini_image (it hosts the Imagen tool in a Flash
+  # session, captures the saved artifact, and returns it). One honest id:
+  # Flash-vs-Pro selection does not change the image model.
+  gemini_image:
+    display_name: imagen
+    backend: gemini
+    image_gen: true
+    aliases: ["gemini_image"]
+
+  # --- Local Qwen3.5-9B via llama.cpp ---
+  qwen:
+    display_name: qwen3.5-9b
+    backend: openai
+    engine: llama-server
+    # Owning host (#178) — cross-enabled on tower below so the Windows
+    # hub can resolve `model=qwen` and proxy it here instead of spawning
+    # it locally (127.0.0.1 wouldn't have a qwen process on Windows).
+    host: mac-mini-m4
+    port: 8081
+    # ~4.9 GB Q4_K_M weights + ~2.0 GB 64K KV (see the -c note below) ≈ 7500 MB.
+    est_vram_mb: 7500
+    hf_repo: "unsloth/Qwen3.5-9B-GGUF"
+    hf_pattern: "Qwen3.5-9B-Q4_K_M.gguf"
+    model_path: "models/Qwen3.5-9B-Q4_K_M.gguf"
+    args:
+      - "--jinja"
+      - "-ngl"
+      - "99"
+      # 64K context (4x the previous 16K) for openClaw long-conversation use.
+      # Qwen3-9B is a hybrid architecture (8 attention + 32 recurrent layers),
+      # so the KV cache at 64K FP16 is only ~2.0 GB on top of the ~4.9 GB of
+      # weights on GPU — total ~7.5 GB used, ~7.6 GB free on a 16 GB card.
+      # Model is trained for 262144; we're using 25% of that and there's
+      # headroom to push further if needed.
+      - "-c"
+      - "65536"
+      # Flash attention. Required at 64K — fused attention kernel cuts the
+      # attention scratch buffer dramatically and is faster on RTX cards.
+      - "--flash-attn"
+      - "on"
+      # Single slot. openClaw is the primary client and we'd rather hand it
+      # the whole context than split it across slots that compete on KV.
+      - "--parallel"
+      - "1"
+      - "--alias"
+      - "qwen3.5-9b"
+      # Qwen3-style chat templates emit reasoning between <think>...</think>.
+      # `none` keeps the tags inline in `content`, so the hub can scrub them
+      # server-side (src/openai_upstream.ThinkStripper). Without this, the
+      # reasoning lands in `reasoning_content`, which OpenAI-shape clients
+      # like openClaw's vllm provider ignore — they then see empty content.
+      - "--reasoning-format"
+      - "none"
+
+  # --- Local GLM-4.5-Air via llama.cpp with MoE CPU offload ---
+  glm:
+    display_name: glm-4.5-air
+    backend: openai
+    engine: llama-server
+    port: 8082
+    # MoE with `-ot .ffn_.*_exps.=CPU` (experts on CPU): only attention +
+    # shared layers sit on GPU, so the VRAM footprint is a fraction of the
+    # full Q4_K_M — ~4000 MB. Out of the active rotation; ad-hoc bring-up only,
+    # so on_demand (#430): never eagerly desired even if re-enabled on a host.
+    startup: on_demand
+    est_vram_mb: 4000
+    hf_repo: "unsloth/GLM-4.5-Air-GGUF"
+    # Multi-part GGUF in a Q4_K_M/ subdir — llama-server follows the
+    # shard chain when given part 1.
+    hf_pattern: "Q4_K_M/GLM-4.5-Air-Q4_K_M-*.gguf"
+    model_path: "models/GLM-4.5-Air-Q4_K_M/GLM-4.5-Air-Q4_K_M-00001-of-00002.gguf"
+    args:
+      - "--jinja"
+      - "-ngl"
+      - "99"
+      - "-ot"
+      - ".ffn_.*_exps.=CPU"
+      - "-c"
+      - "16384"
+      - "--alias"
+      - "glm-4.5-air"
+      # GLM-4.5 also emits <think> blocks; keep them inline so the hub
+      # can strip them. See note on the qwen entry above.
+      - "--reasoning-format"
+      - "none"
+
+  # --- Local Qwen 3.5 4B via llama.cpp (hybrid Gated DeltaNet + sparse MoE) ---
+  # Tier A frontier pick (May 2026): replaces gemma4_e4b on `agentic_light`.
+  # Q4_K_M is ~3 GB on disk; Apache 2.0; native ctx 262144. Same Qwen3-style
+  # chat template as the 9B sibling, so we keep flash-attn on, single slot,
+  # and `--reasoning-format none` to let the hub strip <think>...</think>.
+  # See docs/frontier/runs/2026-05-10/report.md §5 (Tier A) and §10.
+  qwen35_4b:
+    display_name: qwen3.5-4b
+    # `agentic_light` is the role alias — clients (e.g. voice-transcriber)
+    # address the role, not this specific model id. When swap-model flips
+    # roles.agentic_light.model_id to a successor, this alias must move
+    # to the successor's row so the contract stays stable.
+    aliases: ["agentic_light"]
+    backend: openai
+    host: tower  # owning host (#178) — cross-enabled on mac-mini-m4 below
+    engine: llama-server
+    port: 8088
+    # Measured 2026-07-23 with gemma4_26b co-resident (#386): ~2.0 GB actual.
+    # Q4_K_M weights + small 64K KV (hybrid Gated-DeltaNet arch) ≈ 2100 MB.
+    est_vram_mb: 2100
+    hf_repo: "unsloth/Qwen3.5-4B-GGUF"
+    hf_pattern: "Qwen3.5-4B-Q4_K_M.gguf"
+    model_path: "models/Qwen3.5-4B-Q4_K_M.gguf"
+    args:
+      - "--jinja"
+      - "-ngl"
+      - "99"
+      # 64K context — same approach as the 9B sibling. The 4B base + Gated
+      # DeltaNet + sparse-MoE architecture has a small KV footprint, so 64K
+      # fits comfortably in VRAM alongside gemma4_26b on the deep lane.
+      - "-c"
+      - "65536"
+      # Flash attention. Required at 64K — fused kernel cuts attention
+      # scratch and is faster on RTX cards.
+      - "--flash-attn"
+      - "on"
+      # Single slot. agentic_light is OpenClaw's fast lane; we'd rather hand
+      # the whole context to one request than split it across competing slots.
+      - "--parallel"
+      - "1"
+      - "--alias"
+      - "qwen3.5-4b"
+      # Qwen3-style templates emit reasoning between <think>...</think>.
+      # `none` keeps the tags inline in `content`, so the hub can scrub them
+      # server-side (src/openai_upstream.ThinkStripper). Without this, the
+      # reasoning lands in `reasoning_content`, which OpenAI-shape clients
+      # like openClaw's vllm provider ignore — they then see empty content.
+      - "--reasoning-format"
+      - "none"
+
+  # --- No-think alias of qwen35_4b (virtual; shares the :8088 backend) ---
+  # Same running llama-server as qwen35_4b — NOT a second process, NOT extra
+  # VRAM. `virtual: true` + the shared `port: 8088` mean `url` already points
+  # at the live backend; this row is never launched, downloaded, or shown as a
+  # controllable process in the admin Models tab.
+  #
+  # Why it exists: #159 lets `/v1/chat/completions` forward
+  # `chat_template_kwargs`, but some clients can't send it — Home Assistant's
+  # `extended_openai_conversation` only emits model/messages/max_tokens/
+  # temperature/top_p/tools. So the hub delivers the no-think switch itself,
+  # keyed off this model id: `inject_extra` is folded into the upstream `extra`
+  # on every chat request (a caller that sends its own chat_template_kwargs
+  # still wins). Plain `qwen3.5-4b` / `agentic_light` stay thinking-capable.
+  qwen35_4b_nothink:
+    display_name: qwen3.5-4b-nothink
+    # Role-style alias, parallel to agentic_light — clients that want the
+    # no-think fast lane address the role, not the concrete id.
+    aliases: ["agentic_light_nothink"]
+    backend: openai
+    host: tower  # owning host (#178) — cross-enabled on mac-mini-m4 below
+    port: 8088                       # shared with qwen35_4b (virtual alias)
+    est_vram_mb: 0                   # shares qwen35_4b's process — no extra VRAM
+    virtual: true
+    inject_extra:
+      chat_template_kwargs:
+        enable_thinking: false
+
+  # --- Local Gemma 4 E4B IT via llama.cpp (8B dense; full GPU offload) ---
+  # Gemma 4 edge variant. Single-file Q4_K_M GGUF, ~5 GB on disk, fits
+  # comfortably in 16 GB VRAM with plenty of context headroom.
+  gemma4_e4b:
+    display_name: gemma4-e4b-it
+    backend: openai
+    host: tower  # owning host (#178) — cross-enabled on mac-mini-m4 below
+    engine: llama-server
+    port: 8086
+    # On-demand (#430): out of the active rotation since qwen35_4b took the
+    # agentic_light role — it hasn't autostarted since, and the registry-derived
+    # desired set must say so explicitly now that there is no separate
+    # autostart list. First request loads it; 30 idle minutes unload it.
+    startup: on_demand
+    idle_unload_minutes: 30
+    # 8B dense Q4_K_M, ~5 GB weights on disk, full GPU offload + 16K KV ≈ 5500 MB.
+    est_vram_mb: 5500
+    hf_repo: "unsloth/gemma-4-E4B-it-GGUF"
+    hf_pattern: "gemma-4-E4B-it-Q4_K_M.gguf"
+    model_path: "models/gemma-4-E4B-it-Q4_K_M.gguf"
+    args:
+      - "--jinja"
+      - "-ngl"
+      - "99"
+      - "-c"
+      - "16384"
+      - "--alias"
+      - "gemma4-e4b-it"
+
+  # --- Local Gemma 4 26B-A4B IT via llama.cpp (MoE; full GPU offload) ---
+  # MoE model: 25.2B total / 3.8B active. The standard Q4_K_M GGUF is 16.9 GB
+  # and won't fit on a 16 GB GPU without expert offload. Using IQ4_XS
+  # (13.4 GB, importance-matrix quantized — quality close to Q4_K_M) so the
+  # whole model sits on GPU. Context capped at 8K to leave KV cache room.
+  gemma4_26b:
+    display_name: gemma4-26b-a4b-it
+    # `agentic_heavy` is the role alias — see note on qwen35_4b. Move
+    # this alias with the role pointer when swap-model upgrades the slot.
+    aliases: ["agentic_heavy"]
+    backend: openai
+    host: tower  # owning host (#178) — cross-enabled on mac-mini-m4 below
+    engine: llama-server
+    port: 8087
+    # On-demand since #422: this is the single heaviest local model (~13.4 GB)
+    # and the user rarely calls it, yet keeping it hot pinned most of tower's
+    # 16 GB and forced orpheus onto the gaming GTX 1070 (0.71x real-time,
+    # compute-bound — the root cause of app-launcher#599's crackling). The
+    # first agentic_heavy request loads it (~tens of seconds from NVMe) and
+    # 30 idle minutes unload it again, freeing the VRAM for the voice path.
+    startup: on_demand
+    idle_unload_minutes: 30
+    # MoE IQ4_XS ~13.4 GB on GPU (row header), confirmed by the 2026-07-23
+    # co-residency measurement (#386) ≈ 13400 MB — the single heaviest local
+    # model; only fits the 16 GB tower.
+    est_vram_mb: 13400
+    hf_repo: "unsloth/gemma-4-26B-A4B-it-GGUF"
+    hf_pattern: "gemma-4-26B-A4B-it-UD-IQ4_XS.gguf"
+    model_path: "models/gemma-4-26B-A4B-it-UD-IQ4_XS.gguf"
+    args:
+      - "--jinja"
+      - "-ngl"
+      - "99"
+      - "-c"
+      - "8192"
+      - "--flash-attn"
+      - "on"
+      - "--alias"
+      - "gemma4-26b-a4b-it"
+
+  # --- Local whisper.cpp ASR server (OpenAI-compatible audio endpoints) ---
+  # Port 8090 is fixed by design — it is the mutual-exclusion lock shared
+  # with E:\automation\automation\audio\transcribe_voice. Only one of the
+  # two projects can own the server at any time. The hub now proxies both
+  # /v1/audio/transcriptions and /v1/audio/translations (src/server.py),
+  # landing those requests in the observability ring. Clients may also POST
+  # directly to this port for lower overhead, bypassing the hub's capture.
+  #
+  # To switch model size, change hf_pattern + model_path to another
+  # ggml-<size>.bin (tiny / base / small / medium / large-v3 / large-v3-turbo)
+  # and re-run `python -m src.install --fix` (or
+  # scripts/download_models.py --only whisper). See
+  # docs/whisper-turbo-vs-large-v3.md for why turbo is
+  # the default on the reference 16 GB GPU.
+  whisper:
+    display_name: whisper-large-v3-turbo
+    backend: whisper
+    # Preferred owner is the gaming satellite since #323 (GTX 1070, CUDA-built
+    # whisper-server) — ~9.1 RTFx there vs ~33.6 on the tower's 5060 Ti:
+    # slower, but whisper is only the transcribe role's FALLBACK (parakeet@mac
+    # is primary) and keeping it off the tower frees VRAM for the agentic lanes.
+    #
+    # First production failover chain (#405, engine from #342). Chosen as the
+    # pilot precisely because it is the transcribe *fallback*: a wrong failover
+    # decision here degrades a backup path, it does not take fleet STT down.
+    # mac-mini-m4 is the warm middle link (Metal whisper-server, GPU-class
+    # latency); tower is the last resort and is flagged `cpu: true` because its
+    # 16 GB is already ~97% committed to the agentic lanes — a GPU whisper
+    # there would fight gemma4_26b for VRAM, so the degraded-but-up CPU tier is
+    # the honest last rung, not a compromise.
+    #
+    # Every member cross-lists whisper in its `enabled:` (required — see
+    # model_failover.eligible_chain) and must pre-stage weights + a built
+    # whisper-server via `python -m src.install --fix`.
+    hosts: [gaming, mac-mini-m4, {id: tower, cpu: true}]
+    engine: whisper-server
+    port: 8090
+    # large-v3-turbo fp16 ≈ 2000 MB VRAM (docs/whisper-turbo-vs-large-v3.md §VRAM).
+    est_vram_mb: 2000
+    hf_repo: "ggerganov/whisper.cpp"
+    hf_pattern: "ggml-large-v3-turbo.bin"
+    model_path: "models/ggml-large-v3-turbo.bin"
+    # GPU is on by default in whisper.cpp v1.8+; pass -ng / --no-gpu to disable.
+    # --inference-path exposes the OpenAI-compatible route that clients
+    # (including transcribe_voice's TranscriptionClient) expect.
+    #
+    # Anti-hallucination guards (issue #88) + vocabulary boosting (#91):
+    # whisper.cpp defaults --max-context to -1 (unlimited text carry-over
+    # between 30 s windows); once the greedy decoder emits a repeated
+    # phrase on a low-information stretch, that text is fed forward and
+    # self-reinforces into a runaway loop. --suppress-nst drops non-speech
+    # tokens that also seed silence/noise hallucinations.
+    #
+    # --max-context is 64 (not 0): the #88 fix used 0, but 0 *nullifies*
+    # the initial prompt entirely — even with --carry-initial-prompt
+    # (proven on v1.8.6: at maxctx 0 the prompt has zero effect; at 64 it
+    # is honoured). 64 is the smallest budget that re-enables boosting
+    # while still holding loops at 0 repetitions in #88/#91 testing.
+    # --carry-initial-prompt (whisper.cpp >=1.8.5) re-injects the prompt
+    # into every sliding window so it doesn't age out on long dictation.
+    # The prompt text itself is sourced at launch from the committed
+    # dictionary's `boost_terms` (config/transcription_glossary.json) by
+    # backend_process._whisper_boost_args — one home for the vocabulary,
+    # shared with the #90 replacement rules.
+    #
+    # Temperature fallback + the entropy threshold (-et 2.40) are already
+    # on by default. VAD would further help but needs a separate model
+    # download — deferred (see issue #88).
+    args:
+      - "--threads"
+      - "4"
+      - "--processors"
+      - "1"
+      - "--max-context"
+      - "64"
+      - "--carry-initial-prompt"
+      - "--suppress-nst"
+      - "--inference-path"
+      - "/v1/audio/transcriptions"
+
+  # --- Eager-loaded translate-capable whisper instance (CPU, medium) ---
+  # Sibling slot to `whisper`. Turbo (above) is transcription-only — the
+  # decoder distill drops translation training. This second slot fills
+  # the translate role with `ggml-medium.bin`, a non-distilled model.
+  #
+  # Engine `whisper-server` runs medium eagerly on `port` (8091) —
+  # always resident (~1.5 GB RAM), always ready, no cold-start latency.
+  #
+  # CPU-only (`-ng`) by design — leaves VRAM for gemma4_26b. Medium on
+  # CPU is real-time-ish for short dictation clips.
+  #
+  # To switch to lazy mode (spawn-on-request, idle-unload after
+  # `idle_seconds`): set `engine: whisper-server-lazy`, add
+  # `internal_port` (the real whisper-server port), and `idle_seconds`.
+  # Requests will route through `src/whisper_translate_proxy.py`.
+  # Use on RAM-constrained hosts; the active rotation runs eager.
+  #
+  # Sister project (transcribe_voice / voice-transcriber) hits this on
+  # 8091 with `task=translate` form-field. Same OpenAI-compatible shape.
+  whisper_translate:
+    display_name: whisper-medium-translate
+    backend: whisper
+    # Owned by the gaming satellite since #370 (moved off tower alongside
+    # whisper_vanilla, mirroring whisper/orpheus's #323 move) — cross-enabled
+    # on tower + mac-mini-m4, which proxy to gaming's hub.
+    host: gaming
+    engine: whisper-server
+    port: 8091
+    # CPU-only (`-ng`): medium runs in ~1.5 GB *system RAM*, zero discrete VRAM.
+    est_vram_mb: 0
+    hf_repo: "ggerganov/whisper.cpp"
+    hf_pattern: "ggml-medium.bin"
+    model_path: "models/ggml-medium.bin"
+    # Anti-hallucination guards (issue #88): --max-context 0 kills the
+    # cross-window text carry-over that drives repetition cascades;
+    # --suppress-nst drops non-speech tokens. Intentionally NOT boosted
+    # (issue #91): this row translates ES→EN, where the English-tech
+    # glossary is off-topic, so it keeps the strongest loop guard
+    # (maxctx 0) rather than trading it for boosting.
+    args:
+      - "-ng"
+      - "--threads"
+      - "4"
+      - "--processors"
+      - "1"
+      - "--max-context"
+      - "0"
+      - "--suppress-nst"
+      - "--inference-path"
+      - "/v1/audio/transcriptions"
+
+  # --- Lazy turbo whisper instance for unbiased auto-detect (#128) ---
+  # Same ggml-large-v3-turbo model as `whisper`, but configured so language
+  # detection is driven purely by the audio. Two things differ from the
+  # dictation `whisper` row, and BOTH are required (proven empirically in
+  # #128 against a Spanish clip):
+  #   1. NO --carry-initial-prompt / --prompt — the English tech-dictation
+  #      glossary biases language detection toward English.
+  #   2. --language auto — whisper-server defaults language to "en" (NOT
+  #      auto-detect!), so dropping the glossary alone is not enough: a
+  #      request that omits `language` is still forced to English. Proven
+  #      in #128: the launch-level --language flag does NOT change the
+  #      per-request default — whisper-server's HTTP handler resets each
+  #      request to "en" unless the body carries a language. So the lazy
+  #      proxy (src/whisper_translate_proxy.py) reads this arg and injects
+  #      it as the request default when the caller omits `language`; a
+  #      caller that sends its own language always wins.
+  # Callers that want unbiased auto-detect (e.g. whatsapp-radar transcribing
+  # Spanish voice notes) select this row via model=whisper-vanilla on the
+  # standard /v1/audio/transcriptions request — no custom endpoint needed.
+  #
+  # Engine whisper-server-lazy (spawn-on-request, idle-unload after
+  # idle_seconds) saves GPU VRAM: the vanilla path is low-frequency and
+  # the turbo model is already resident on :8090 for dictation.
+  # External proxy port 8094; whisper-server child binds 18094 (loopback).
+  #
+  # --max-context 0 (strongest anti-hallucination, same as translate row):
+  # no --carry-initial-prompt means no boosting trade-off, so there is no
+  # reason to raise max-context above zero.
+  # GPU-accelerated (no -ng) to keep transcription latency low.
+  whisper_vanilla:
+    display_name: whisper-vanilla
+    backend: whisper
+    # Owned by the gaming satellite since #370 (moved off tower alongside
+    # whisper_translate, mirroring whisper/orpheus's #323 move) — cross-enabled
+    # on tower + mac-mini-m4, which proxy to gaming's hub.
+    host: gaming
+    engine: whisper-server-lazy
+    port: 8094
+    internal_port: 18094
+    idle_seconds: 300
+    # Same large-v3-turbo weights as `whisper`, GPU-accelerated, but a SEPARATE
+    # process (own port) → counts its own ~2000 MB when resident. Lazy/idle-
+    # unload means it's not always loaded, but the placement estimate is a
+    # worst-case footprint, so it's counted whenever placed.
+    est_vram_mb: 2000
+    aliases: ["whisper-vanilla"]
+    hf_repo: "ggerganov/whisper.cpp"
+    hf_pattern: "ggml-large-v3-turbo.bin"
+    model_path: "models/ggml-large-v3-turbo.bin"
+    args:
+      - "--language"
+      - "auto"
+      - "--threads"
+      - "4"
+      - "--processors"
+      - "1"
+      - "--max-context"
+      - "0"
+      - "--suppress-nst"
+      - "--inference-path"
+      - "/v1/audio/transcriptions"
+
+  # --- Parakeet TDT v3 on the Mac Mini's ANE (CoreML, FluidAudio) ---
+  # Selectable alternative to whisper-turbo, NOT the audio_transcribe
+  # default (#138). Faster end-to-end than whisper-turbo's own loopback
+  # latency, but drops the "Claude Code" wake phrase and mangles
+  # "YOLO"→"yellow" — accepted trade-off for use cases that value speed
+  # over perfect jargon recognition (e.g. Home Assistant voice commands).
+  # Call it explicitly with model=parakeet. See docs/parakeet-asr-evaluation.md
+  # for the full spike write-up and the accepted-trade-offs decision.
+  #
+  # engine: parakeet-server (not whisper-server) — src/parakeet_server.py
+  # owns a persistent mac/parakeet-worker Swift subprocess (FluidAudio),
+  # not whisper.cpp. backend: whisper reuses the hub's existing
+  # audio_transcribe dispatch/role-resolution unchanged (its API is
+  # already OpenAI-transcription-shaped) — see backend_process.py's
+  # engine == "parakeet-server" branch for why this needs no model_path.
+  parakeet:
+    display_name: parakeet-tdt-0.6b-v3
+    backend: whisper
+    engine: parakeet-server
+    host: mac-mini-m4  # owning host (#178) — cross-enabled on tower below
+    port: 8098
+    aliases: ["parakeet"]
+    # Runs on the Mac's ANE via CoreML (unified memory), not discrete GPU VRAM.
+    est_vram_mb: 0
+
+  # --- Local Chatterbox TTS (Resemble AI) — OpenAI /v1/audio/speech ---
+  # The inverse of the whisper STT pair: text -> speech. Served by the
+  # in-repo FastAPI shim src/tts_server.py (engine `tts-server`), proxied
+  # through the hub at POST /v1/audio/speech so it lands in the
+  # observability ring (src/server.py), mirroring the audio transcription
+  # proxy. The shim loads the engine named by `tts_engine`.
+  #
+  # Chatterbox — on-demand alternate (NOT autostarted). A small (~0.5 B)
+  # torch model with an emotion/"tone" dial (exaggeration + cfg_weight) and
+  # optional zero-shot voice cloning. Weights are pulled by
+  # ChatterboxTTS.from_pretrained() into the HF cache on first start — no
+  # GGUF in models/, so no hf_repo/model_path here. `--device auto` picks
+  # CUDA when the GPU has room, else CPU. Needs requirements-tts.txt
+  # (chatterbox-tts, snac, soundfile) — installed only on TTS-enabled hosts.
+  # Start it from the Models tab / launchers/run_model.bat chatterbox.
+  chatterbox:
+    display_name: chatterbox-tts
+    backend: tts
+    host: tower  # owning host (#178) — cross-enabled on mac-mini-m4 below
+    engine: tts-server
+    tts_engine: chatterbox
+    port: 8092
+    # On-demand (#430) — the "NOT autostarted" comment above, now enforced by
+    # the registry-derived desired set. First request loads it; 30 idle
+    # minutes unload it.
+    startup: on_demand
+    idle_unload_minutes: 30
+    # ~0.5 B torch model on CUDA (`--device auto`) ≈ 2000 MB; on-demand only.
+    est_vram_mb: 2000
+    args:
+      - "--device"
+      - "auto"
+
+  # --- Local Piper TTS — fast CPU VITS voices ---
+  # The auto-loaded default speech engine (startup: eager on tower, #430) and
+  # the `audio_speech` role alias. Piper is optimized for local short-form TTS
+  # and is the low-latency path for assistant confirmations. The installer
+  # downloads the standalone Piper binary into vendor/piper and voices into
+  # models/piper.
+  piper:
+    display_name: piper-tts
+    # `audio_speech` is the role alias — clients (e.g. Home Assistant and
+    # app-launcher) address the role, not this specific engine. Move the alias
+    # to the successor row if the speech role is ever repointed.
+    aliases: ["audio_speech"]
+    backend: tts
+    host: tower  # owning host (#178) — cross-enabled on mac-mini-m4 below
+    engine: tts-server
+    tts_engine: piper
+    port: 8096
+    est_vram_mb: 0                   # CPU-only VITS binary (#371) — no VRAM.
+    model_path: "models/piper/en_US-amy-medium.onnx"
+    # No `--device` arg: piper.py hardcodes CPU unconditionally (#371) — the
+    # standalone binary is lightweight enough it never needed GPU, unlike
+    # chatterbox/orpheus/kokoro's resolve_device() path below.
+
+  # --- Local Orpheus TTS (3B) — llama.cpp GGUF + SNAC decoder ---
+  # Expressive on-demand speech. Orpheus is an LLM-based TTS (Llama-3B
+  # finetune) that emits SNAC audio tokens; the most expressive and natural
+  # of the local options (inline emotion tags), and faster than real-time on
+  # the reference GPU. Its reference runtime is vLLM, which has no usable
+  # Windows build, so the shim runs the GGUF on the already-vendored
+  # llama-server (loopback `internal_port`) and decodes the audio tokens with
+  # the SNAC neural codec in-process.
+  #
+  # NOTE: the exact GGUF repo / filename below is the community Q4_K_M build
+  # most commonly paired with the llama.cpp route — verify it resolves on
+  # `python scripts/download_models.py --only orpheus` and adjust hf_repo /
+  # hf_pattern / model_path if the upstream naming has changed. See
+  # docs/add-tts.md.
+  orpheus:
+    display_name: orpheus-tts
+    backend: tts
+    # Back on tower since #422: the gaming GTX 1070 synthesizes at 0.71x
+    # real-time with the GPU pegged (measured 2026-07-25) — every streamed
+    # playback starved and stuttered — while tower's 5060 Ti sustains 1.84x
+    # with SNAC on CPU. Tower fits it now that gemma4_26b is on-demand.
+    # Gaming stays in the chain as the degraded-but-up fallback (slower than
+    # real-time, but audible) via the #342 failover/failback machinery.
+    # The audio_speech ROLE stays piper (tower CPU); orpheus serves explicit
+    # `model=orpheus` requests.
+    hosts: [tower, gaming]
+    engine: tts-server
+    tts_engine: orpheus
+    port: 8093
+    internal_port: 18093          # llama-server child (loopback) for the GGUF
+    # 3B Llama Q4_K_M GGUF (~2.2 GB weights + 8K KV) on llama-server ≈ 2200 MB.
+    # SNAC decodes on CPU since #422 (see the --device note below), saving the
+    # ~1 GB the codec used to hold on-GPU.
+    est_vram_mb: 2200
+    hf_repo: "isaiahbjork/orpheus-3b-0.1-ft-Q4_K_M-GGUF"
+    hf_pattern: "*q4_k_m*.gguf"
+    model_path: "models/orpheus-3b-0.1-ft-q4_k_m.gguf"
+    args:
+      # SNAC on CPU (#422): measured *faster* than GPU SNAC on the 5060 Ti
+      # (1.84x vs 1.73x sustained) and saves ~1 GB VRAM on every host. Only
+      # the SNAC codec is affected — the llama-server child is hardcoded
+      # `-ngl 99` in src/tts_engines/orpheus.py, so the 3B GGUF stays on GPU.
+      - "--device"
+      - "cpu"
+
+  # --- Local Kokoro TTS (82M) — ONNX Runtime comparison option ---
+  # Tiny Kokoro-82M path for voice comparison. Kept as an
+  # explicit model (`model: kokoro-tts`) instead of the `audio_speech` role
+  # alias because the current Windows ONNX path is not the fast option. The
+  # installer downloads the kokoro-onnx release
+  # assets into models/kokoro/: an int8 ONNX model plus voices-v1.0.bin.
+  # Stable Spanish profiles in that pack: ef_dora (female), em_alex (male).
+  kokoro:
+    display_name: kokoro-tts
+    backend: tts
+    host: tower  # owning host (#178) — cross-enabled on mac-mini-m4 below
+    engine: tts-server
+    tts_engine: kokoro
+    port: 8095
+    # On-demand (#430): a comparison voice, not part of the always-on set.
+    # First request loads it; 30 idle minutes unload it.
+    startup: on_demand
+    idle_unload_minutes: 30
+    # Kokoro-82M int8 ONNX — tiny; ~500 MB even on the GPU path.
+    est_vram_mb: 500
+    model_path: "models/kokoro/kokoro-v1.0.int8.onnx"
+    args:
+      - "--device"
+      - "auto"
+
+# --- Active roles (managed by the `/swap-model` slash command — see README) ---
+# Maps a small fixed set of role slots to model ids in `models:` above.
+# Latest-only: exactly one model id per role (audio is two-slotted by
+# design — turbo for transcribe, medium for translate). The `claude`
+# subscription path is **not** part of this rotation and is never
+# touched by the swap logic.
+roles:
+  agentic_light:
+    model_id: qwen35_4b
+    notes: "OpenClaw fast lane, classification, edge"
+  agentic_heavy:
+    model_id: gemma4_26b
+    notes: "OpenClaw deep lane, transcripts, documents, translation, disfluency removal"
+  # Audio roles support an optional ordered `fallback:` list (issue #348): the
+  # hub's audio proxy tries `model_id` first, then each fallback in turn when a
+  # backend is unavailable (connection error / 502-503-504) — so STT never errors
+  # on a dead primary. A role with only `model_id` behaves exactly as before.
+  # Example (activated by the parakeet switch):
+  #   transcribe:
+  #     model_id: parakeet
+  #     fallback: [whisper]
+  audio:
+    transcribe:
+      model_id: parakeet           # parakeet-tdt-0.6b-v3 on the Mac ANE (#350)
+      fallback: [whisper]          # → whisper-large-v3-turbo on :8090 if parakeet is down (#348)
+    translate:
+      model_id: whisper_translate  # whisper-medium on :8091, eager CPU
+    speech:
+      model_id: piper              # piper-tts on :8096 (orpheus/kokoro on demand)

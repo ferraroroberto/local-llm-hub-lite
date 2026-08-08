@@ -1,0 +1,109 @@
+# venv
+.venv/
+.venv-agentsview/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project artefacts
+data/logs/
+data/output/
+data/telemetry/
+data/code_usage_history.json
+# Diagnostics capture store (issue #315) — per-machine runtime data, plus the
+# SQLite WAL/shm sidecars. config/diagnostics_{apps,rules}.json ARE committed:
+# they are the tunable rule sets, not runtime state.
+data/diagnostics.db
+data/diagnostics.db-wal
+data/diagnostics.db-shm
+config/diagnostics_settings.json
+tmp_server.log
+*.log
+
+# Local LLM assets — large binaries, host-specific, downloaded by installer
+vendor/
+models/
+
+# Env
+.env
+.env.local
+
+# Langfuse local stack secrets (issue #4) — schema in .env.example.
+docker/langfuse/.env
+
+# SearXNG's generated settings.yml (home-automation#321) — the container
+# writes a fresh random secret_key into this on first run; instance-specific,
+# never committed.
+docker/searxng/config/
+
+# Host-specific machine specs (real values; example file is committed)
+config/machine_specs.yaml
+
+# Runtime-mutated startup profile (issue #304) — the admin UI's Startup card
+# rewrites this on every service toggle, so it must not be tracked.
+# config/startup_profile.example.json is the committed template + fresh-clone default.
+config/startup_profile.json
+
+# Runtime-mutated fleet maintenance drain markers (issue #411) — armed/cleared
+# via /admin/api/fleet-maintenance, so it must not be tracked. No committed
+# example — an absent file means "nothing under maintenance".
+config/fleet_maintenance.json
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Tray single-instance lock
+.tray.pid
+
+# /admin webapp runtime data — bearer token, webauthn devices, auth.log,
+# user cloudflared config.
+config/webapp_config.json
+config/webauthn_devices.json
+# TTS voice-cloning reference clips (config/tts_voices/<voice>.wav) — local audio
+config/tts_voices/
+webapp/cloudflared.yml
+
+# Local-only transcription boost_terms overlay (issue #290) — private
+# vocabulary (e.g. a caller's proper nouns) that must never be committed.
+# Sample file is committed as config/transcription_glossary.local.sample.json.
+config/transcription_glossary.local.json
+webapp/auth.log
+webapp/last_tunnel_url.txt
+webapp/certificates/
+
+# Playwright autoboot log + caches
+tests/e2e/autoboot-hub.log
+tests/e2e/snapshots/
+playwright-report/
+test-results/
+
+# launcher temporary files
+.launcher-tmp/
+
+# Spike scratch (issue #123 Parakeet bench — binaries, weights, clips)
+.scratch/
+
+# Swift build artifacts (mac/parakeet-worker/) — rebuilt by `swift build`,
+# analogous to .venv/ for the Python side. Source (Package.swift, Sources/)
+# is committed; the resolved dependency lockfile is not (SPM re-resolves
+# against FluidAudio's version constraint on next build).
+mac/*/.build/
+mac/*/.swiftpm/
+mac/*/Package.resolved
