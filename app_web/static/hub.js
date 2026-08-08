@@ -1,11 +1,10 @@
-/* Hub tab — status card, services, install panel, live request stream,
+/* Hub tab — status card, install panel, live request stream,
  * counters, errors, log tail. The four diagnostic surfaces are vendored
  * disclosure cards, folded by default (#215).
  */
 
 import { els, state } from './state.js';
 import { jsonApi, postJson, eventStream, toast, escapeHtml, fmtClock, renderCounterTable, shortGpu, modelLabel } from './api.js';
-import { langfuseTraceUrl, fetchTelemetryHealth } from './telemetry.js';
 import { icon } from './_vendored/icons/icons.js';
 
 // --------------------------------------------------------- status / urls
@@ -72,21 +71,8 @@ function prependRequest(rec) {
   }
 }
 
-// A trace deep-link should only render when clicking it would actually
-// reach a Langfuse trace: the hub itself up, Docker up, and Langfuse
-// reachable. Otherwise the link would land on a connection error — so we
-// hide it (the row still shows tokens, just no `trace` affordance). Same
-// signals the Services card uses (issue #27).
-function traceLinkReady() {
-  const svc = state.services || {};
-  const docker = svc.docker || {};
-  const lf = svc.langfuse || {};
-  return !!state.status && docker.running === true && lf.reachable === true;
-}
-
 function renderRequests() {
   const items = state.liveRequests || [];
-  const traceUp = traceLinkReady();
   const list = els.liveRequestsList;
   if (!list) return;
   if (els.liveRequestsBadge) els.liveRequestsBadge.textContent = items.length;
@@ -95,18 +81,11 @@ function renderRequests() {
   items.forEach(function (r) {
     const li = document.createElement('li');
     const cls = r.status >= 500 ? 'err' : r.status >= 400 ? 'warn' : 'ok';
-    // Identical deep-link to the Telemetry tab: shared langfuseTraceUrl()
-    // derives the client-reachable Langfuse host (Tailscale/LAN/localhost
-    // transparent) + project_id, opened in a new tab. Only shown when the
-    // stack is up (see traceLinkReady).
-    const traceCol = (r.trace_id && traceUp)
-      ? ('<a href="' + langfuseTraceUrl(r.trace_id) + '" target="_blank" rel="noopener" title="' + escapeHtml(r.trace_id) + '">trace</a>')
-      : '';
     li.innerHTML =
       '<span class="muted">' + fmtClock(r.ts) + '</span>' +
       '<span>' + modelLabel(r, '(no model)') + ' <span class="muted">' + escapeHtml(r.backend || '') + '</span></span>' +
       '<span class="req-status ' + cls + '">' + r.status + ' · ' + r.latency_ms + ' ms</span>' +
-      '<span class="muted">' + (r.in_tok || 0) + ' / ' + (r.out_tok || 0) + ' tok ' + traceCol + '</span>';
+      '<span class="muted">' + (r.in_tok || 0) + ' / ' + (r.out_tok || 0) + ' tok</span>';
     list.appendChild(li);
   });
 }
@@ -214,291 +193,6 @@ function renderInstall(body) {
   });
 }
 
-// --------------------------------------------------------- services card (issue #27)
-export async function fetchServicesStatus() {
-  try {
-    const body = await jsonApi('/admin/api/services/status');
-    state.services = body;
-    renderServices();
-  } catch (exc) {
-    if (String(exc.message) === 'auth required') return;
-    // Probe error itself — render an "unreachable" state. `probeFailed`
-    // tells renderServices() this isn't a real launchable=false verdict
-    // (we never got far enough to check the install path), so it must
-    // not show the "Docker Desktop install not found" hint — that would
-    // be a fabricated claim about install state from a fetch failure.
-    state.services = { docker: { running: false, error: String(exc.message || exc) },
-                       langfuse: { reachable: false, error: '' },
-                       launchable: false, platform: '', probeFailed: true };
-    renderServices();
-  }
-}
-
-function setStatusPill(rootEl, textEl, kind, text) {
-  if (!rootEl) return;
-  rootEl.classList.remove('good', 'warn', 'danger');
-  if (kind) rootEl.classList.add(kind);
-  if (textEl) textEl.textContent = text;
-}
-
-function renderServices() {
-  const body = state.services;
-  if (!body) return;
-  const docker = body.docker || {};
-  const lf = body.langfuse || {};
-
-  const dockerKind = docker.running ? 'good' : 'danger';
-  const dockerLabel = docker.running ? 'up' : 'down';
-  setStatusPill(els.dockerStatus, els.dockerStatusText, dockerKind, dockerLabel);
-  if (els.dockerDetail) {
-    els.dockerDetail.textContent = docker.running
-      ? (docker.server_version ? 'engine ' + docker.server_version : '')
-      : (docker.error || '');
-  }
-  // Start/Stop (#284) — only offered where launch_docker_desktop() actually
-  // knows how (same `launchable` gate the combined Launch button already
-  // uses: win32 + a found Docker Desktop install).
-  if (els.dockerStartBtn) {
-    els.dockerStartBtn.hidden = !(body.launchable && !docker.running);
-    els.dockerStartBtn.disabled = state.dockerBusy;
-  }
-  if (els.dockerStopBtn) {
-    els.dockerStopBtn.hidden = !(body.launchable && docker.running);
-    els.dockerStopBtn.disabled = state.dockerBusy;
-  }
-
-  // Langfuse: "up" when reachable, "partial" when Docker is up but Langfuse
-  // isn't (containers starting / never launched), "down" otherwise.
-  let lfKind = 'danger';
-  let lfLabel = 'down';
-  if (lf.reachable) { lfKind = 'good'; lfLabel = 'up'; }
-  else if (docker.running) { lfKind = 'warn'; lfLabel = 'down'; }
-  setStatusPill(els.langfuseStatus, els.langfuseStatusText, lfKind, lfLabel);
-  if (els.langfuseDetail) {
-    els.langfuseDetail.textContent = lf.reachable ? '' : (lf.error || '');
-  }
-  if (els.langfuseStartBtn) {
-    els.langfuseStartBtn.hidden = lf.reachable;
-    els.langfuseStartBtn.disabled = state.langfuseBusy;
-  }
-  if (els.langfuseStopBtn) {
-    els.langfuseStopBtn.hidden = !lf.reachable;
-    els.langfuseStopBtn.disabled = state.langfuseBusy;
-  }
-
-  // AgentsView (#280): optional external indexer feeding the Code tab's
-  // AGY vendor. "not installed" is a warn, not a danger — the hub is fully
-  // functional without it.
-  const av = body.agentsview || {};
-  const avEnabled = !!av.host;
-  let avKind = 'danger';
-  let avLabel = 'down';
-  if (av.reachable) { avKind = 'good'; avLabel = 'up'; }
-  else if (!avEnabled) { avKind = 'warn'; avLabel = 'disabled'; }
-  else if (av.installed === false) { avKind = 'warn'; avLabel = 'not installed'; }
-  setStatusPill(els.agentsviewStatus, els.agentsviewStatusText, avKind, avLabel);
-  if (els.agentsviewDetail) {
-    els.agentsviewDetail.textContent = av.reachable
-      ? (av.version ? av.version : '')
-      : (av.installed === false ? 'see docs/code-usage-agentsview.md' : (av.error || ''));
-  }
-  if (els.agentsviewStartBtn) {
-    els.agentsviewStartBtn.hidden = !(avEnabled && !av.reachable && av.installed);
-    els.agentsviewStartBtn.disabled = state.agentsviewBusy;
-  }
-  if (els.agentsviewStopBtn) {
-    els.agentsviewStopBtn.hidden = !(avEnabled && av.reachable);
-    els.agentsviewStopBtn.disabled = state.agentsviewBusy;
-  }
-
-  // Peer rows (#179, generalized #372): the pills don't factor into the
-  // overall status/launch-button logic above — each tells its own peer's
-  // story. See renderPeerRows() below.
-  renderPeerRows();
-
-  // Overall pill summarises both.
-  let overallKind = 'good';
-  let overallText = 'all up';
-  if (!docker.running && !lf.reachable) { overallKind = 'danger'; overallText = 'both down'; }
-  else if (!docker.running) { overallKind = 'danger'; overallText = 'docker down'; }
-  else if (!lf.reachable) { overallKind = 'warn'; overallText = 'langfuse down'; }
-  else if (avEnabled && !av.reachable) { overallKind = 'warn'; overallText = 'agentsview down'; }
-  setStatusPill(els.servicesOverall, els.servicesOverallText, overallKind, overallText);
-
-  // Launch button + hint visibility.
-  const anyDown = !docker.running || !lf.reachable;
-  const showActions = anyDown && body.launchable && !state.servicesLaunching;
-  if (els.servicesActions) els.servicesActions.hidden = !(anyDown && body.launchable);
-  if (els.servicesHint) {
-    if (body.probeFailed) {
-      // Status probe itself failed — we don't know the install state,
-      // so surface the real error instead of guessing.
-      els.servicesHint.textContent = 'Status check failed: ' + (docker.error || 'unknown error') + '.';
-      els.servicesHint.hidden = false;
-    } else if (anyDown && !body.launchable) {
-      const hint = body.platform === 'darwin'
-        ? 'Start Docker manually: `open -a Docker`, then `./start_langfuse.sh`.'
-        : body.platform === 'linux'
-          ? 'Start Docker manually: `sudo systemctl start docker`, then `./start_langfuse.sh`.'
-          : 'Docker Desktop install not found — install from docker.com.';
-      els.servicesHint.textContent = hint;
-      els.servicesHint.hidden = false;
-    } else {
-      els.servicesHint.hidden = true;
-    }
-  }
-  if (els.servicesLaunchBtn) {
-    els.servicesLaunchBtn.disabled = !showActions;
-    els.servicesLaunchBtn.innerHTML = state.servicesLaunching
-      ? 'Launching… (up to ~90s)'
-      : icon('rocket') + 'Launch Docker + Langfuse';
-  }
-}
-
-async function onServicesLaunchClick() {
-  if (state.servicesLaunching) return;
-  state.servicesLaunching = true;
-  renderServices();
-  try {
-    const result = await postJson('/admin/api/services/launch', {});
-    const steps = (result && result.steps) || [];
-    const summary = steps.map(function (s) { return s.name + ':' + s.status; }).join(' · ');
-    if (result.ok) {
-      toast('Services launched · ' + summary, 'good');
-    } else {
-      const first = steps.find(function (s) { return s.status === 'error'; });
-      const detail = first ? (first.name + ': ' + first.detail) : summary;
-      toast('Launch failed — ' + detail, 'error');
-    }
-  } catch (exc) {
-    toast('Launch failed: ' + (exc.message || exc), 'error');
-  } finally {
-    state.servicesLaunching = false;
-    await fetchServicesStatus();
-  }
-}
-
-// Peer rows (#179, generalized #372): one row per hub-running peer, driven
-// by the `peers` list on /admin/api/services/status — never hardcoded (was
-// issue #245's original point for the single Mac Mini row; still holds for
-// N peers). Renders like machines.js's renderMachineCard()/onMachinesListClick
-// — an innerHTML template + one delegated click listener on the container —
-// rather than binding a listener per row, since the row count varies.
-function renderPeerRows() {
-  const container = els.peerRows;
-  if (!container) return;
-  const peers = (state.services && state.services.peers) || [];
-  container.innerHTML = peers.map(renderPeerRow).join('');
-}
-
-function renderPeerRow(peer) {
-  const busy = !!(state.peerBusyIds && state.peerBusyIds[peer.host_id]);
-  const kind = peer.reachable ? 'good' : 'danger';
-  const label = peer.reachable ? 'up' : 'down';
-  // git_sha_match is null until both sides answer; only warn on an explicit
-  // false, never on "haven't compared yet" (#181).
-  const outOfSync = peer.reachable && peer.git_sha_match === false;
-  const detail = !peer.reachable
-    ? escapeHtml(peer.error || '')
-    : outOfSync
-      ? '<span class="badge warn">out of sync</span> ' +
-        escapeHtml(peer.remote_git_sha || '?') + ' vs ' + escapeHtml(peer.local_git_sha || '?')
-      : '';
-  // Wake/Sync: mirrors the Docker/Langfuse launch-button pattern — one
-  // action visible at a time depending on reachability.
-  const wakeHtml = busy ? 'Waking…' : icon('play') + 'Wake';
-  const syncHtml = busy ? 'Syncing…' : icon('refresh-cw') + 'Sync';
-  return '<div class="services-row" data-host-id="' + escapeHtml(peer.host_id) + '">'
-    + '<span class="services-label">' + icon('signal') + escapeHtml(peer.display_name || peer.host_id) + '</span>'
-    + '<span class="hub-live-status ' + kind + '"><span class="dot"></span><span>' + label + '</span></span>'
-    + '<span class="muted small services-detail">' + detail + '</span>'
-    + '<button type="button" class="ghost-btn" data-action="bootstrap"' + (peer.reachable ? ' hidden' : '') + (busy ? ' disabled' : '') + '>' + wakeHtml + '</button>'
-    + '<button type="button" class="ghost-btn" data-action="sync"' + (peer.reachable ? '' : ' hidden') + (busy ? ' disabled' : '') + '>' + syncHtml + '</button>'
-    + '</div>';
-}
-
-function onPeerRowsClick(ev) {
-  const btn = ev.target.closest('button[data-action]');
-  if (!btn || btn.disabled) return;
-  const row = btn.closest('.services-row');
-  const hostId = row && row.dataset ? row.dataset.hostId : '';
-  if (!hostId) return;
-  const action = btn.dataset.action; // 'bootstrap' | 'sync'
-  onPeerAction(hostId, action, action === 'bootstrap' ? 'woken up' : 'synced');
-}
-
-async function onPeerAction(hostId, action, pastTense) {
-  if (state.peerBusyIds && state.peerBusyIds[hostId]) return;
-  state.peerBusyIds = Object.assign({}, state.peerBusyIds);
-  state.peerBusyIds[hostId] = true;
-  renderPeerRows();
-  const peers = (state.services && state.services.peers) || [];
-  const found = peers.find(function (p) { return p.host_id === hostId; });
-  const label = (found && found.display_name) || hostId;
-  try {
-    await postJson('/admin/api/hosts/' + hostId + '/' + action, {});
-    toast(label + ' ' + pastTense, 'good');
-  } catch (exc) {
-    toast(label + ' ' + action + ' failed: ' + (exc.message || exc), 'error');
-  } finally {
-    const nextBusy = Object.assign({}, state.peerBusyIds);
-    delete nextBusy[hostId];
-    state.peerBusyIds = nextBusy;
-    await fetchServicesStatus();
-  }
-}
-
-// One start/stop action on a service row: busy flag → re-render → POST →
-// {ok, steps}-driven toast → clear the flag and refresh (#284). AgentsView,
-// Docker Desktop and Langfuse all ride this one helper (#470 — AgentsView
-// kept its own hand-rolled copy when #284 generalized the shape). `busyKey`
-// is the `state` flag the row's buttons read to disable themselves.
-async function onServiceAction(label, busyKey, path, verb, doneLabel) {
-  if (state[busyKey]) return;
-  state[busyKey] = true;
-  renderServices();
-  try {
-    const result = await postJson(path, {});
-    if (result.ok) {
-      toast(label + ' ' + doneLabel, 'good');
-    } else {
-      const first = (result.steps || []).find(function (s) { return s.status === 'error'; });
-      toast(label + ' ' + verb + ' failed — ' + (first ? first.detail : 'unknown'), 'error');
-    }
-  } catch (exc) {
-    toast(label + ' ' + verb + ' failed: ' + (exc.message || exc), 'error');
-  } finally {
-    state[busyKey] = false;
-    await fetchServicesStatus();
-  }
-}
-
-// AgentsView's start endpoint is `/launch`, not `/start` — hence the full
-// path per action rather than a shared prefix + verb.
-function onAgentsviewStartClick() {
-  return onServiceAction('AgentsView', 'agentsviewBusy',
-    '/admin/api/services/agentsview/launch', 'start', 'started');
-}
-function onAgentsviewStopClick() {
-  return onServiceAction('AgentsView', 'agentsviewBusy',
-    '/admin/api/services/agentsview/stop', 'stop', 'stopped');
-}
-
-// Docker Desktop + Langfuse individual start/stop (#284) — complementing
-// (not replacing) the combined "Launch Docker + Langfuse" recovery button.
-function onDockerStartClick() {
-  return onServiceAction('Docker', 'dockerBusy', '/admin/api/services/docker/start', 'start', 'started');
-}
-function onDockerStopClick() {
-  return onServiceAction('Docker', 'dockerBusy', '/admin/api/services/docker/stop', 'stop', 'stopped');
-}
-function onLangfuseStartClick() {
-  return onServiceAction('Langfuse', 'langfuseBusy', '/admin/api/services/langfuse/start', 'start', 'started');
-}
-function onLangfuseStopClick() {
-  return onServiceAction('Langfuse', 'langfuseBusy', '/admin/api/services/langfuse/stop', 'stop', 'stopped');
-}
-
 // --------------------------------------------------------- wire buttons
 export function wireHub() {
   function togglePause() {
@@ -532,48 +226,11 @@ export function wireHub() {
     els.installRefreshBtn.addEventListener('click', function () { fetchInstallStatus(); });
   }
 
-  if (els.servicesLaunchBtn) {
-    els.servicesLaunchBtn.addEventListener('click', onServicesLaunchClick);
-  }
-  if (els.peerRows) {
-    els.peerRows.addEventListener('click', onPeerRowsClick);
-  }
-  if (els.agentsviewStartBtn) {
-    els.agentsviewStartBtn.addEventListener('click', onAgentsviewStartClick);
-  }
-  if (els.agentsviewStopBtn) {
-    els.agentsviewStopBtn.addEventListener('click', onAgentsviewStopClick);
-  }
-  if (els.dockerStartBtn) {
-    els.dockerStartBtn.addEventListener('click', onDockerStartClick);
-  }
-  if (els.dockerStopBtn) {
-    els.dockerStopBtn.addEventListener('click', onDockerStopClick);
-  }
-  if (els.langfuseStartBtn) {
-    els.langfuseStartBtn.addEventListener('click', onLangfuseStartClick);
-  }
-  if (els.langfuseStopBtn) {
-    els.langfuseStopBtn.addEventListener('click', onLangfuseStopClick);
-  }
-
   // Sparklines: lightweight inline-SVG renderer driven by /admin/api/hub/stats.
   setInterval(function () {
     if (state.tab !== 'hub') return;
     renderSparklines();
   }, 2500);
-
-  // Services card — Docker + Langfuse status. Cheaper than the sparkline
-  // sweep (two small probes, each capped at 2 s) so 5 s is plenty.
-  // Also refresh telemetry health here so the live-request trace links can
-  // resolve Langfuse's project_id without the user first visiting the
-  // Telemetry tab — the deep-link URL is then byte-identical across tabs.
-  setInterval(function () {
-    if (state.tab !== 'hub') return;
-    if (state.servicesLaunching) return;
-    fetchServicesStatus().catch(function () {});
-    fetchTelemetryHealth().catch(function () {});
-  }, 5000);
 }
 
 async function renderSparklines() {
