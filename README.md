@@ -28,7 +28,7 @@ tray.bat                                       REM tray icon -> hub on :8000
 
 `python -m src.install` reports what's missing (venv, deps, GPU, vendored binaries, model weights, free ports); `--fix` downloads the platform llama.cpp/whisper.cpp release binaries into `vendor/` and the GGUF/BIN weights into `models/` (several GB — grab a coffee). Everything is idempotent; run it again any time. The same checks live in the admin Hub tab with per-item **Fix** buttons.
 
-Open the admin at <http://127.0.0.1:8000/admin/>. `GET /health` returns 200 once the hub is up.
+Open the admin at <http://127.0.0.1:8000/admin/>. `GET /health` returns 200 once the hub is up; `GET /v1/audio/health` preflights the whisper backend specifically — 200 `ok` when reachable, 503 `degraded`/`none` when it is down or disabled, so a caller can branch on the status code alone before sending a clip.
 
 ## Calling it
 
@@ -66,6 +66,19 @@ curl -F file=@clip.wav http://127.0.0.1:8000/v1/audio/transcriptions
 
 **Limitations (by design of the lite fork):** local backends are text-only — image/document content blocks are rejected with a 400; no `stream=true` on `/v1/messages` (use the OpenAI shape for streaming); Anthropic-shape tool-use is not implemented for llama backends (OpenAI-shape tool calling works via llama.cpp's `--jinja`).
 
+### Response headers
+
+Every response carries a small header contract, useful to a caller quoting the hub back in a bug report or branching on Anthropic-SDK behaviour:
+
+| Header | When | Meaning |
+| --- | --- | --- |
+| `request-id` | Every non-static response | Ties the caller's own record to the matching hub log line; aliased to the derived trace ID. |
+| `X-Trace-Id` | Only when the caller sent one | Deterministically derived from the caller's own `X-Trace-Id` so repeat calls with the same value correlate. |
+| `anthropic-version` | Anthropic-shape routes | Echoes the caller's value, or `2023-06-01` when none was sent. The hub does not vary its wire shape by version. |
+| `anthropic-beta` | Anthropic-shape routes, when the caller sent one | Accepted and echoed, never honoured — any requested beta not implemented by the hub also gets an RFC 7234 `Warning: 299` advisory on the same response. |
+
+All four are CORS-exposed to browser callers (`src/cors_policy.py`).
+
 ## The admin tabs
 
 ### Hub
@@ -101,8 +114,17 @@ models:
     model_path: "models/Qwen3.5-4B-Q4_K_M.gguf"
     hf_repo: "unsloth/Qwen3.5-4B-GGUF"   # where --fix downloads from
     hf_pattern: "Qwen3.5-4B-Q4_K_M.gguf"
+    est_vram_mb: 2100                # rough VRAM footprint (display only)
     startup: eager                  # eager | on_demand
+    idle_unload_minutes: 30          # on_demand only: unload after N idle minutes
     args: [...]                     # extra backend CLI args
+    host: local                     # owning host id; unset = local everywhere
+  qwen35_4b_nothink:
+    display_name: qwen3.5-4b-nothink
+    virtual: true                   # alias of another backend's port; never
+                                     # launched/downloaded or offered in the admin UI
+    inject_extra:                   # server-side defaults folded into every
+      chat_template_kwargs: { enable_thinking: false }   # /v1/chat/completions call (caller wins)
 roles:  { ... }                     # display card in the Models tab
 ```
 

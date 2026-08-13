@@ -17,6 +17,14 @@
 #                  (spawned by the first request; add idle_unload_minutes to
 #                  auto-unload after N idle minutes)
 #   args           extra CLI args appended to the backend command line
+#   virtual        true = an alias of another backend, sharing its port;
+#                  never launched or downloaded, routes via inject_extra only
+#   inject_extra   server-side defaults folded into the upstream OpenAI
+#                  payload on every /v1/chat/completions call for this id
+#                  (caller-sent fields win) — the mechanism behind a
+#                  no-think alias
+#   host           owning host id (bare `host: <id>`); unset means "local
+#                  everywhere", the same thing on a single-host config
 
 hub:
   port: 8000
