@@ -7,3 +7,85 @@ icon         = "🧠"
 port         = ":8000"
 display_name = "Local LLM Hub Lite"
 description  = "<b>Local LLM Hub Lite</b> — single-machine local-models hub, lite fork of local-llm-hub. Anthropic + OpenAI shapes on :8000 routed to llama-server (qwen3.5-4b :8081) and whisper-server (:8090); admin SPA with Hub · Models · Playground."
+
+# Diff-proportionate e2e routing (project-scaffolding#180). scripts/verify-
+# before-ship.ps1's browser phase classifies the branch's changed files
+# against the rules below (first match wins, in this order) instead of
+# always running the whole tests/e2e suite. Schema + rationale:
+# project-scaffolding's docs/e2e-routing.md. Mechanism: scripts/classify_e2e.py
+# (byte-verbatim copy). A path matching no rule below -- or a repo with no
+# [e2e] table at all -- fails safe to the full suite; this table only ever
+# narrows what an *already-covered* diff runs, never what an unmatched one runs.
+[e2e]
+static_pytest_target = "tests/e2e/test_smoke.py"
+static_browsers       = ["chromium"]
+full_pytest_target    = "tests/e2e"
+
+# Inert image/font/icon assets under the static tree -> smoke is enough.
+[[e2e.rule]]
+tier       = "static"
+prefix     = "app_web/static/"
+extensions = ["svg", "png", "jpg", "jpeg", "gif", "ico", "webp", "avif", "woff", "woff2", "ttf", "eot", "otf", "webmanifest"]
+
+# A vendored HTML fragment is pure markup with no behaviour of its own; its
+# .css/.js siblings are NOT covered by this rule and fall through to "full"
+# below (the component-contract harnesses in tests/e2e/ assert those).
+[[e2e.rule]]
+tier       = "static"
+prefix     = "app_web/static/_vendored/"
+extensions = ["html"]
+
+# Real browser surface -> full dual coverage.
+[[e2e.rule]]
+tier   = "full"
+prefix = "app_web/"
+[[e2e.rule]]
+tier   = "full"
+prefix = "tray/"
+# The e2e suite itself.
+[[e2e.rule]]
+tier   = "full"
+prefix = "tests/e2e/"
+
+# Backend/tooling with no browser impact -> no browser suite needed.
+[[e2e.rule]]
+tier       = "none"
+prefix     = "src/"
+extensions = ["py"]
+[[e2e.rule]]
+tier       = "none"
+prefix     = "tests/"
+extensions = ["py"]
+[[e2e.rule]]
+tier   = "none"
+prefix = "scripts/"
+[[e2e.rule]]
+tier   = "none"
+prefix = "config/"
+[[e2e.rule]]
+tier   = "none"
+prefix = "launchers/"
+[[e2e.rule]]
+tier   = "none"
+prefix = ".github/"
+[[e2e.rule]]
+tier       = "none"
+extensions = ["md"]
+[[e2e.rule]]
+tier = "none"
+path = ".fleet.toml"
+[[e2e.rule]]
+tier = "none"
+path = ".gitignore"
+[[e2e.rule]]
+tier = "none"
+path = "LICENSE"
+[[e2e.rule]]
+tier = "none"
+path = "AGENTS.md"
+[[e2e.rule]]
+tier = "none"
+path = "CLAUDE.md"
+[[e2e.rule]]
+tier       = "none"
+extensions = ["bat", "sh"]
