@@ -2,14 +2,14 @@
 
 Each enabled local model in the registry gets its own singleton process +
 per-backend log file (``data/logs/backend-<id>.log``) here. Keyed by model
-id ("qwen", "glm", "whisper"). Used by the admin SPA's Models tab, the
+id ("qwen35_4b", "whisper"). Used by the admin SPA's Models tab, the
 tray, and the per-model launcher scripts to start/stop individual backends
 and tail their output without global-state entanglement. The log file is
 written by the child (not a hub-owned pipe), so it stays readable across a
 hub restart and an inherited backend never writes into a closed pipe.
 
 Two engine families share this manager:
-  - `llama-server` for chat/completion GGUF models (qwen, glm, gemma4*)
+  - `llama-server` for chat/completion GGUF models
   - `whisper-server` for whisper.cpp ASR (OpenAI-compatible /v1/audio/*)
 The shape differences (binary location, -m vs --model flag, health
 endpoint) are absorbed in `build_command` and `is_reachable`.
@@ -28,9 +28,7 @@ import socket
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
-
-import httpx
+from typing import Dict, Optional
 
 from .host_profile import resolve as resolve_host
 from .http_client import get_sync_client
@@ -145,46 +143,6 @@ def is_running(model_id: str) -> bool:
     return _inherited_alive(state)
 
 
-def is_inherited(model_id: str) -> bool:
-    """True iff this model is alive via an inherited PID (not a Popen we own)."""
-    state = _state_for(model_id)
-    return state.proc is None and _inherited_alive(state)
-
-
-def inherited_foreign(model_id: str) -> bool:
-    """True iff this model is alive via an inherited PID whose process has
-    **no tie to this repo** — an external sibling's server on a mutex-shared
-    port, adopted for control but never spawned by the hub (#431). The
-    canonical case: a sibling app's own ``whisper-server`` holding the port —
-    the hub can route to it, but the admin UI must not claim the hub runs it.
-
-    Checks exe + command line + cwd for the repo path, not exe alone —
-    any repo-path mention marks it ours. Best-effort: an unreadable
-    process (access denied, racing exit) reads as not-foreign rather
-    than guessing.
-    """
-    state = _state_for(model_id)
-    if not (state.proc is None and _inherited_alive(state)):
-        return False
-    try:
-        import psutil
-
-        proc = psutil.Process(state.inherited_pid)
-        probes = [proc.exe() or ""]
-        for getter in (proc.cmdline, proc.cwd):
-            try:
-                value = getter()
-                probes.extend(value if isinstance(value, list) else [value or ""])
-            except Exception:  # noqa: BLE001 — per-probe best-effort
-                pass
-        root = str(PROJECT_ROOT).lower().replace("/", "\\")
-        return not any(
-            root in str(p).lower().replace("/", "\\") for p in probes
-        )
-    except Exception:  # noqa: BLE001 — display-only hint, never block
-        return False
-
-
 def pid(model_id: str) -> Optional[int]:
     state = _state_for(model_id)
     p = state.proc
@@ -243,26 +201,6 @@ def is_reachable(model: Model, timeout: float = 1.5) -> bool:
         return r.status_code == 200
     except Exception:
         return False
-
-
-def probe_health(model: Model, timeout: float = 1.5) -> Optional[Dict[str, Any]]:
-    """GET the backend's own ``/health`` and return the parsed JSON body, or
-    ``None`` if unreachable / non-JSON.
-
-    Unlike :func:`is_reachable` (a boolean liveness gate used everywhere),
-    this is for callers that need a field out of the body itself.
-    """
-    if not model.url:
-        return None
-    base = model.url.removesuffix("/v1").rstrip("/")
-    try:
-        r = httpx.get(f"{base}/health", timeout=timeout)
-        if r.status_code == 200:
-            body = r.json()
-            return body if isinstance(body, dict) else None
-    except Exception:
-        pass
-    return None
 
 
 def log_lines(model_id: str, limit: int = LOG_TAIL_LINES) -> list[str]:

@@ -106,9 +106,9 @@ def _delayed_darwin_bootout(label: str, delay: float = 0.4) -> None:
     (``_delayed_shutdown``) and even an explicit ``launchctl stop`` both got
     immediately relaunched. ``launchctl bootout`` is the only thing that
     actually removes the job from launchd's active registry, so nothing is
-    left to respawn. Bringing it back requires ``launchctl bootstrap``
-    again — the ``bootstrap`` action in ``mac/bin/hub-remote-ctl.sh`` and
-    ``src/install.py``'s ``_fix_launchagent()`` both already do this.
+    left to respawn. Bringing it back requires manually re-running
+    ``launchctl bootstrap`` with the LaunchAgent's plist — this repo doesn't
+    ship an automated re-bootstrap helper.
     """
 
     def _runner() -> None:
@@ -340,7 +340,7 @@ async def stats() -> Dict[str, Any]:
 @router.get("/api/install/status")
 async def install_status() -> Dict[str, Any]:
     """Run every install check off the event loop — many shell out to
-    ``claude --version`` / ``nvidia-smi`` / ``llama-server --version``
+    ``nvidia-smi`` / ``llama-server --version`` / ``whisper-server --version``
     via blocking subprocess.run, which would otherwise pin the entire
     uvicorn worker for seconds while other admin requests queue up."""
     from src import install

@@ -18,7 +18,7 @@ import json
 import logging
 import os
 import secrets
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlencode, urlparse, urlunparse
@@ -96,14 +96,6 @@ def save_webapp_config(cfg: WebappConfig, path: Optional[Path] = None) -> Path:
     os.replace(tmp, target)
     logger.info(f"💾 Saved webapp_config to {target}")
     return target
-
-
-def update_webapp_config(**fields) -> WebappConfig:
-    """Read, patch, save — convenience for the API endpoint."""
-    current = load_webapp_config()
-    patched = replace(current, **fields)
-    save_webapp_config(patched)
-    return patched
 
 
 def ensure_auth_token(cfg: Optional[WebappConfig] = None) -> WebappConfig:

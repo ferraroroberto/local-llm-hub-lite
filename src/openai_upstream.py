@@ -1,6 +1,6 @@
 """Adapter to call an OpenAI-compatible upstream (e.g. llama-server).
 
-Used by the hub when routing to local Qwen / GLM backends. Helpers:
+Used by the hub when routing to a local llama-server backend. Helpers:
 
 - ``call_openai_chat()``: POST {base_url}/chat/completions, return dict.
 - ``call_openai_chat_stream()``: POST with ``stream: true``, yield raw
@@ -354,7 +354,7 @@ def openai_response_text(resp: Dict[str, Any]) -> str:
     msg = choices[0].get("message") or {}
     text = msg.get("content") or ""
     if not text:
-        # Qwen3/GLM reasoning models put the answer in reasoning_content
+        # Qwen3-family reasoning models put the answer in reasoning_content
         # when --jinja is on and the client doesn't opt out of thinking.
         text = msg.get("reasoning_content") or ""
     return strip_think_blocks(text)

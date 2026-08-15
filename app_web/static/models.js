@@ -106,7 +106,7 @@ function fillItem(li, m) {
   }
   buttons.push({
     act: 'ping', glyph: icon('signal'), label: 'Ping',
-    disabled: !reachable && m.backend !== 'claude' && m.backend !== 'gemini',
+    disabled: !reachable,
   });
   if (adopted) {
     buttons.push({ act: 'force-stop', glyph: icon('skull'), label: 'Force stop', danger: true });

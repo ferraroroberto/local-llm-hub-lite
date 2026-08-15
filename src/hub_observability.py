@@ -37,18 +37,15 @@ class RequestRecord:
     model: str = ""           # request model alias the client sent (what was *asked* for)
     # Model id that actually served the request, when the hub resolved the
     # requested name to something else — a role alias (``audio_transcribe``)
-    # landing on a chain member, or a chain fallback taking over. Empty when
-    # nothing resolved it (the ordinary chat paths) — never guess: a consumer
-    # reads "requested=X served=Y" only when this is set (issue #412).
+    # resolving to its backing model id. Empty when nothing resolved it (the
+    # ordinary chat paths) — never guess: a consumer reads "requested=X
+    # served=Y" only when this is set (issue #412).
     served_model: str = ""
-    # Host id that actually served the request — the missing dimension behind
-    # the #405 false pass: a `model=whisper` answered 200 by a host with no
-    # whisper bound was a legitimate remote hop to whisper's owner, and the
-    # record had no field that said so (``client`` is the *caller*, not the
-    # server). Set on the audio paths: the active host for a locally-served
-    # request, the owning host for a remote-proxy hop, and whatever the peer
-    # hub reports when it answers with its own ``X-Hub-Served-Host``. Empty
-    # when nothing resolved it (issue #412).
+    # Host id that actually served the request — this is a single-host fork
+    # (no chains, no remote hops, no peer hubs), so this is simply the
+    # active host's id when a served backend is known. Set on the audio
+    # paths alongside served_model. Empty when nothing resolved it
+    # (issue #412).
     served_host: str = ""
     backend: str = ""         # "openai" | "whisper" | ""
     status: int = 0           # HTTP status of the response

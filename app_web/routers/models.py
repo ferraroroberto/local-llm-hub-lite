@@ -33,13 +33,7 @@ router = APIRouter()
 def _add_startup_fields(row: Dict[str, Any], m: Model) -> None:
     """Annotate a tile row with its declared startup policy — the registry
     fields the SPA's eager / on-demand badge renders.
-
-    Subscription rows (claude/gemini) have no lifecycle concept — no process,
-    no VRAM — so they carry none of these keys rather than an empty shell the
-    UI would have to special-case.
     """
-    if m.backend in ("claude", "gemini"):
-        return
     row["startup"] = m.startup
     row["idle_unload_minutes"] = m.idle_unload_minutes
     row["est_vram_mb"] = m.est_vram_mb
@@ -83,9 +77,6 @@ async def list_models_for_admin() -> Dict[str, Any]:
     do a single netstat snapshot up front instead of one per backend —
     O(N) → O(1) subprocesses, O(N) → O(0.5 s) wall time when all
     backends are alive.
-
-    A reachable TTS row also gets a second, equally-fanned-out probe for
-    its resolved ``device`` (cuda/cpu/mps) — see ``_probe_device`` below.
     """
     local_models = list(enabled_models())
 
@@ -95,10 +86,6 @@ async def list_models_for_admin() -> Dict[str, Any]:
     listening = await asyncio.to_thread(snapshot_listening_pids)
 
     async def _probe_reach(m: Model) -> bool:
-        if m.backend == "claude" or m.backend == "gemini":
-            # Subscription-backed — always "live" if the hub itself
-            # answered, which the caller already knows it did.
-            return True
         if not m.port or m.port not in listening:
             # Port isn't bound → definitely not reachable; skip the
             # 1-second-per-dead-backend HTTP probe.
@@ -107,30 +94,11 @@ async def list_models_for_admin() -> Dict[str, Any]:
 
     reach_results = await asyncio.gather(*(_probe_reach(m) for m in local_models))
 
-    async def _probe_device(m: Model, reachable: bool) -> Optional[str]:
-        # TTS backends resolve a real device (cuda/cpu/mps) at load time and
-        # report it on their own /health (tts_server.py's state.device) —
-        # other backends have no comparable concept. Only probe a row that's
-        # already known-reachable, and only trust a fully-resolved value: a
-        # backend still loading reports its raw "auto" arg, and surfacing
-        # that would be actively misleading — omit rather than guess wrong.
-        if not reachable or m.backend != "tts":
-            return None
-        body = await asyncio.to_thread(bp.probe_health, m, 0.4)
-        dev = body.get("device") if isinstance(body, dict) else None
-        if isinstance(dev, str) and dev.strip().lower() in ("cpu", "cuda", "mps"):
-            return dev.strip().lower()
-        return None
-
-    device_results = await asyncio.gather(
-        *(_probe_device(m, reachable) for m, reachable in zip(local_models, reach_results))
-    )
-
     rows: List[Dict[str, Any]] = []
-    for m, reachable, device in zip(local_models, reach_results, device_results):
+    for m, reachable in zip(local_models, reach_results):
         # Virtual aliases share an existing backend's port and own no process,
         # so they're reachable but never independently start/stop-able.
-        controllable = m.backend in ("openai", "whisper", "tts") and not m.virtual
+        controllable = m.backend in ("openai", "whisper") and not m.virtual
         own = OWNERSHIP_NONE
         pid: Any = None
         if controllable:
@@ -150,8 +118,6 @@ async def list_models_for_admin() -> Dict[str, Any]:
             "model_path": m.model_path,
         }
         _add_startup_fields(row, m)
-        if device:
-            row["device"] = device
         rows.append(row)
 
     return {"models": rows}
@@ -165,10 +131,10 @@ async def model_start(model_id: str) -> Dict[str, Any]:
             status_code=400,
             detail=f"model {model_id!r} is a virtual alias of another backend — nothing to start",
         )
-    if not (target.backend in ("openai", "whisper", "tts")):
+    if not (target.backend in ("openai", "whisper")):
         raise HTTPException(
             status_code=400,
-            detail=f"backend {target.backend!r} has no managed process (subscription-backed)",
+            detail=f"backend {target.backend!r} has no managed process",
         )
     ok, msg = bp.start(model_id)
     if not ok:
@@ -209,14 +175,13 @@ async def model_log(model_id: str, limit: int = 400) -> Dict[str, Any]:
 
     Readable for a backend the hub spawned *and* one it inherited across a
     restart — the child owns the log fd. Empty ``lines`` (200) when the
-    backend has never started; 404 only for an unknown/subscription-backed
-    model that has no managed process.
+    backend has never started; 404 only for an unknown model.
     """
     target = _require_model(model_id)
-    if not (target.backend in ("openai", "whisper", "tts")):
+    if not (target.backend in ("openai", "whisper")):
         raise HTTPException(
             status_code=400,
-            detail=f"backend {target.backend!r} has no managed process (subscription-backed)",
+            detail=f"backend {target.backend!r} has no managed process",
         )
     limit = max(1, min(limit, bp.LOG_TAIL_LINES * 10))
     lines = await asyncio.to_thread(bp.log_lines, model_id, limit)
@@ -248,16 +213,15 @@ def _silent_wav(seconds: float = 0.5, rate: int = 16000) -> bytes:
 async def _probe(url: str, *, timeout: float, **kwargs: Any) -> tuple[Any, float, Optional[str]]:
     """POST ``url`` through the shared pooled client, timing the round trip.
 
-    All three ``model_ping`` arms (whisper/tts/chat) only differ in URL,
-    payload shape, and timeout — this is that shared probe. Goes through
+    Both ``model_ping`` arms (whisper/chat) only differ in URL, payload
+    shape, and timeout — this is that shared probe. Goes through
     ``get_async_client()`` rather than constructing a fresh ``httpx.AsyncClient``
     per call, which is exactly what that shared client exists to avoid (issue
     #165: ~0.26s per construction vs ~1ms reused).
 
     On success returns ``(response, latency_ms, None)``; on ``httpx.HTTPError``
     returns ``(None, latency_ms, str(exc))`` — callers shape the two cases into
-    the identical ``{"ok": False, "status": 0, ...}`` payload themselves, since
-    the tts arm's success shape differs from the others.
+    the identical ``{"ok": False, "status": 0, ...}`` payload themselves.
     """
     client = get_async_client()
     t0 = time.monotonic_ns()
@@ -293,13 +257,13 @@ async def model_ping(model_id: str) -> Dict[str, Any]:
     The probe is protocol-aware: chat/ASR backends speak different APIs, so
     a chat ping at a whisper row would always 400. Whisper rows get a real
     audio transcription probe instead; everything else gets a 1-token chat
-    probe. For subscription-backed claude/gemini rows the alias resolves
-    inside the hub the same way as any other request.
+    probe.
     """
     target = bp.resolve_model_by_id(model_id)
     if target is None:
-        # Could still be a claude/gemini row — those aren't backed by
-        # backend_process but are still resolvable in the registry.
+        # bp.resolve_model_by_id only matches the registry id; fall back to
+        # the broader lookup (id, display_name, or alias) so pinging by an
+        # alias like "agentic_light" still resolves.
         target = resolve_model(model_id)
     if target is None:
         raise HTTPException(status_code=404, detail=f"unknown model {model_id!r}")
@@ -319,26 +283,6 @@ async def model_ping(model_id: str) -> Dict[str, Any]:
         if error is not None:
             return {"ok": False, "status": 0, "latency_ms": latency_ms, "error": error}
         return _ping_result(r, latency_ms)
-
-    if target.backend == "tts":
-        # TTS speaks the OpenAI /v1/audio/speech shape, not chat — synthesize
-        # a short phrase through the hub's proxy (model=display_name routes it
-        # to this exact backend and keeps the hit in the observability ring).
-        url = f"http://127.0.0.1:{port}/v1/audio/speech"
-        payload = {"model": target.display_name, "input": "ping", "response_format": "wav"}
-        # Generous timeout: a cold TTS backend may still be warming weights.
-        r, latency_ms, error = await _probe(url, timeout=120.0, json=payload)
-        if error is not None:
-            return {"ok": False, "status": 0, "latency_ms": latency_ms, "error": error}
-        # Audio bytes aren't JSON — _ping_result would mis-parse them, so
-        # shape the result directly (ok = 2xx, no usage payload for audio).
-        return {
-            "ok": r.is_success,
-            "status": r.status_code,
-            "latency_ms": round(latency_ms, 1),
-            "usage": {"audio_bytes": len(r.content)} if r.is_success else {},
-            "error": "" if r.is_success else r.text[:300],
-        }
 
     url = f"http://127.0.0.1:{port}/v1/messages"
     payload = {
