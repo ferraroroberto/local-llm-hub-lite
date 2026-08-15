@@ -33,6 +33,7 @@ from _lib import (  # noqa: E402
     download,
     extract,
     flatten_if_nested,
+    flatten_nested_bin,
     no_window_flags,
 )
 
@@ -299,22 +300,12 @@ def _normalise_binary_name() -> None:
     if want.exists():
         return
     for candidate_name in _upstream_server_names():
-        for candidate in VENDOR_DIR.rglob(candidate_name):
-            # Lift the entire bin directory up alongside the expected path,
-            # so sibling DLLs (cudart, whisper.dll, ggml.dll, ...) travel with it.
-            src_dir = candidate.parent
-            if src_dir != VENDOR_DIR:
-                log.info("flattening %s -> %s", src_dir, VENDOR_DIR)
-                for child in list(src_dir.iterdir()):
-                    target = VENDOR_DIR / child.name
-                    if target.exists():
-                        if target.is_dir():
-                            shutil.rmtree(target)
-                        else:
-                            target.unlink()
-                    shutil.move(str(child), str(target))
-            src = VENDOR_DIR / candidate_name
-            if src.exists() and src != want:
+        # Lift the entire bin directory up alongside the expected path, so
+        # sibling DLLs (cudart, whisper.dll, ggml.dll, ...) travel with it.
+        flatten_nested_bin(VENDOR_DIR, candidate_name)
+        src = VENDOR_DIR / candidate_name
+        if src.exists():
+            if src != want:
                 log.info("renaming %s -> %s", src.name, want.name)
                 src.rename(want)
             return
