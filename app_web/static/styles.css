@@ -305,14 +305,6 @@ h2 { display: flex; align-items: center; gap: 8px; }
   gap: 10px;
   min-width: 0;
 }
-/* Services card: the header's overall pill ("all up") sits in the same
-   column as the four row pills below it — same first-column floor and
-   column gap as .services-row (#280 follow-up, user-flagged). */
-#servicesCard .hub-title-block {
-  display: grid;
-  grid-template-columns: minmax(110px, auto) auto;
-  gap: 12px;
-}
 .hub-live-status {
   display: inline-flex;
   align-items: center;
@@ -346,8 +338,6 @@ h2 { display: flex; align-items: center; gap: 8px; }
 }
 .hub-meta-row > span { display: inline-flex; gap: 6px; align-items: baseline; min-width: 0; }
 .hub-meta-row > span > span:first-child { color: var(--muted); }
-/* Long single-token values (the OTel endpoint URL) wrap instead of
- * overflowing the card edge. */
 .hub-meta-row code { word-break: break-all; }
 
 /* ---------- buttons ---------- */
@@ -668,214 +658,6 @@ h2 { display: flex; align-items: center; gap: 8px; }
   gap: 6px;
   font-size: var(--font-caption);
 }
-.placement-chain {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.placement-arrow { color: var(--muted); }
-.place-pill {
-  background: var(--card-off);
-  color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  padding: 1px 8px;
-  font-size: var(--font-caption);
-  white-space: nowrap;
-}
-.place-pill.owner {
-  color: var(--accent);
-  background: var(--accent-soft);
-  border-color: var(--accent-border-strong);
-  font-weight: 600;
-}
-/* Edit affordance (#424) — compact inline icon control on the placement
- * line, same sub-row scale as the glossary REPL row's delete button. */
-.placement-line .placement-edit-btn { width: 26px; min-height: 26px; }
-
-/* ---------- placement editor (#424, inline panel under a model row) ----------
- * Same sibling-panel recipe as .glossary-panel — the panel sits next to
- * .app-main so it (and its unsaved draft) survives the 5 s poll. */
-.placement-editor {
-  border-top: 1px solid var(--line);
-  background: var(--card-off);
-  padding: 12px 14px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.placement-editor .opt-group-title { margin: 4px 0 0; }
-.pe-note { margin: 0; }
-.pe-chain { display: flex; flex-direction: column; gap: 6px; }
-.pe-host-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  background: var(--input-bg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-}
-.pe-host-name { flex: 1 1 0; min-width: 0; font-size: var(--font-label); }
-.pe-cpu-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-/* Compact inline chain controls — sub-row icon scale, same rationale as
- * .glossary-repl-row .icon-btn. */
-.pe-host-row .icon-btn { width: 30px; min-height: 30px; flex-shrink: 0; }
-.pe-add-row { display: flex; gap: 8px; align-items: stretch; }
-.pe-add-row select {
-  flex: 1 1 0;
-  min-width: 0;
-  background: var(--input-bg);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 7px 9px;
-  font: inherit;
-  font-size: var(--font-label);
-}
-.pe-add-row .ghost-btn { flex-shrink: 0; }
-.pe-policy { display: flex; gap: 10px; flex-wrap: wrap; }
-.pe-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: var(--font-caption);
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.pe-field select,
-.pe-field input {
-  background: var(--input-bg);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 7px 9px;
-  font: inherit;
-  font-size: var(--font-label);
-  text-transform: none;
-  letter-spacing: normal;
-}
-.pe-field input[type="number"] { width: 110px; }
-.pe-field input[disabled] { opacity: 0.5; }
-/* Inline rejection detail — state color (danger), matching the login
- * error's tone: the validation arithmetic is the message, keep it legible. */
-.pe-error {
-  margin: 0;
-  font-size: var(--font-caption);
-  color: var(--danger);
-  background: var(--danger-soft);
-  border: 1px solid var(--danger-border);
-  border-radius: var(--radius-sm);
-  padding: 7px 10px;
-}
-.pe-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-/* Config-version chip (#424) in the Models card header. Same typography as
- * the build sha in the page footer (#buildReadout: plain .muted.small) —
- * the monospace face clashed with the header type (#431). */
-.models-config-sha {
-  white-space: nowrap;
-}
-
-/* ---------- transcription dictionary editor (inline whisper-row panel) ---------- */
-.glossary-panel {
-  border-top: 1px solid var(--line);
-  background: var(--card-off);
-  padding: 12px 14px 14px;
-}
-.glossary-editor { display: flex; flex-direction: column; gap: var(--gap); }
-.glossary-shared-note {
-  margin: 0;
-  font-size: var(--font-caption);
-  color: var(--accent);
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-border-soft);
-  border-radius: var(--radius-sm);
-  padding: 7px 10px;
-}
-.glossary-status { margin: 0; }
-.glossary-section { display: flex; flex-direction: column; gap: 6px; }
-.glossary-section .opt-group-title { margin: 0; }
-.glossary-section p { margin: 0; }
-.glossary-repl-list { display: flex; flex-direction: column; gap: 6px; }
-.glossary-repl-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.glossary-repl-row input {
-  flex: 1 1 0;
-  min-width: 0;
-  padding: 7px 9px;
-  background: var(--input-bg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--ink);
-  font-size: var(--font-label);
-}
-.glossary-arrow { color: var(--muted); flex-shrink: 0; }
-/* Compact inline delete action nested inside a REPL row — deliberately below
- * the 44/52/60 rows scale, which governs list-row containers, not the icon
- * controls sitting in them (design.md Components list-row). */
-.glossary-repl-row .icon-btn { width: 30px; min-height: 30px; flex-shrink: 0; }
-.glossary-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.glossary-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  background: var(--input-bg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  font-size: var(--font-label);
-  color: var(--ink);
-}
-.glossary-chip-x {
-  background: none;
-  border: none;
-  color: var(--muted);
-  cursor: pointer;
-  padding: 0;
-  font-size: var(--font-caption);
-  line-height: 1;
-}
-.glossary-chip-x:hover { color: var(--danger); }
-.glossary-chip-suggest {
-  cursor: pointer;
-  border-color: var(--accent-border-strong);
-  color: var(--accent);
-}
-.glossary-chip-suggest:hover { background: var(--accent-soft); }
-.glossary-add-row { display: flex; gap: 6px; }
-.glossary-add-row input {
-  flex: 1 1 0;
-  min-width: 0;
-  padding: 7px 9px;
-  background: var(--input-bg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--ink);
-  font-size: var(--font-label);
-}
-.glossary-suggest {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  border: 1px dashed var(--line);
-  border-radius: var(--radius-md);
-}
-.glossary-suggest-head { font-size: var(--font-label); font-weight: 600; }
-.glossary-sublabel { margin-top: 2px; }
-.glossary-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
 /* ---------- playground ---------- */
 .opt-stack {
   display: flex;
@@ -973,53 +755,6 @@ h2 { display: flex; align-items: center; gap: 8px; }
 .badge.warn   { color: var(--attention); border-color: var(--attention-border); }
 .badge.danger { color: var(--danger);    border-color: var(--danger-border); }
 
-/* ---------- services card (Docker + Langfuse) ---------- */
-.services-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 4px 0 0;
-}
-.services-row {
-  display: grid;
-  /* 4th column: the compact Wake/Sync action sits inline at the row's end,
-   * on the same line as the "out of sync" detail (#215). */
-  grid-template-columns: minmax(110px, auto) auto 1fr auto;
-  align-items: center;
-  gap: 4px 12px;
-  font-size: var(--font-caption);
-  padding: 4px 0;
-  border-bottom: 1px solid var(--line-muted);
-}
-.services-row:last-child { border-bottom: 0; }
-/* Peer rows (#372) render into this anchor via innerHTML — `display:
- * contents` keeps it out of the flex box model so its .services-row
- * children lay out as direct siblings of the static Docker/Langfuse/
- * AgentsView rows above, with the same gap rhythm. */
-#peerRows { display: contents; }
-.services-detail {
-  word-break: break-word;
-  min-width: 0;
-}
-/* Row-level service action (Wake / Sync) — compact, never a big block. */
-.services-row .ghost-btn {
-  min-height: 28px;
-  padding: 4px 10px;
-  font-size: var(--font-caption);
-}
-/* Docker/Langfuse/AgentsView start+stop pair (#284) — same compact
- * icon-btn sizing as .glossary-repl-row, scaled down from the Models
- * tab's 36px touch target to fit this row's 28px ghost-btn rhythm. */
-.services-row .services-actions {
-  display: flex;
-  gap: 2px;
-}
-.services-row .services-actions .icon-btn {
-  width: 28px;
-  min-height: 28px;
-  border-radius: var(--radius-sm);
-}
-
 /* ---------- Startup card — per-item toggle rows (#265) ---------- */
 .startup-list {
   list-style: none;
@@ -1049,89 +784,13 @@ h2 { display: flex; align-items: center; gap: 8px; }
 /* Section labels reuse .opt-group-title (playground's existing group-label
  * pattern) rather than a new one-off class. */
 
-/* ---------- Fleet summary card — per-machine read-only summary (#354/#431) ----------
- * The fleet-wide sibling of the Service startup card: summary lines reuse
- * .startup-row / .startup-list and the roles card's .roles-row-value; only
- * the per-host grouping (header + status chip + offline note) is new here. */
-.fleet-placement {
-  display: flex;
-  flex-direction: column;
-  margin-top: 4px;
-}
-.fleet-host + .fleet-host {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line-muted);
-}
-.fleet-host-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.fleet-host-name {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  font-size: var(--font-label);
-  font-weight: 600;
-}
-.fleet-host-name > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.fleet-host-name .icon {
-  width: var(--icon-title);
-  height: var(--icon-title);
-  flex-shrink: 0;
-  color: var(--muted);
-}
-.fleet-host-head .hub-live-status { flex-shrink: 0; }
-.fleet-host-note { margin: 6px 0 0; }
-/* Advisory VRAM-overcommit warning (#375) — a tinted host note with a leading
- * glyph, matching the .badge.warn colour token. */
-.fleet-capacity-warn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--attention);
-}
-.fleet-capacity-warn .icon {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-}
-/* The .startup-list under a host group has no extra top margin — the head +
- * note already own the spacing above it. */
-.fleet-host .startup-list { margin-top: 2px; }
-/* Multi-line Running/Loadable values (#434): the label tops-out against the
- * first model line instead of floating mid-list. */
-.fleet-host .startup-row { align-items: flex-start; }
+/* Truncates a long model name inside a .startup-row (roles_card.js). */
 .fleet-model-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
 }
-/* One model per line (#434) — right-aligned by the parent .roles-row-value;
- * both Running and Loadable read at the caption size (the old inline
- * `·`-joined Running flow wrapped awkwardly on phones). */
-.fleet-model-line {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-/* Single-line values (Capacity, an honest "none") are inline spans inside
- * .roles-row-value: without a matching font-size their anonymous line box is
- * struck at the inherited body size, seating the caption-sized text below
- * the label's baseline (#436) — block .fleet-model-line values never had
- * the problem. Scoped to the fleet card; the roles card keeps its own
- * rhythm. */
-.fleet-host .roles-row-value { font-size: var(--font-caption); }
 
 /* ---------- Model decisions card — role/placement summary rows (#373) ----------
  * Same .startup-row/.startup-list rhythm as the Startup + Fleet placement
