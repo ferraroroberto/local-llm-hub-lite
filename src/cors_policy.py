@@ -17,7 +17,7 @@ Three deliberate choices, each of which is the security-relevant half:
   honoured — ``allow_origins=["*"]`` is exactly the shape that turns a
   loopback-trusting service into one any page in the browser can drive.
 - **Loopback is the default because it is already the trust boundary.**
-  The bearer gate (``app_web/middleware.py``) lets a loopback caller
+  The bearer gate (``src/auth_middleware.py``) lets a loopback caller
   through without a token, so letting a loopback *origin* read the
   response grants nothing it did not already have. A page served from a
   non-loopback origin still makes its request from 127.0.0.1 — so the

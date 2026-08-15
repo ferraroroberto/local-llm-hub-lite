@@ -26,6 +26,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
 from starlette.types import Scope
 
+from src.auth_middleware import BearerTokenMiddleware
 from src.static_versioning import (
     compute_asset_hashes,
     fleet_hash_of,
@@ -33,7 +34,6 @@ from src.static_versioning import (
 )
 from src.webapp_config import load_webapp_config
 
-from .middleware import BearerTokenMiddleware
 from .routers import auth, hub, misc, models, playground, roles, version
 from .routers._helpers import STATIC_DIR
 

@@ -15,6 +15,8 @@ dispatch).
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 import shutil
 import subprocess
@@ -23,6 +25,7 @@ import tarfile
 import urllib.request
 import zipfile
 from pathlib import Path
+from typing import List, Optional
 
 log = logging.getLogger(__name__)
 
@@ -56,7 +59,34 @@ def detect_cuda_arch() -> str:
     return ""
 
 
-def download(url: str, dest: Path) -> None:
+def asset_sha256(asset: dict) -> Optional[str]:
+    """Extract the expected sha256 from a GitHub release asset's ``digest``
+    field (``"sha256:<hex>"``), if the API returned one. Older assets (or a
+    GitHub Enterprise instance that hasn't backfilled digests) omit it —
+    callers treat ``None`` as "nothing to verify against" rather than an
+    error, since this is a hardening check, not a hard requirement."""
+    digest = (asset or {}).get("digest") or ""
+    prefix = "sha256:"
+    if digest.lower().startswith(prefix):
+        return digest[len(prefix):].strip().lower()
+    return None
+
+
+def _sha256_of(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def download(url: str, dest: Path, *, expected_sha256: Optional[str] = None) -> str:
+    """Download ``url`` to ``dest``, returning the sha256 of the bytes written.
+
+    When ``expected_sha256`` is given (from :func:`asset_sha256`), the
+    downloaded file is verified against it and removed + rejected on a
+    mismatch — a corrupted or tampered download must never reach ``extract()``.
+    """
     dest.parent.mkdir(parents=True, exist_ok=True)
     log.info("downloading %s", url)
     log.info("       -> %s", dest)
@@ -77,16 +107,46 @@ def download(url: str, dest: Path) -> None:
                     next_report = seen + total // 20
     log.info("  done: %.1f MB", seen/1_048_576)
 
+    digest = _sha256_of(dest)
+    log.info("  sha256: %s", digest)
+    if expected_sha256 is not None and not hmac.compare_digest(digest, expected_sha256):
+        dest.unlink(missing_ok=True)
+        raise InstallError(
+            f"sha256 mismatch for {dest.name}: expected {expected_sha256}, got {digest}"
+        )
+    return digest
+
+
+def _reject_unsafe_members(names: List[str], dest_dir: Path) -> None:
+    """Raise if any archive member would extract outside ``dest_dir``.
+
+    Belt-and-suspenders on top of the stdlib's own member-path handling
+    (``zipfile`` sanitises ``..``/drive components; ``tarfile``'s
+    ``filter="data"`` does likewise for tar) — resolves each member's
+    target path and confirms it stays under ``dest_dir``.
+    """
+    dest_resolved = dest_dir.resolve()
+    for name in names:
+        target = (dest_dir / name).resolve()
+        if target != dest_resolved and dest_resolved not in target.parents:
+            raise InstallError(f"archive member escapes destination: {name!r}")
+
 
 def extract(archive: Path, dest_dir: Path) -> None:
     dest_dir.mkdir(parents=True, exist_ok=True)
     log.info("extracting %s -> %s", archive.name, dest_dir)
     if archive.suffix == ".zip":
         with zipfile.ZipFile(archive) as zf:
+            _reject_unsafe_members(zf.namelist(), dest_dir)
             zf.extractall(dest_dir)
     elif archive.name.endswith(".tar.gz"):
         with tarfile.open(archive, "r:gz") as tf:
-            tf.extractall(dest_dir)
+            _reject_unsafe_members(tf.getnames(), dest_dir)
+            # filter="data": rejects absolute paths, `..` traversal, device
+            # files, and symlinks/hardlinks that escape dest_dir. Required
+            # explicitly on 3.12/3.13 (unfiltered extraction warns); becomes
+            # the stdlib default in 3.14.
+            tf.extractall(dest_dir, filter="data")
     else:
         raise InstallError(f"unknown archive type: {archive}")
 
