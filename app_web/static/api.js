@@ -66,24 +66,6 @@ export function postJson(path, payload) {
   });
 }
 
-// JSON PUT helper.
-export function putJson(path, payload) {
-  return jsonApi(path, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload || {}),
-  });
-}
-
-// JSON PATCH helper.
-export function patchJson(path, payload) {
-  return jsonApi(path, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload || {}),
-  });
-}
-
 // --------------------------------------------------------------- SSE
 // EventSource doesn't support custom headers, so we attach the bearer
 // token via ?token=… (the BearerTokenMiddleware accepts that form).
@@ -170,26 +152,10 @@ export function escapeHtml(s) {
   });
 }
 
-/* Plain-text label for a request record's model: the requested name, the model
- * that actually served it when the hub resolved one to the other, and the host
- * that served it ("audio_transcribe → parakeet @mac-mini-m4"). The served host
- * is the dimension the #405 drill was missing — a `model=whisper` answered by
- * a machine with no whisper bound was a legitimate remote hop, and no field
- * said so. Only the audio paths populate the served pair, so ordinary chat
- * rows render exactly as before (#412). */
-export function modelLabelText(rec, fallback) {
-  const requested = (rec && rec.model) || '';
-  const served = (rec && rec.served_model) || '';
-  const host = (rec && rec.served_host) || '';
-  let out = requested || fallback || '';
-  if (served && served !== requested) out += ' → ' + served;
-  if (host) out += ' @' + host;
-  return out;
-}
-
-/* Escaped-HTML twin of modelLabelText, with the resolved parts muted. Used
- * by the Hub tab's live-request / error lists so a substitution renders
- * consistently across both (#412). */
+/* Escaped-HTML label for a request record's model: the requested name, the
+ * model that actually served it when the hub resolved one to the other
+ * (muted), and the host that served it. Used by the Hub tab's live-request
+ * / error lists (#412). */
 export function modelLabel(rec, fallback) {
   const requested = (rec && rec.model) || '';
   const served = (rec && rec.served_model) || '';
@@ -269,41 +235,8 @@ export function renderCounterTable(table, rows) {
   });
 }
 
-/* Equivalent metered-API dollar cost — "≈ $1.23" / "≈ <$0.01" / "" when
- * zero/absent (#215-style dedup). */
-export function fmtCost(n) {
-  if (!n) return '';
-  if (n < 0.01) return '≈ <$0.01';
-  if (n >= 1000) return '≈ $' + Math.round(n).toLocaleString();
-  return '≈ $' + n.toFixed(2);
-}
-
-export function fmtBytes(n) {
-  if (!Number.isFinite(n)) return '—';
-  if (n < 1024) return n + ' B';
-  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
-  if (n < 1024 * 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
-  return (n / 1024 / 1024 / 1024).toFixed(2) + ' GB';
-}
-
 /* MB (VRAM/RAM figure) -> compact "X.X GB" label, unit baked in (#448
  * dedup — was defined verbatim in multiple tabs). */
 export function fmtGb(mb) {
   return (Number(mb || 0) / 1024).toFixed(1) + ' GB';
-}
-
-/* Bare "X.X" (no unit suffix) for a value already in GB — distinct contract
- * from fmtGb, which takes raw MB and bakes the unit in (design-drift audit
- * #384; #448 dedup). */
-export function fmtGbValue(n) {
-  return Number.isFinite(n) ? n.toFixed(1) : '—';
-}
-
-export function fmtAge(ts) {
-  if (!ts) return '';
-  const ms = Date.now() - new Date(ts).getTime();
-  if (ms < 1000) return 'just now';
-  if (ms < 60_000) return Math.floor(ms / 1000) + 's ago';
-  if (ms < 3_600_000) return Math.floor(ms / 60_000) + 'm ago';
-  return Math.floor(ms / 3_600_000) + 'h ago';
 }

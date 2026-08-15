@@ -12,14 +12,15 @@ the process, so each call pays ~1 ms instead. Both are created lazily — the
 async one binds whatever event loop is running on first use — and closed on hub
 shutdown via :func:`aclose` / :func:`close`.
 
-Per-call timeouts differ widely (a 2 s health probe vs a 900 s image
-generation), so the clients carry a single generous default and callers pass
-the real timeout via the request's ``timeout=`` argument (httpx applies it
-per-request). Do **not** close the shared client inside a request handler.
+Per-call timeouts differ widely (a 0.4 s reachability probe vs a 300 s cold
+whisper transcription), so the clients carry a single generous default and
+callers pass the real timeout via the request's ``timeout=`` argument (httpx
+applies it per-request). Do **not** close the shared client inside a request
+handler.
 
-Backends that run in their *own* process (the Orpheus engine and the
-whisper-vanilla shim live outside the hub process) can't use these — they hold
-their own persistent client in their own process.
+The llama-server / whisper-server backends run in their own process and
+can't use these — they're reached over loopback HTTP, not an in-process
+client.
 """
 
 from __future__ import annotations

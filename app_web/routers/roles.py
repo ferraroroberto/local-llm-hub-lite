@@ -1,7 +1,6 @@
 """Role → model mapping API (issue #373, broadened by its follow-up comment).
 
-Exposes ``config/models.yaml``'s ``roles:`` section — previously read only
-server-side by ``src.model_registry.audio_role_chain()`` — as a single, flat,
+Exposes ``config/models.yaml``'s ``roles:`` section as a single, flat,
 general-purpose representation. Built as shared infrastructure rather than a
 card-specific shim: issue #342 (dynamic model fallback) will read the same
 role→model chain data to reason about failover, not just display it, so the
@@ -60,9 +59,9 @@ def _collect_roles(roles_cfg: Dict[str, Any], names: Dict[str, str]) -> Dict[str
 async def get_roles() -> Dict[str, Any]:
     """Every configured role → ``{model_id, display_name, notes, fallback}``.
 
-    Reads ``config/models.yaml`` through ``host_profile._load_config()`` — the
-    same cached loader ``model_registry.audio_role_chain()`` uses — so this
-    never re-parses the YAML independently.
+    Reads ``config/models.yaml`` through ``host_profile._load_config()`` —
+    the same cached loader the rest of the hub uses — so this never
+    re-parses the YAML independently.
     """
     cfg = _load_config()
     roles_cfg: Dict[str, Any] = cfg.get("roles") or {}

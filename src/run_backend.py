@@ -1,8 +1,8 @@
 """Cross-platform backend dispatcher.
 
-    python -m src.run_backend hub    # run the FastAPI hub on port 8000
-    python -m src.run_backend qwen   # run llama-server with the qwen entry
-    python -m src.run_backend glm    # run llama-server with the glm entry
+    python -m src.run_backend hub        # run the FastAPI hub on port 8000
+    python -m src.run_backend qwen35_4b  # run llama-server with the qwen35_4b entry
+    python -m src.run_backend whisper    # run whisper-server with the whisper entry
 
 ``launchers/run_model.bat`` / ``run_model.sh`` are the sole entry point for
 every per-model launcher (#448 dedup — 22 near-identical hand-rolled scripts

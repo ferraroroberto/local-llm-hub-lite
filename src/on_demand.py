@@ -34,9 +34,9 @@ from .model_registry import Model, STARTUP_ON_DEMAND
 
 logger = logging.getLogger(__name__)
 
-# How long the first request waits for a cold backend to come up. Sized for
-# the heaviest on-demand row (gemma4_26b's 13.4 GB IQ4_XS read from NVMe) with
-# the same generosity as the orpheus shim's llama child (180 s deadline).
+# How long the first request waits for a cold backend to come up. Generous
+# on purpose: an on-demand llama-server row can be reading several GB of
+# GGUF weights from disk before it answers /health.
 READY_DEADLINE_S = 180.0
 READY_POLL_S = 1.0
 # Idle watchdog cadence — coarse on purpose; unload windows are minutes.

@@ -26,16 +26,12 @@ async def playground_models() -> Dict[str, Any]:
     for m in enabled_models():
         if m.backend == "whisper":
             continue
-        # Image-generation rows don't speak the chat shape either.
-        if getattr(m, "image_gen", False):
-            continue
         rows.append(
             {
                 "id": m.id,
                 "display_name": m.display_name,
                 "backend": m.backend,
                 "aliases": list(m.aliases or []),
-                "image_capable": m.backend in ("claude", "gemini"),
             }
         )
     return {"models": rows}

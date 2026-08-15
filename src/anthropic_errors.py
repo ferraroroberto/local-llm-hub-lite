@@ -15,9 +15,9 @@ OpenAI envelope, not this one, so the handlers below delegate to FastAPI's
 defaults for every path that is not Anthropic-shaped. A blanket app-level
 rewrite would be a regression on the OpenAI route.
 
-Statuses are never rewritten — only the body. The observability ring and
-the ``record_genai_metrics`` call in :func:`src.server.messages` both run
-before/around the handler and are unaffected.
+Statuses are never rewritten — only the body. The observability ring,
+populated via ``request.state.obs_ctx`` around :func:`src.server.messages`,
+runs before/around the handler and is unaffected.
 """
 
 from __future__ import annotations

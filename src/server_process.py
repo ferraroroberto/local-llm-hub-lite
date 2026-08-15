@@ -88,11 +88,6 @@ def lan_ip() -> Optional[str]:
         s.close()
 
 
-def lan_url() -> Optional[str]:
-    ip = lan_ip()
-    return f"http://{ip}:{PORT}" if ip else None
-
-
 class _ServerState:
     def __init__(self) -> None:
         self.proc: Optional[subprocess.Popen] = None
