@@ -1,7 +1,5 @@
 # Project Instructions
 
-Canonical instructions for AI coding agents working in this repository. Claude Code reads this file directly as project memory; other agents (GitHub Copilot, Cursor, Codex, etc.) reach it via the one-line `AGENTS.md` pointer.
-
 ## This repository
 
 **Local LLM Hub Lite** — single-machine local HTTP hub, a lite fork of [ferraroroberto/local-llm-hub](https://github.com/ferraroroberto/local-llm-hub) for environments with no cloud CLIs and no fleet: **local backends only** (llama.cpp `llama-server` for chat, whisper.cpp `whisper-server` for transcription), routed by `model` name from Anthropic-shape `POST /v1/messages` and OpenAI-shape `POST /v1/chat/completions` on `:8000`, plus `POST /v1/audio/transcriptions`. Admin SPA at `/admin` with exactly three tabs: **Hub · Models · Playground**. See `README.md` for setup, config reference, and usage.
