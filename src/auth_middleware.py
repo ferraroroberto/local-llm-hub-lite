@@ -1,4 +1,10 @@
-"""Bearer-token middleware for the /admin sub-app.
+"""Bearer-token middleware for the hub and its /admin sub-app.
+
+Shared by both apps: :class:`ParentBearerTokenMiddleware` guards the
+parent hub's ``/v1/*`` routes, :class:`BearerTokenMiddleware` guards the
+``/admin`` sub-app — same auth boundary, one implementation, so it lives
+in ``src/`` (the hub's package) rather than ``app_web/`` (the admin
+panel's), which only ever depends on ``src/``, never the reverse.
 
 Loopback callers (PC itself) bypass the bearer token. Non-loopback
 callers must present ``Authorization: Bearer <token>``, ``x-api-key:

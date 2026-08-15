@@ -323,3 +323,115 @@ def test_detect_cuda_arch_reads_nvidia_smi(monkeypatch):
 
     monkeypatch.setattr(_lib.subprocess, "run", lambda *a, **k: _R())
     assert _lib.detect_cuda_arch() == "89"
+
+
+# --------------------------------------------------------------- download/extract hardening (#6)
+
+
+def test_asset_sha256_parses_digest_field():
+    from scripts import _lib
+
+    assert _lib.asset_sha256({"digest": "sha256:ABCDEF0123"}) == "abcdef0123"
+
+
+def test_asset_sha256_none_when_absent_or_unrecognised():
+    from scripts import _lib
+
+    assert _lib.asset_sha256({}) is None
+    assert _lib.asset_sha256({"digest": "md5:deadbeef"}) is None
+
+
+class _FakeResponse:
+    def __init__(self, payload: bytes):
+        import io
+        self._buf = io.BytesIO(payload)
+        self.headers = {"Content-Length": str(len(payload))}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self, n=-1):
+        return self._buf.read(n)
+
+
+def test_download_writes_bytes_and_returns_matching_sha256(monkeypatch, tmp_path):
+    import hashlib
+    from scripts import _lib
+
+    payload = b"hello world"
+    monkeypatch.setattr(_lib.urllib.request, "urlopen", lambda url, timeout=120: _FakeResponse(payload))
+
+    dest = tmp_path / "out.bin"
+    digest = _lib.download("http://example.invalid/asset", dest, expected_sha256=hashlib.sha256(payload).hexdigest())
+    assert dest.read_bytes() == payload
+    assert digest == hashlib.sha256(payload).hexdigest()
+
+
+def test_download_rejects_and_removes_file_on_sha_mismatch(monkeypatch, tmp_path):
+    import pytest
+    from scripts import _lib
+
+    monkeypatch.setattr(_lib.urllib.request, "urlopen", lambda url, timeout=120: _FakeResponse(b"hello world"))
+
+    dest = tmp_path / "out.bin"
+    with pytest.raises(_lib.InstallError, match="sha256 mismatch"):
+        _lib.download("http://example.invalid/asset", dest, expected_sha256="0" * 64)
+    assert not dest.exists()
+
+
+def test_download_skips_verification_when_no_expected_digest(monkeypatch, tmp_path):
+    from scripts import _lib
+
+    monkeypatch.setattr(_lib.urllib.request, "urlopen", lambda url, timeout=120: _FakeResponse(b"hello world"))
+
+    dest = tmp_path / "out.bin"
+    _lib.download("http://example.invalid/asset", dest)  # no expected_sha256 -> no raise
+    assert dest.read_bytes() == b"hello world"
+
+
+def test_extract_zip_rejects_path_traversal_member(tmp_path):
+    import pytest
+    import zipfile
+    from scripts import _lib
+
+    archive = tmp_path / "evil.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr("../../evil.txt", "pwned")
+
+    dest = tmp_path / "dest"
+    with pytest.raises(_lib.InstallError, match="escapes destination"):
+        _lib.extract(archive, dest)
+
+
+def test_extract_tar_rejects_path_traversal_member(tmp_path):
+    import io
+    import pytest
+    import tarfile
+    from scripts import _lib
+
+    archive = tmp_path / "evil.tar.gz"
+    with tarfile.open(archive, "w:gz") as tf:
+        data = b"pwned"
+        info = tarfile.TarInfo(name="../../evil.txt")
+        info.size = len(data)
+        tf.addfile(info, io.BytesIO(data))
+
+    dest = tmp_path / "dest"
+    with pytest.raises(_lib.InstallError, match="escapes destination"):
+        _lib.extract(archive, dest)
+
+
+def test_extract_zip_normal_member_still_works(tmp_path):
+    import zipfile
+    from scripts import _lib
+
+    archive = tmp_path / "good.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr("llama-server.exe", "binary-contents")
+
+    dest = tmp_path / "dest"
+    _lib.extract(archive, dest)
+    assert (dest / "llama-server.exe").read_text() == "binary-contents"

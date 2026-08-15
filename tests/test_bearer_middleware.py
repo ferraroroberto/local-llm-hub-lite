@@ -1,4 +1,4 @@
-"""Unit tests for app_web/middleware.py's shared ``_authenticate`` helper
+"""Unit tests for src/auth_middleware.py's shared ``_authenticate`` helper
 (issue #195): BearerTokenMiddleware (the /admin sub-app) and
 ParentBearerTokenMiddleware (the parent hub app) both delegate to it now
 instead of each carrying its own near-identical dispatch body. These tests

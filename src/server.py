@@ -26,6 +26,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response, Streamin
 from pydantic import BaseModel
 
 from .anthropic_errors import install_anthropic_error_handlers
+from .auth_middleware import ParentBearerTokenMiddleware
 from .chat_translation import MessagesRequest, _run_openai_backend
 from .cors_policy import install_cors
 from .host_profile import hub_bind_host, hub_port
@@ -111,8 +112,6 @@ def _hub_get_token() -> str:
     except Exception:  # noqa: BLE001
         return ""
 
-
-from app_web.middleware import ParentBearerTokenMiddleware  # noqa: E402
 
 app.add_middleware(ParentBearerTokenMiddleware, get_token=_hub_get_token)
 
