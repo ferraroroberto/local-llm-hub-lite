@@ -99,3 +99,32 @@ def flatten_if_nested(target: Path) -> None:
         for child in inner.iterdir():
             shutil.move(str(child), str(target / child.name))
         inner.rmdir()
+
+
+def flatten_nested_bin(vendor_dir: Path, binary_name: str) -> None:
+    """Lift a nested ``bin/``-style directory holding ``binary_name`` up into
+    ``vendor_dir``, so sibling files (DLLs, configs) travel with it.
+
+    Some release archives put the server binary a level or two down (e.g.
+    ``build/bin/``) instead of at the archive root. Finds the binary via
+    ``rglob``, then moves every sibling in its parent directory up into
+    ``vendor_dir``, overwriting an existing file/dir of the same name.
+    No-op if the binary is already directly in ``vendor_dir``, or absent.
+    Both install scripts wrote this walk-and-lift by hand before this
+    helper existed (issue #5) — consolidated here for the same reason
+    ``flatten_if_nested`` was.
+    """
+    for candidate in vendor_dir.rglob(binary_name):
+        src_dir = candidate.parent
+        if src_dir == vendor_dir:
+            return
+        log.info("flattening %s -> %s", src_dir, vendor_dir)
+        for child in list(src_dir.iterdir()):
+            target = vendor_dir / child.name
+            if target.exists():
+                if target.is_dir():
+                    shutil.rmtree(target)
+                else:
+                    target.unlink()
+            shutil.move(str(child), str(target))
+        return

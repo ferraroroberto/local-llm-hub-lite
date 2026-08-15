@@ -9,9 +9,11 @@ import time
 import wave
 from typing import Any, Dict, List, Optional
 
+import httpx
 from fastapi import APIRouter, HTTPException
 
 from src import backend_process as bp
+from src.http_client import get_async_client
 from src.model_registry import (
     Model,
     enabled_models,
@@ -243,6 +245,29 @@ def _silent_wav(seconds: float = 0.5, rate: int = 16000) -> bytes:
     return buf.getvalue()
 
 
+async def _probe(url: str, *, timeout: float, **kwargs: Any) -> tuple[Any, float, Optional[str]]:
+    """POST ``url`` through the shared pooled client, timing the round trip.
+
+    All three ``model_ping`` arms (whisper/tts/chat) only differ in URL,
+    payload shape, and timeout — this is that shared probe. Goes through
+    ``get_async_client()`` rather than constructing a fresh ``httpx.AsyncClient``
+    per call, which is exactly what that shared client exists to avoid (issue
+    #165: ~0.26s per construction vs ~1ms reused).
+
+    On success returns ``(response, latency_ms, None)``; on ``httpx.HTTPError``
+    returns ``(None, latency_ms, str(exc))`` — callers shape the two cases into
+    the identical ``{"ok": False, "status": 0, ...}`` payload themselves, since
+    the tts arm's success shape differs from the others.
+    """
+    client = get_async_client()
+    t0 = time.monotonic_ns()
+    try:
+        r = await client.post(url, timeout=timeout, **kwargs)
+    except httpx.HTTPError as exc:
+        return None, (time.monotonic_ns() - t0) / 1e6, str(exc)
+    return r, (time.monotonic_ns() - t0) / 1e6, None
+
+
 def _ping_result(r: Any, latency_ms: float) -> Dict[str, Any]:
     """Shape a backend probe response into the tile's ping payload."""
     body: Dict[str, Any] = {}
@@ -279,7 +304,6 @@ async def model_ping(model_id: str) -> Dict[str, Any]:
     if target is None:
         raise HTTPException(status_code=404, detail=f"unknown model {model_id!r}")
 
-    import httpx
     from src.host_profile import hub_port
 
     port = hub_port()
@@ -290,19 +314,11 @@ async def model_ping(model_id: str) -> Dict[str, Any]:
         url = f"http://127.0.0.1:{port}/v1/audio/transcriptions"
         files = {"file": ("ping.wav", _silent_wav(), "audio/wav")}
         data = {"model": target.display_name}
-        t0 = time.monotonic_ns()
-        try:
-            # Generous timeout: a lazy/CPU whisper backend may cold-load.
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                r = await client.post(url, files=files, data=data)
-        except httpx.HTTPError as exc:
-            return {
-                "ok": False,
-                "status": 0,
-                "latency_ms": (time.monotonic_ns() - t0) / 1e6,
-                "error": str(exc),
-            }
-        return _ping_result(r, (time.monotonic_ns() - t0) / 1e6)
+        # Generous timeout: a lazy/CPU whisper backend may cold-load.
+        r, latency_ms, error = await _probe(url, timeout=60.0, files=files, data=data)
+        if error is not None:
+            return {"ok": False, "status": 0, "latency_ms": latency_ms, "error": error}
+        return _ping_result(r, latency_ms)
 
     if target.backend == "tts":
         # TTS speaks the OpenAI /v1/audio/speech shape, not chat — synthesize
@@ -310,21 +326,12 @@ async def model_ping(model_id: str) -> Dict[str, Any]:
         # to this exact backend and keeps the hit in the observability ring).
         url = f"http://127.0.0.1:{port}/v1/audio/speech"
         payload = {"model": target.display_name, "input": "ping", "response_format": "wav"}
-        t0 = time.monotonic_ns()
-        try:
-            # Generous timeout: a cold TTS backend may still be warming weights.
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                r = await client.post(url, json=payload)
-        except httpx.HTTPError as exc:
-            return {
-                "ok": False,
-                "status": 0,
-                "latency_ms": (time.monotonic_ns() - t0) / 1e6,
-                "error": str(exc),
-            }
+        # Generous timeout: a cold TTS backend may still be warming weights.
+        r, latency_ms, error = await _probe(url, timeout=120.0, json=payload)
+        if error is not None:
+            return {"ok": False, "status": 0, "latency_ms": latency_ms, "error": error}
         # Audio bytes aren't JSON — _ping_result would mis-parse them, so
         # shape the result directly (ok = 2xx, no usage payload for audio).
-        latency_ms = (time.monotonic_ns() - t0) / 1e6
         return {
             "ok": r.is_success,
             "status": r.status_code,
@@ -339,15 +346,7 @@ async def model_ping(model_id: str) -> Dict[str, Any]:
         "max_tokens": 1,
         "messages": [{"role": "user", "content": "ping"}],
     }
-    t0 = time.monotonic_ns()
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            r = await client.post(url, json=payload)
-    except httpx.HTTPError as exc:
-        return {
-            "ok": False,
-            "status": 0,
-            "latency_ms": (time.monotonic_ns() - t0) / 1e6,
-            "error": str(exc),
-        }
-    return _ping_result(r, (time.monotonic_ns() - t0) / 1e6)
+    r, latency_ms, error = await _probe(url, timeout=20.0, json=payload)
+    if error is not None:
+        return {"ok": False, "status": 0, "latency_ms": latency_ms, "error": error}
+    return _ping_result(r, latency_ms)

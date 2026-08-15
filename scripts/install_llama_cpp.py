@@ -16,7 +16,6 @@ import json
 import logging
 import os
 import platform
-import shutil
 import subprocess
 import sys
 import urllib.request
@@ -30,6 +29,7 @@ from _lib import (  # noqa: E402
     download,
     extract,
     flatten_if_nested,
+    flatten_nested_bin,
     no_window_flags,
 )
 
@@ -162,21 +162,7 @@ def main() -> int:
     bin_path = _server_binary()
     if not bin_path.exists():
         # Some zips extract into a `build/bin/` or `bin/` subdirectory.
-        for candidate in VENDOR_DIR.rglob(bin_path.name):
-            # Move the entire bin directory up next to llama-server.exe.
-            src_dir = candidate.parent
-            if src_dir == VENDOR_DIR:
-                break
-            log.info("flattening %s -> %s", src_dir, VENDOR_DIR)
-            for child in list(src_dir.iterdir()):
-                target = VENDOR_DIR / child.name
-                if target.exists():
-                    if target.is_dir():
-                        shutil.rmtree(target)
-                    else:
-                        target.unlink()
-                shutil.move(str(child), str(target))
-            break
+        flatten_nested_bin(VENDOR_DIR, bin_path.name)
 
     if not already_installed():
         raise InstallError(
