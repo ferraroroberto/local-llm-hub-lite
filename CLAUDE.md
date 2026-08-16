@@ -27,7 +27,9 @@
 - key views:                      # single tabbed SPA served at `/admin/`
   - /admin/    (Hub · Models · Playground tabs)
 - accepted exceptions:
-  - PWA/tray/favicon icon assets are committed byte-for-byte from upstream `local-llm-hub` and are shape-correct. Re-sync by copying from an upstream checkout when its brand changes — never by adding a generator dependency, which this fork exists to avoid.
+  - **app-icon-family FAIL** — accepted. PWA/tray/favicon icon assets are committed byte-for-byte from upstream `local-llm-hub` and are shape-correct. Re-sync by copying from an upstream checkout when its brand changes — never by adding a generator dependency, which this fork exists to avoid. (`design_lint`'s app-icon-family check keys on a `brand_gen`/`render_set()` call in `scripts/`, which this repo deliberately never adopts.)
+- re-audit log:
+  - 2026-08-16 — `ferraroroberto/local-llm-hub-lite#1`: `/design-sync` re-surfaced `app-icon-family FAIL`; reconfirmed accepted per the reasoning above, no code change warranted. The same run's `row-height-scale WARN` (`.pe-host-row .icon-btn`, `.glossary-repl-row .icon-btn`, `.services-row .ghost-btn`/`.services-actions .icon-btn`) is stale — those selectors were already deleted by `9d56cf6` (dead services/fleet/placement/glossary CSS cleanup) before this audit ran, so there is nothing left to fix.
 
 ## CI expectations
 
