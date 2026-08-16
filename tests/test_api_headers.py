@@ -111,10 +111,10 @@ def test_messages_response_carries_request_id():
 
 
 def test_request_id_matches_x_trace_id_when_present():
-    r = _messages(_client())
+    r = _messages(_client(), headers={"x-trace-id": "9e108e0e-3a5b-4d8c-9f10-1234567890ab"})
     trace_id = r.headers.get("x-trace-id")
-    if trace_id:  # only when the OTel SDK is live
-        assert r.headers["request-id"] == trace_id
+    assert trace_id
+    assert r.headers["request-id"] == trace_id
 
 
 def test_messages_response_echoes_default_version():
