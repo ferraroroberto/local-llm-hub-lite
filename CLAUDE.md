@@ -2,13 +2,11 @@
 
 ## This repository
 
-**Local LLM Hub Lite** — single-machine local HTTP hub, a lite fork of [ferraroroberto/local-llm-hub](https://github.com/ferraroroberto/local-llm-hub) for environments with no cloud CLIs and no fleet: **local backends only** (llama.cpp `llama-server` for chat, whisper.cpp `whisper-server` for transcription), routed by `model` name from Anthropic-shape `POST /v1/messages` and OpenAI-shape `POST /v1/chat/completions` on `:8000`, plus `POST /v1/audio/transcriptions`. Admin SPA at `/admin` with exactly three tabs: **Hub · Models · Playground**. See `README.md` for setup, config reference, and usage.
-
-**Project specifics:**
+**Local LLM Hub Lite** — single-machine HTTP hub, a lite fork of [ferraroroberto/local-llm-hub](https://github.com/ferraroroberto/local-llm-hub) for environments with no cloud CLIs and no fleet: **local backends only** (llama.cpp `llama-server` for chat, whisper.cpp `whisper-server` for transcription), routed by `model` name from Anthropic-shape `POST /v1/messages` and OpenAI-shape `POST /v1/chat/completions` on `:8000`, plus `POST /v1/audio/transcriptions`. Admin SPA at `/admin` with exactly three tabs: **Hub · Models · Playground**. Setup, config reference, and usage: `README.md`.
 
 - **Stack:** FastAPI + vanilla JS (no framework, no build step). Windows-first (tray via pystray); the hub itself is cross-platform Python 3.12+.
-- **No cloud, no fleet — keep it that way.** Do not add subscription-CLI backends, multi-host routing, Docker services, or OTel/Langfuse exports here; those live in the upstream full fork. New model backends are `config/models.yaml` rows (engine `llama-server` or `whisper-server`), not new code paths.
-- **Config & secrets:** the model registry is `config/models.yaml` (committed — models, ports, roles, startup policy). Runtime web config + bearer token in `config/webapp_config.json` (gitignored; sample committed; token auto-generated on first tray boot). There is no `.env`.
+- **No cloud, no fleet — keep it that way.** Never add subscription-CLI backends, multi-host routing, Docker services, or OTel/Langfuse exports; those live in the upstream full fork. New model backends are `config/models.yaml` rows (engine `llama-server` or `whisper-server`), never new code paths.
+- **Config & secrets:** model registry `config/models.yaml` (committed — models, ports, roles, startup policy). Runtime web config + bearer token in `config/webapp_config.json` (gitignored; sample committed; token auto-generated on first tray boot). There is no `.env`.
 - **Ports:** hub `:8000` (tray-owned); backend ports come from `config/models.yaml` (defaults: llama-server `:8081`, whisper-server `:8090`) and are owned by the hub's process manager (`src/backend_process.py`), never by the tray.
 - **Auth model:** loopback callers are trusted; non-loopback callers need the bearer token (`Authorization: Bearer` / `x-api-key` / `?token=`); `extra_allowlist` IPs bypass. One implementation in `src/auth_middleware.py`, mounted on both the hub and `/admin`.
 - **Layout:** `src/` (hub, registry, process manager, translation, audio proxy, observability ring, system stats, installer), `app_web/` (admin routers + `app_web/static/` SPA), `tray/` (pystray app), `scripts/` (installers + gate + vendored `tray_lifecycle.ps1`), `launchers/` (registry-driven per-model consoles), `tests/` (+ `tests/e2e` Playwright). `vendor/` and `models/` are downloaded by `python -m src.install --fix`, gitignored.
@@ -18,8 +16,6 @@
 
 ## UX surface
 
-*Design-conformance block — the product is the FastAPI + static SPA under `app_web/static/`.*
-
 - design spec applies: yes
 - paths:
   - app_web/static/**/*.css
@@ -27,9 +23,9 @@
 - key views:                      # single tabbed SPA served at `/admin/`
   - /admin/    (Hub · Models · Playground tabs)
 - accepted exceptions:
-  - **app-icon-family FAIL** — accepted. PWA/tray/favicon icon assets are committed byte-for-byte from upstream `local-llm-hub` and are shape-correct. Re-sync by copying from an upstream checkout when its brand changes — never by adding a generator dependency, which this fork exists to avoid. (`design_lint`'s app-icon-family check keys on a `brand_gen`/`render_set()` call in `scripts/`, which this repo deliberately never adopts.)
+  - **app-icon-family FAIL** — accepted. PWA/tray/favicon icon assets are committed byte-for-byte from upstream `local-llm-hub` and are shape-correct. Re-sync by copying from an upstream checkout when its brand changes — never by adding a generator dependency, which this fork exists to avoid. (`design_lint`'s check keys on a `brand_gen`/`render_set()` call in `scripts/`, which this repo deliberately never adopts.)
 - re-audit log:
-  - 2026-08-16 — `ferraroroberto/local-llm-hub-lite#1`: `/design-sync` re-surfaced `app-icon-family FAIL`; reconfirmed accepted per the reasoning above, no code change warranted. The same run's `row-height-scale WARN` (`.pe-host-row .icon-btn`, `.glossary-repl-row .icon-btn`, `.services-row .ghost-btn`/`.services-actions .icon-btn`) is stale — those selectors were already deleted by `9d56cf6` (dead services/fleet/placement/glossary CSS cleanup) before this audit ran, so there is nothing left to fix.
+  - 2026-08-16 — `ferraroroberto/local-llm-hub-lite#1`: `/design-sync` re-surfaced `app-icon-family FAIL`; reconfirmed accepted per the reasoning above, no code change warranted. The same run's `row-height-scale WARN` is stale — those selectors were already deleted by `9d56cf6` before the audit ran.
 
 ## CI expectations
 
