@@ -30,6 +30,7 @@
   - **app-icon-family FAIL** — accepted. PWA/tray/favicon icon assets are committed byte-for-byte from upstream `local-llm-hub` and are shape-correct. Re-sync by copying from an upstream checkout when its brand changes — never by adding a generator dependency, which this fork exists to avoid. (`design_lint`'s app-icon-family check keys on a `brand_gen`/`render_set()` call in `scripts/`, which this repo deliberately never adopts.)
 - re-audit log:
   - 2026-08-16 — `ferraroroberto/local-llm-hub-lite#1`: `/design-sync` re-surfaced `app-icon-family FAIL`; reconfirmed accepted per the reasoning above, no code change warranted. The same run's `row-height-scale WARN` (`.pe-host-row .icon-btn`, `.glossary-repl-row .icon-btn`, `.services-row .ghost-btn`/`.services-actions .icon-btn`) is stale — those selectors were already deleted by `9d56cf6` (dead services/fleet/placement/glossary CSS cleanup) before this audit ran, so there is nothing left to fix.
+  - 2026-08-27 — `ferraroroberto/local-llm-hub-lite#18`: `/design-sync` re-surfaced `app-icon-family FAIL` again, this time proposing to adopt `project-scaffolding`'s `brand_gen.render_set` in a `scripts/gen_icons.py`-style entry point. That is precisely the generator dependency this lite fork exists to avoid (see "No cloud, no fleet" above and the accepted-exception reasoning) — reconfirmed accepted, no code change warranted. All other findings in the same run (token adoption, contracts, vendored components, sibling consistency, token map) are clean/informational.
 
 ## CI expectations
 
