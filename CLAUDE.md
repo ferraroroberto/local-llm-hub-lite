@@ -31,6 +31,7 @@
 - re-audit log:
   - 2026-08-16 — `ferraroroberto/local-llm-hub-lite#1`: `app-icon-family FAIL` reconfirmed accepted (see reasoning above). Same run's `row-height-scale WARN` was already stale — selectors removed by `9d56cf6` before the audit ran; no action needed.
   - 2026-08-27 — `ferraroroberto/local-llm-hub-lite#18`: `app-icon-family FAIL` reconfirmed accepted again — proposed adopting `project-scaffolding`'s `brand_gen.render_set`, rejected as the same generator dependency this fork exists to avoid (see "No cloud, no fleet" and the accepted-exception above). All other findings that run: clean/informational.
+  - 2026-09-03 — `ferraroroberto/local-llm-hub-lite#21`: `app-icon-family FAIL` reconfirmed accepted a third time — same `brand_gen.render_set` proposal, same rejection (see accepted-exception above). 23/24 applicable contracts pass, zero token drift in either theme; no other action needed.
 
 ## CI expectations
 
