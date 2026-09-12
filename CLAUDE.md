@@ -2,7 +2,7 @@
 
 ## This repository
 
-**Local LLM Hub Lite** — single-machine local HTTP hub, a lite fork of [ferraroroberto/local-llm-hub](https://github.com/ferraroroberto/local-llm-hub) for environments with no cloud CLIs and no fleet: **local backends only** (llama.cpp `llama-server` for chat, whisper.cpp `whisper-server` for transcription), routed by `model` name from Anthropic-shape `POST /v1/messages` and OpenAI-shape `POST /v1/chat/completions` on `:8000`, plus `POST /v1/audio/transcriptions`. Admin SPA at `/admin` with exactly three tabs: **Hub · Models · Playground**. See `README.md` for setup, config reference, and usage.
+**Local LLM Hub Lite** — single-machine local HTTP hub, a lite fork of [ferraroroberto/local-llm-hub](https://github.com/ferraroroberto/local-llm-hub) for environments with no cloud CLIs and no fleet: **local backends only** (llama.cpp `llama-server` for chat, whisper.cpp `whisper-server` for transcription), routed by `model` name from Anthropic-shape `POST /v1/messages` and OpenAI-shape `POST /v1/chat/completions` on `:8000`, plus `POST /v1/audio/transcriptions`. Admin SPA at `/admin` with exactly three tabs: **Hub · Models · Playground**. Setup, config reference and usage: `README.md`.
 
 **Project specifics:**
 
@@ -29,10 +29,9 @@
 - accepted exceptions:
   - **app-icon-family FAIL** — accepted. PWA/tray/favicon icon assets are committed byte-for-byte from upstream `local-llm-hub` and are shape-correct. Re-sync by copying from an upstream checkout when its brand changes — never by adding a generator dependency, which this fork exists to avoid. (`design_lint`'s app-icon-family check keys on a `brand_gen`/`render_set()` call in `scripts/`, which this repo deliberately never adopts.)
 - re-audit log:
-  - 2026-08-16 — `ferraroroberto/local-llm-hub-lite#1`: `app-icon-family FAIL` reconfirmed accepted (see reasoning above). Same run's `row-height-scale WARN` was already stale — selectors removed by `9d56cf6` before the audit ran; no action needed.
-  - 2026-08-27 — `ferraroroberto/local-llm-hub-lite#18`: `app-icon-family FAIL` reconfirmed accepted again — proposed adopting `project-scaffolding`'s `brand_gen.render_set`, rejected as the same generator dependency this fork exists to avoid (see "No cloud, no fleet" and the accepted-exception above). All other findings that run: clean/informational.
-  - 2026-09-03 — `ferraroroberto/local-llm-hub-lite#21`: `app-icon-family FAIL` reconfirmed accepted a third time — same `brand_gen.render_set` proposal, same rejection (see accepted-exception above). 23/24 applicable contracts pass, zero token drift in either theme; no other action needed.
-  - 2026-09-11 — `ferraroroberto/local-llm-hub-lite#23`: `app-icon-family FAIL` reconfirmed accepted a fourth time — same `brand_gen.render_set` proposal, same rejection. Provenance re-verified: all five icon assets + `manifest.webmanifest` are sha256-identical to upstream `local-llm-hub`, whose `scripts/gen_icons.py` is the `brand_gen` generator — so the set *is* generator-made, one hop upstream. 21 PASS / 3 NA / 1 FAIL, 0 token drift, no dark-only tokens. The recurrence is a tooling gap: `design_lint` / `/design-sync` do not read this block's accepted exceptions.
+  - `app-icon-family FAIL` reconfirmed accepted four times — `#1` (2026-08-16), `#18` (2026-08-27), `#21` (2026-09-03), `#23` (2026-09-11). Each run re-proposed adopting `project-scaffolding`'s `brand_gen.render_set`; rejected every time as the same generator dependency this fork exists to avoid (see the accepted-exception above). Otherwise clean: 21–23 of 24 applicable contracts pass, 0 token drift in either theme, no dark-only tokens.
+  - Provenance re-verified (`#23`): all five icon assets + `manifest.webmanifest` are sha256-identical to upstream `local-llm-hub`, whose `scripts/gen_icons.py` *is* the `brand_gen` generator — so the set **is** generator-made, one hop upstream.
+  - The recurrence is a tooling gap: `design_lint` / `/design-sync` do not read this block's accepted exceptions.
 
 ## CI expectations
 
