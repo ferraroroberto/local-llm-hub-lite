@@ -89,3 +89,13 @@ path = "CLAUDE.md"
 [[e2e.rule]]
 tier       = "none"
 extensions = ["bat", "sh"]
+
+# Accepted design-drift exceptions (schema: fleet-config architecture/README.md).
+[[design.accepted]]
+check        = "app-icon-family"
+target       = "app_web/static/index.html"
+detail       = "shared brand_gen.render_set generator not adopted"
+reason       = "Icons and manifest are byte-identical copies of upstream local-llm-hub's brand_gen output; lite updates them by copying and refuses the generator dependency."
+record       = "https://github.com/ferraroroberto/local-llm-hub-lite/issues/23"
+identical_to = "../local-llm-hub"
+paths        = ["app_web/static/icon-180.png", "app_web/static/icon-192.png", "app_web/static/icon-512.png", "app_web/static/icon-512-maskable.png", "app_web/static/favicon.ico", "app_web/static/manifest.webmanifest"]
