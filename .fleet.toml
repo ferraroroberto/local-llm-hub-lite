@@ -16,6 +16,9 @@ description  = "<b>Local LLM Hub Lite</b> — single-machine local-models hub, l
 # (byte-verbatim copy). A path matching no rule below -- or a repo with no
 # [e2e] table at all -- fails safe to the full suite; this table only ever
 # narrows what an *already-covered* diff runs, never what an unmatched one runs.
+[vendored]
+classify_e2e = { src = "scripts/classify_e2e.py", sha = "16741c3610bc57dccc75546fd55bc869acf07dab", dest = "scripts/classify_e2e.py" }
+
 [e2e]
 static_pytest_target = "tests/e2e/test_smoke.py"
 static_browsers       = ["chromium"]
