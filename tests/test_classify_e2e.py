@@ -156,7 +156,8 @@ def test_real_rules_route_representative_paths() -> None:
     assert tier("app_web/routers/models.py") == "full"
     assert tier("app_web/static/api.js") == "full"
     assert tier("tray/tray_app.py") == "full"
-    assert tier("tests/e2e/test_smoke.py") == "full"
+    assert tier("tests/e2e/test_smoke.py") == "surface"
+    assert tier("tests/e2e/conftest.py") == "full"
 
     # Inert static assets -> static.
     assert tier("app_web/static/icon-192.png") == "static"
