@@ -24,11 +24,15 @@
   /* colors — accent + status (status colors signal state only, never decoration) */
   --accent: #0969da;
   --accent-fg: #ffffff;     /* text/icon on an accent fill */
+  --accent-fill: #0969da;   /* solid primary fill (button-primary) */
+  --accent-text: #0550ae;   /* accent-coloured text on an accent-soft tint (6.04:1) */
+  --control-border: #818b98; /* control boundary + switch off-track (3.45:1 vs card) */
   --on: #1a7f37;
   --danger: #cf222e;
+  --danger-text: #a40e26;   /* danger text on a danger tint */
   --attention: #9a6700;
   /* derived surface roles (mapped onto the neutral tokens above) */
-  --toggle-track: var(--line);  /* vendored switch: off-track */
+  --toggle-track: var(--line);  /* legacy: the vendored switch now reads --control-border */
   --toggle-knob: #ffffff;       /* vendored switch: thumb */
   --input-bg: var(--card-off);
   --code-bg: var(--card-off);  /* logpane / trace-detail <pre> surfaces */
@@ -39,6 +43,10 @@
   --accent-border-soft: color-mix(in srgb, var(--accent) 24%, transparent);
   --accent-border-strong: color-mix(in srgb, var(--accent) 28%, transparent);
   --danger-soft: color-mix(in srgb, var(--danger) 12%, transparent);
+  /* vendored button.css `.button-tint.danger` reads the spec's --deficit-*
+     names; this app's status hue is --danger, so derive them from it. */
+  --deficit-soft: var(--danger-soft);
+  --deficit-border-soft: color-mix(in srgb, var(--danger) 30%, transparent);
   --danger-strong: color-mix(in srgb, var(--danger) 18%, transparent);
   --danger-border: color-mix(in srgb, var(--danger) 45%, transparent);
   --success-border: color-mix(in srgb, var(--on) 45%, transparent);
@@ -59,6 +67,12 @@
   --gap: 12px;
   /* shared height for inline controls (select / input) so they line up */
   --control-h: 36px;
+  /* row heights + wide-layout geometry read by the vendored nav
+     (hit-target.min, rows.lg, layout.measure, layout.rail) */
+  --row-sm: 44px;
+  --row-lg: 60px;
+  --layout-measure: 772px;
+  --layout-rail: 80px;
   /* canonical icon-size steps (icons.size.* — consumed by the vendored
      disclosure / empty-state components) */
   --icon-title: 18px;
@@ -103,8 +117,12 @@
   --line-muted: #21262d;
   --accent: #2f81f7;
   --accent-fg: #ffffff;
+  --accent-fill: #1f6feb;   /* one step below accent so white text holds AA */
+  --accent-text: #58a6ff;
+  --control-border: #6e7681;
   --on: #3fb950;
   --danger: #f85149;
+  --danger-text: #ff7b72;
   --attention: #d29922;
   --toggle-knob: var(--ink);
   --close-bg: var(--line);   /* vendored modal's × close-button fill (_vendored/modal) */
@@ -121,12 +139,14 @@
 @media (color-gamut: p3) {
   :root {
     --accent: oklch(0.52 0.18 256);
+    --accent-fill: oklch(0.52 0.18 256);
     --on: oklch(0.55 0.14 150);
     --danger: oklch(0.55 0.20 25);
     --attention: oklch(0.55 0.11 80);
   }
   [data-theme="dark"] {
     --accent: oklch(0.64 0.18 256);
+    --accent-fill: oklch(0.57 0.21 260);
     --on: oklch(0.72 0.18 150);
     --danger: oklch(0.68 0.20 25);
     --attention: oklch(0.77 0.13 85);
