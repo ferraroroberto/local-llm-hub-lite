@@ -6,7 +6,7 @@ layer        = "enabling"
 icon         = "🧠"
 port         = ":8000"
 display_name = "Local LLM Hub Lite"
-description  = "<b>Local LLM Hub Lite</b> — single-machine local-models hub, lite fork of local-llm-hub. Anthropic + OpenAI shapes on :8000 routed to llama-server (qwen3.5-4b :8081) and whisper-server (:8090); admin SPA with Hub · Models · Playground."
+description  = "Single-machine lite fork of local-llm-hub: local models and whisper on :8000."
 
 # Diff-proportionate e2e routing (project-scaffolding#180). scripts/verify-
 # before-ship.ps1's browser phase classifies the branch's changed files
