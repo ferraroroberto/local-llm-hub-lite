@@ -60,13 +60,11 @@ Each `.tab` carries `data-tab` (its name) and `aria-controls` (the id of the pan
 
 ## Tab icons
 
-Each `.tab` holds one `<svg class="tab-icon">` stroke glyph and one `<span class="tab-label">` — and the icon is visible on **both** surfaces: beside the label in the desktop segmented control, above it in the mobile pill. Give the SVG a `24 24` viewBox and `<path>`s with no `fill`/`stroke` attributes of their own; `nav-tabs.css` paints them (`fill: none; stroke: currentColor`) so they inherit the active/inactive tab colour. Desktop sizes the icon at `1.05em` of the label's font-size; the pill uses `--bottom-tabs-icon`. Below 520px on a fine pointer (a squeezed desktop window) the tab stacks the icon over its label, the pill's shape at the `--font-caption` size, since an icon beside a 7–8 letter label no longer fits five tabs there. The nav never goes icon-only (`design.md` navigation contract, fleet-config#966); the label ellipsizes only as a last resort (#278).
+Each `.tab` holds one `<svg class="tab-icon">` stroke glyph and one `<span class="tab-label">` — and the icon is visible on **both** surfaces: beside the label in the desktop segmented control, above it in the mobile pill. Give the SVG a `24 24` viewBox and `<path>`s with no `fill`/`stroke` attributes of their own; `nav-tabs.css` paints them (`fill: none; stroke: currentColor`) so they inherit the active/inactive tab colour. Desktop sizes the icon at `1.05em` of the label's font-size; the pill uses `--bottom-tabs-icon`. Every icon size is scoped as `.tabs .tab-icon`, so an app's own single-class icon utility (a `.icon { width: 1em }` you also put on the glyph) can't resize it, whatever order the stylesheets load in (#303). Below 520px on a fine pointer (a squeezed desktop window) the tab stacks the icon over its label, the pill's shape at the `--font-caption` size, since an icon beside a 7–8 letter label no longer fits five tabs there. The nav never goes icon-only (`design.md` navigation contract, fleet-config#966); the label ellipsizes only as a last resort (#278).
 
 ## Wide layout: left rail
 
 At `(min-width: 1100px) and (pointer: fine)` (`design.md` `layout.wide`, fleet-config#968) the segmented control becomes a **left rail**: `layout.rail` (80px) wide, full height, on the `card` surface with a `line` hairline on its right edge. It shows the same tabs stacked top to bottom, each an `--icon-feature` glyph over a `--font-caption` label, never icon-only. Only the placement changes. The active tint, `aria-selected` and persistence are the same rules, and the markup is the same skeleton. The file offsets your content past the rail itself: `body:has(> .tabs)` gets `padding-left: var(--layout-rail)`, and `.tabs ~ .app` gets the top gap the sticky control used to supply. Both are keyed on the nav so they outrank an app's own `body` / `.app` padding shorthand loaded after this file. Below 1100px the control keeps the `layout.measure` column (`--layout-measure`, 772px); on a coarse pointer nothing changes at any width. Master-detail and a board's full-width exception are app layout, not nav, so they stay in your CSS (#281, lifted from app-launcher#1166).
-
-`.tab-emoji` is **legacy** — an emoji span the desktop control used to show instead of the icon, superseded by SVG glyphs fleet-wide (`home-automation#77`, fixed here in `project-scaffolding#142`). `nav-tabs.css` hides it at every width, so an app still shipping the span picks up its desktop icon by re-vendoring the CSS alone; delete the span from your markup when you next touch it. If your app kept a per-app `.tab-icon { display: … }` override to work around the old rule, drop that too — it now fights the vendored file.
 
 ## Required design tokens
 
@@ -75,7 +73,8 @@ At `(min-width: 1100px) and (pointer: fine)` (`design.md` `layout.wide`, fleet-c
 | Token | Light value | Used for |
 | --- | --- | --- |
 | `--card` | `#ffffff` | tab bar surface (desktop) |
-| `--card-off` | `#f6f8fa` | active-tab fill |
+| `--accent-soft` | `color-mix(in srgb, var(--accent) 16%, transparent)` | active-tab fill, desktop and mobile (fleet-config#963) |
+| `--accent-border-soft` | `color-mix(in srgb, var(--accent) 24%, transparent)` | active-tab border (mobile) |
 | `--accent-text` | `#0550ae` (dark `#58a6ff`) | active-tab text/icon (text on the `accent-soft` tint, fleet-config#963) |
 | `--muted` | `#656d76` | inactive-tab text |
 | `--line` | `#d1d9e0` | bar border, active-tab border (mobile) |
@@ -86,21 +85,23 @@ At `(min-width: 1100px) and (pointer: fine)` (`design.md` `layout.wide`, fleet-c
 | `--row-sm` | `44px` | stacked narrow-desktop tab min-height (`hit-target.min`) |
 | `--row-lg` | `60px` | rail tab min-height |
 | `--space-sm` | `8px` | rail tab padding |
-| `--icon-feature` | `24px` | rail icon size (`icons.size.feature`) |
-| `--layout-measure` | `772px` | desktop column the control spans (falls back to 772px if unset) |
-| `--layout-rail` | `80px` | wide-layout rail width + content offset (falls back to 80px if unset) |
+| `--icon-feature` | `24px` | rail icon size (`icons.size.feature`) — optional, falls back to `24px` |
+| `--layout-measure` | `772px` | desktop column the control spans — optional, falls back to `772px` |
+| `--layout-rail` | `80px` | wide-layout rail width + content offset — optional, falls back to `80px` |
 | `--radius-md` | `12px` | bar corners (desktop) |
 | `--radius-pill` | `9999px` | tab corners |
 | `--radius-nav` | `30px` | floating bar corners (mobile) |
-| `--bottom-tabs-height` | `61px` | floating bar height |
-| `--bottom-tabs-margin` | `21px` | floating bar inset from left/right/physical bottom |
-| `--bottom-tabs-pill-height` | `53px` | per-tab pill height (mobile) |
-| `--bottom-tabs-padding` | `4px` | mobile bar inner padding |
-| `--bottom-tabs-gap` | `4px` | mobile tab gap |
-| `--bottom-tabs-icon` | `20px` | mobile SVG icon size |
-| `--bottom-tabs-label` | `11px` | mobile label font size |
+| `--bottom-tabs-height` | `61px` | floating bar height — optional, falls back to `61px` |
+| `--bottom-tabs-margin` | `21px` | floating bar inset from left/right/physical bottom — optional, falls back to `21px` |
+| `--bottom-tabs-pill-height` | `53px` | per-tab pill height (mobile) — optional, falls back to `53px` |
+| `--bottom-tabs-padding` | `4px` | mobile bar inner padding — optional, falls back to `4px` |
+| `--bottom-tabs-gap` | `4px` | mobile tab gap — optional, falls back to `4px` |
+| `--bottom-tabs-icon` | `20px` | mobile SVG icon size — optional, falls back to `20px` |
+| `--bottom-tabs-label` | `11px` | mobile label font size — optional, falls back to `11px` |
 | `--tabbar-bg` | `rgba(255,255,255,0.85)` | floating bar glass fill |
 | `--tabbar-border` | `rgba(31,35,40,0.12)` | floating bar border |
+
+The tokens marked optional (`--icon-feature`, `--layout-measure`, `--layout-rail`, `--bottom-tabs-height`, `--bottom-tabs-margin`, `--bottom-tabs-pill-height`, `--bottom-tabs-padding`, `--bottom-tabs-gap`, `--bottom-tabs-icon`, `--bottom-tabs-label`) are optional per-context knob settings: `nav-tabs.css` reads each with an inline fallback, so an app that leaves one undefined gets the fallback named in its row and nothing renders wrong. Define one only to override it. Every unmarked token is read with no fallback and must be defined.
 
 ## The modal-hide rule
 
