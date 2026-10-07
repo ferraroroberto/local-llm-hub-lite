@@ -32,11 +32,9 @@
   --danger-text: #a40e26;   /* danger text on a danger tint */
   --attention: #9a6700;
   /* derived surface roles (mapped onto the neutral tokens above) */
-  --toggle-track: var(--line);  /* legacy: the vendored switch now reads --control-border */
   --toggle-knob: #ffffff;       /* vendored switch: thumb */
   --input-bg: var(--card-off);
   --code-bg: var(--card-off);  /* logpane / trace-detail <pre> surfaces */
-  --close-bg: var(--card-off); /* vendored modal's × close-button fill (_vendored/modal) */
   --scrim: rgba(0, 0, 0, 0.5); /* login-overlay dim — theme-invariant by design */
   /* status-alpha composites — derived, so they re-theme for free */
   --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
@@ -83,8 +81,8 @@
   --font-heading-xl: 2rem;
   --font-heading-lg: 1.5rem;
   --font-body: 1rem;
-  --font-label: 0.92rem;
-  --font-caption: 0.78rem;
+  --font-label: 0.875rem;
+  --font-caption: 0.75rem;
   /* elevation — cards lean on surface + hairline border; only floating
      elements (toast) carry a real shadow. */
   --shadow: 0 8px 24px rgba(31, 35, 40, 0.12);
@@ -125,7 +123,6 @@
   --danger-text: #ff7b72;
   --attention: #d29922;
   --toggle-knob: var(--ink);
-  --close-bg: var(--line);   /* vendored modal's × close-button fill (_vendored/modal) */
   /* Depth on a near-black canvas comes from surface lightness, not shadow. */
   --shadow: 0 8px 24px rgba(1, 4, 9, 0.6);
   --tabbar-bg: rgba(22, 27, 34, 0.86);
@@ -193,6 +190,9 @@ html, body {
   scrollbar-gutter: stable;
   min-height: 100vh;
 }
+
+/* Controls take the app font, not the UA's (project-scaffolding#266). */
+button, input, select, textarea { font: inherit; }
 
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -652,7 +652,7 @@ h2 { display: flex; align-items: center; gap: 8px; }
 .app-item .app-meta {
   font-size: var(--font-caption);
   color: var(--muted);
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 .app-item .app-icons .icon-btn.active {
   color: var(--accent);
@@ -688,8 +688,6 @@ h2 { display: flex; align-items: center; gap: 8px; }
 .opt-stack > label {
   font-size: var(--font-caption);
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 .opt-stack > textarea,
 .opt-stack > input,
@@ -733,8 +731,6 @@ h2 { display: flex; align-items: center; gap: 8px; }
   font-size: var(--font-caption);
   color: var(--muted);
   margin: 14px 0 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   font-weight: 500;
 }
 .maxtokens-row {
@@ -876,7 +872,6 @@ h2 { display: flex; align-items: center; gap: 8px; }
    * progress and results remain readable after the nav migration. */
   z-index: 130;
 }
-.toast.good  { border-color: var(--on); }
 .toast.error { border-color: var(--danger); }
 
 /* ---------- login overlay ---------- */
