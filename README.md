@@ -4,7 +4,7 @@ A tiny local HTTP hub for running **open-weight LLMs and Whisper on your own mac
 
 - **`POST /v1/messages`** (Anthropic shape) and **`POST /v1/chat/completions`** (OpenAI shape, streaming supported) on `:8000`, routed by `model` name to local [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server` backends.
 - **`POST /v1/audio/transcriptions`** (OpenAI shape) proxied to a local [whisper.cpp](https://github.com/ggerganov/whisper.cpp) `whisper-server`.
-- An **admin SPA** at `/admin` — three tabs: **Hub** (health, live requests, counters, errors, log, CPU/GPU/RAM/VRAM stats, install checks with one-click fixes), **Models** (start/stop each backend, roles card), **Playground** (chat + transcribe).
+- An **admin SPA** at `/admin` — three tabs: **Hub** (health, live requests, counters, errors, log, CPU/GPU/RAM/VRAM stats, install checks with one-click fixes, plus the Small/Default/Large text-size setting), **Models** (start/stop each backend, roles card), **Playground** (chat + transcribe).
 - A **Windows tray icon** that owns the hub lifecycle (start at login, restart, per-model toggles).
 
 Default model lineup (edit `config/models.yaml` to change it):
