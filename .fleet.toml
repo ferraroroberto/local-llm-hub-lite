@@ -102,3 +102,9 @@ reason       = "Icons and manifest are byte-identical copies of upstream local-l
 record       = "https://github.com/ferraroroberto/local-llm-hub-lite/issues/23"
 identical_to = "../local-llm-hub"
 paths        = ["app_web/static/icon-180.png", "app_web/static/icon-192.png", "app_web/static/icon-512.png", "app_web/static/icon-512-maskable.png", "app_web/static/favicon.ico", "app_web/static/manifest.webmanifest"]
+
+# Repo-level finding with no evidence file, so no target/detail (fleet-config#1322).
+[[design.accepted]]
+check  = "rendered-leg"
+reason = "The rendered geometry leg needs tests/e2e/_geometry.py (project-scaffolding#157), a harness this lite fork does not carry; it stays small, and the static contracts plus the Chromium smoke e2e are the proof here (Roberto, 2026-10-08)."
+record = "https://github.com/ferraroroberto/local-llm-hub-lite/issues/34"
