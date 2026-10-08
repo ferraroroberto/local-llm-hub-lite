@@ -6,6 +6,7 @@
 import { state, els, THEME_KEY, STATUS_POLL_MS, COUNTERS_POLL_MS, MODELS_POLL_MS } from './state.js';
 import { jsonApi, tokenFromUrl, writeToken, wireLoginForm, toast } from './api.js';
 import { icon } from './_vendored/icons/icons.js';
+import { bindTextSize } from './_vendored/text-size/text-size.js';
 import { wireTabs, onTabChange } from './tabs.js';
 import { wireHub, fetchHubStatus, fetchCounters, startHubStreams, stopHubStreams, fetchInstallStatus } from './hub.js';
 import { wireModels, fetchModels } from './models.js';
@@ -34,6 +35,11 @@ function toggleTheme() {
 })();
 
 if (els.themeToggleBtn) els.themeToggleBtn.addEventListener('click', toggleTheme);
+
+// Text size: the pre-paint script stamped html[data-textsize]; this paints the
+// stored step on the Health & install card control and persists clicks.
+const textSizeControl = document.getElementById('textSizeControl');
+if (textSizeControl) bindTextSize(textSizeControl, 'llmhub');
 
 async function fetchVersion() {
   try {

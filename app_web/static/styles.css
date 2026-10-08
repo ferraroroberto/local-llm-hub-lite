@@ -285,6 +285,13 @@ h2 { display: flex; align-items: center; gap: 8px; }
   display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-top: 10px;
   align-items: center;
 }
+/* Label + control row inside a card body (Hub tab text-size setting). */
+.setting-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm);
+  margin-top: 10px;
+}
+.setting-label { font-size: var(--font-label); font-weight: 500; }
+.setting-row .range-tabs { flex: 1; min-width: 220px; }
 /* Header-mounted icon action. Smaller than .icon-btn so it doesn't
  * dominate the card header. */
 .icon-header-btn {

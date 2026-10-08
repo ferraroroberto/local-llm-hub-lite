@@ -89,6 +89,34 @@ def test_toast_stacks_above_mobile_navigation(page, admin_url):
     assert toast_z > 120, "toast must clear the floating nav's z-index: 120"
 
 
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_text_size_control_persists(page, admin_url, theme):
+    """The Hub-tab Small/Default/Large control scales the root font-size,
+    survives a reload via the pre-paint stamp, and works in both themes (#34)."""
+    page.goto(admin_url, wait_until="load")
+    page.evaluate(
+        "(t) => { localStorage.setItem('llmhub.theme', t); localStorage.removeItem('llmhub.textsize'); }",
+        theme,
+    )
+    page.reload(wait_until="load")
+    assert page.evaluate("document.documentElement.dataset.theme") == theme
+    assert page.evaluate("document.documentElement.dataset.textsize") == "default"
+
+    page.click("#installCard > summary")
+    for step, px in (("large", "18px"), ("small", "15px"), ("default", "16px")):
+        page.click(f"#textSizeControl [data-textsize='{step}']")
+        assert page.evaluate("document.documentElement.dataset.textsize") == step
+        assert page.evaluate("getComputedStyle(document.documentElement).fontSize") == px
+        active = page.locator("#textSizeControl .range-tab.active")
+        assert active.count() == 1 and active.get_attribute("data-textsize") == step
+
+    page.click("#textSizeControl [data-textsize='large']")
+    page.reload(wait_until="load")
+    # Pre-paint stamp: set from storage before any control is bound or clicked.
+    assert page.evaluate("document.documentElement.dataset.textsize") == "large"
+    assert page.evaluate("getComputedStyle(document.documentElement).fontSize") == "18px"
+
+
 def test_playground_tab(page, admin_url):
     page.goto(admin_url, wait_until="load")
     page.click("#tabPlayground")
