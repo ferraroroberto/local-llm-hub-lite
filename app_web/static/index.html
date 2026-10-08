@@ -18,12 +18,26 @@
   <link rel="stylesheet" href="/admin/static/_vendored/switch/switch.css">
   <link rel="stylesheet" href="/admin/static/_vendored/empty-state/empty-state.css">
   <link rel="stylesheet" href="/admin/static/_vendored/nav/nav-tabs.css">
+  <link rel="stylesheet" href="/admin/static/_vendored/range-tab/range-tab.css">
+  <link rel="stylesheet" href="/admin/static/_vendored/text-size/text-size.css">
   <title>Local LLM Hub</title>
+  <!-- Pre-paint boot: vendored _vendored/text-size/text-size-boot.html, which
+       stamps html[data-theme] and html[data-textsize] before first paint.
+       Per-app edit: the localStorage prefix. -->
   <script>
-    (function(){
-      var t = localStorage.getItem('llmhub.theme');
-      var dark = t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
-      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    (function () {
+      var app = 'llmhub';
+      var root = document.documentElement;
+      var theme = null;
+      var size = null;
+      try {
+        theme = localStorage.getItem(app + '.theme');
+        size = localStorage.getItem(app + '.textsize');
+      } catch (e) {}
+      var dark = theme ? theme === 'dark'
+        : window.matchMedia('(prefers-color-scheme: dark)').matches;
+      root.dataset.theme = dark ? 'dark' : 'light';
+      root.dataset.textsize = size === 'small' || size === 'large' ? size : 'default';
     })();
   </script>
 </head>
@@ -82,6 +96,14 @@
         </summary>
         <div class="collapse-body">
           <div id="installRows"></div>
+          <div class="setting-row">
+            <span class="setting-label">Text size</span>
+            <nav class="range-tabs" id="textSizeControl" aria-label="Text size">
+              <button type="button" class="range-tab" data-textsize="small">Small</button>
+              <button type="button" class="range-tab" data-textsize="default">Default</button>
+              <button type="button" class="range-tab" data-textsize="large">Large</button>
+            </nav>
+          </div>
           <div class="card-actions">
             <button id="installFixAllBtn" type="button" class="button-primary launch-btn"><svg class="icon" aria-hidden="true"><use href="#i-wrench"></use></svg>Fix all</button>
             <button id="installRefreshBtn" type="button" class="ghost-btn"><svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"></use></svg>Re-check</button>
