@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="/admin/static/_vendored/switch/switch.css">
   <link rel="stylesheet" href="/admin/static/_vendored/empty-state/empty-state.css">
   <link rel="stylesheet" href="/admin/static/_vendored/nav/nav-tabs.css">
-  <link rel="stylesheet" href="/admin/static/_vendored/range-tab/range-tab.css">
+  <link rel="stylesheet" href="/admin/static/_vendored/segmented/segmented.css">
   <link rel="stylesheet" href="/admin/static/_vendored/text-size/text-size.css">
   <title>Local LLM Hub</title>
   <!-- Pre-paint boot: vendored _vendored/text-size/text-size-boot.html, which
@@ -98,11 +98,11 @@
           <div id="installRows"></div>
           <div class="setting-row">
             <span class="setting-label">Text size</span>
-            <nav class="range-tabs" id="textSizeControl" aria-label="Text size">
-              <button type="button" class="range-tab" data-textsize="small">Small</button>
-              <button type="button" class="range-tab" data-textsize="default">Default</button>
-              <button type="button" class="range-tab" data-textsize="large">Large</button>
-            </nav>
+            <div class="segmented" id="textSizeControl" role="group" aria-label="Text size">
+              <button type="button" class="segmented-item" aria-pressed="false" data-textsize="small">Small</button>
+              <button type="button" class="segmented-item" aria-pressed="true" data-textsize="default">Default</button>
+              <button type="button" class="segmented-item" aria-pressed="false" data-textsize="large">Large</button>
+            </div>
           </div>
           <div class="card-actions">
             <button id="installFixAllBtn" type="button" class="button-primary launch-btn"><svg class="icon" aria-hidden="true"><use href="#i-wrench"></use></svg>Fix all</button>
@@ -259,7 +259,7 @@
           <div class="opt-stack">
             <label>Max tokens</label>
             <div class="maxtokens-row">
-              <div id="playgroundMaxTokensSeg" class="segmented stretch" role="tablist" aria-label="Max tokens preset">
+              <div id="playgroundMaxTokensSeg" class="preset-tabs stretch" role="tablist" aria-label="Max tokens preset">
                 <button type="button" data-value="256">256</button>
                 <button type="button" data-value="512" class="active">512</button>
                 <button type="button" data-value="2048">2048</button>

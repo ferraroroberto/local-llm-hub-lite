@@ -107,7 +107,7 @@ def test_text_size_control_persists(page, admin_url, theme):
         page.click(f"#textSizeControl [data-textsize='{step}']")
         assert page.evaluate("document.documentElement.dataset.textsize") == step
         assert page.evaluate("getComputedStyle(document.documentElement).fontSize") == px
-        active = page.locator("#textSizeControl .range-tab.active")
+        active = page.locator("#textSizeControl .segmented-item[aria-pressed='true']")
         assert active.count() == 1 and active.get_attribute("data-textsize") == step
 
     page.click("#textSizeControl [data-textsize='large']")
