@@ -163,7 +163,7 @@ The canonical restart is **`tray.bat --restart`** — an orphan-proof reclaim-th
 Before shipping a change, run the local gate:
 
 ```powershell
-powershell -File scripts\verify-before-ship.ps1   # byte-compile + pytest + e2e (chromium)
+powershell -File scripts\verify-before-ship.ps1   # byte-compile + static ratchet + pytest + e2e (chromium)
 ```
 
 CI (`.github/workflows/e2e.yml`) runs the same three steps on every PR/push to `main` — advisory, the local gate is the contract.
