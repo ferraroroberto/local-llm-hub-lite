@@ -9,3 +9,7 @@ playwright>=1.45
 # anthropic SDK against the hub's error envelopes to prove drop-in
 # compatibility. Dev-only — the hub itself never imports it.
 anthropic>=0.40
+
+# Unused-import / unused-variable pass of the gate's static ratchet
+# (scripts/static_ratchet.py selects F401,F841 itself).
+ruff>=0.17.1

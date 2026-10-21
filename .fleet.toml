@@ -19,6 +19,19 @@ description  = "Single-machine lite fork of local-llm-hub: local models and whis
 [vendored]
 classify_e2e = { src = "scripts/classify_e2e.py", sha = "bede95f00aee0b17d5007246a29fa881a71f24f4", dest = "scripts/classify_e2e.py" }
 build_info = { src = "src/build_info.py", sha = "c9e54e917fd3cbc96011d6c09f9d363af460b205", dest = "src/build_info.py" }
+static_ratchet = { src = "scripts/static_ratchet.py", sha = "2f1e2f7c81b9a91a062271881fc87830104808ae", dest = "scripts/static_ratchet.py" }
+
+# [static_ratchet] -- the scaffold's baseline-and-ratchet static analysis. The gate
+# (scripts/verify-before-ship.ps1) runs scripts/static_ratchet.py, which fails on a
+# duplicate block (jscpd via npx, Python and JS) or an unused import/variable (ruff
+# F401,F841) that is not in .static-ratchet-baseline.json. Needs Node and ruff in
+# the gate's venv; a detector that cannot run exits 3, which fails the gate. Excluded:
+# vendored admin-SPA components (copies by design) and the gitignored vendor/ and
+# models/ trees. Procedure + limits: project-scaffolding docs/static-ratchet.md.
+[static_ratchet]
+enabled  = true
+baseline = ".static-ratchet-baseline.json"
+exclude  = ["**/_vendored/**", "vendor/**", "models/**"]
 
 [e2e]
 static_pytest_target = "tests/e2e/test_smoke.py"
@@ -78,6 +91,9 @@ extensions = ["md"]
 [[e2e.rule]]
 tier = "none"
 path = ".fleet.toml"
+[[e2e.rule]]
+tier = "none"
+path = ".static-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = ".gitignore"
