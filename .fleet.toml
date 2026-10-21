@@ -18,6 +18,7 @@ description  = "Single-machine lite fork of local-llm-hub: local models and whis
 # narrows what an *already-covered* diff runs, never what an unmatched one runs.
 [vendored]
 classify_e2e = { src = "scripts/classify_e2e.py", sha = "bede95f00aee0b17d5007246a29fa881a71f24f4", dest = "scripts/classify_e2e.py" }
+build_info = { src = "src/build_info.py", sha = "c9e54e917fd3cbc96011d6c09f9d363af460b205", dest = "src/build_info.py" }
 
 [e2e]
 static_pytest_target = "tests/e2e/test_smoke.py"
