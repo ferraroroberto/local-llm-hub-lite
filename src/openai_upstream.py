@@ -315,20 +315,50 @@ def clean_openai_chunk(
     return chunk
 
 
+def _flush_stripper_chunks(
+    strippers: Dict[int, ThinkStripper],
+    meta: Optional[Dict[str, Any]],
+) -> Iterator[str]:
+    """Yield one synthetic content-delta SSE line per choice with a
+    non-empty ``flush()`` tail. ``flush()`` is idempotent (empty after the
+    first call), so calling this more than once on the same strippers is
+    safe — already-flushed choices simply contribute nothing."""
+    for idx, stripper in strippers.items():
+        tail = stripper.flush()
+        if not tail:
+            continue
+        chunk: Dict[str, Any] = dict(meta or {})
+        chunk["choices"] = [{"index": idx, "delta": {"content": tail}, "finish_reason": None}]
+        yield "data: " + json.dumps(chunk, ensure_ascii=False)
+
+
 def iter_cleaned_sse(raw_lines: Iterator[str]) -> Iterator[str]:
     """Filter raw SSE lines, applying think-strip to ``data:`` payloads.
 
     Yields cleaned SSE lines (without trailing newline). The caller is
     responsible for joining lines back with ``\\n`` (each line + ``\\n``
     is the wire format).
+
+    Each choice's :class:`ThinkStripper` retains up to ``len('<think')``
+    bytes against a tag split across chunks (see its docstring); that tail
+    must be flushed once the stream ends or it is silently dropped. Flushed
+    on whichever comes first: the chunk whose choice carries a
+    ``finish_reason`` (merged into that choice's own delta), or — if the
+    upstream never sends one — the ``[DONE]`` sentinel / raw-line exhaustion
+    (emitted as one extra synthetic chunk per choice).
     """
     strippers: Dict[int, ThinkStripper] = {}
+    last_meta: Optional[Dict[str, Any]] = None
     for line in raw_lines:
         if not line.startswith("data:"):
             yield line
             continue
         payload = line[len("data:"):].lstrip()
-        if payload == "[DONE]" or payload == "":
+        if payload == "[DONE]":
+            yield from _flush_stripper_chunks(strippers, last_meta)
+            yield line
+            continue
+        if payload == "":
             yield line
             continue
         try:
@@ -339,7 +369,25 @@ def iter_cleaned_sse(raw_lines: Iterator[str]) -> Iterator[str]:
             yield line
             continue
         clean_openai_chunk(obj, strippers)
+        last_meta = {k: obj[k] for k in ("id", "object", "created", "model") if k in obj}
+        for choice in obj.get("choices") or []:
+            if not choice.get("finish_reason"):
+                continue
+            idx = int(choice.get("index", 0) or 0)
+            stripper = strippers.get(idx)
+            if stripper is None:
+                continue
+            tail = stripper.flush()
+            if not tail:
+                continue
+            delta = choice.get("delta")
+            if not isinstance(delta, dict):
+                delta = {}
+                choice["delta"] = delta
+            delta["content"] = (delta.get("content") or "") + tail
         yield "data: " + json.dumps(obj, ensure_ascii=False)
+    # Defensive: upstream closed without ever sending [DONE].
+    yield from _flush_stripper_chunks(strippers, last_meta)
 
 
 def openai_response_text(resp: Dict[str, Any]) -> str:

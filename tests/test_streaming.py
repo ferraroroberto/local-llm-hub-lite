@@ -133,6 +133,27 @@ def _delta(content: str = "", reasoning_content: str = "") -> dict:
     }
 
 
+def _finish_chunk(idx: int = 0, finish_reason: str = "stop") -> dict:
+    return {
+        "id": "x", "object": "chat.completion.chunk", "model": "qwen3.5-4b",
+        "choices": [{"index": idx, "delta": {}, "finish_reason": finish_reason}],
+    }
+
+
+def _reassemble(cleaned_lines: List[str]) -> str:
+    out = ""
+    for line in cleaned_lines:
+        if not line.startswith("data:"):
+            continue
+        payload = line[len("data:"):].strip()
+        if payload == "[DONE]" or payload == "":
+            continue
+        obj = json.loads(payload)
+        delta = (obj.get("choices") or [{}])[0].get("delta", {})
+        out += delta.get("content") or ""
+    return out
+
+
 def test_iter_cleaned_sse_strips_think_across_chunks():
     raw = _sse_lines(
         _delta("Hello <thi"),
@@ -164,6 +185,27 @@ def test_iter_cleaned_sse_passes_blank_lines():
     raw = ["", "data: [DONE]"]
     out = list(iter_cleaned_sse(iter(raw)))
     assert out == ["", "data: [DONE]"]
+
+
+def test_iter_cleaned_sse_flushes_trailing_tag_at_finish_chunk():
+    """#51: a tail that looks like it might start a ``<think`` tag (any
+    ``<...`` within the last 6 chars) is held back by ThinkStripper and
+    must be flushed once the upstream's finish chunk arrives — otherwise
+    it is silently dropped. Repro from the issue: deltas ``<p>``, ``Hello``,
+    ``</p>`` then a finish chunk."""
+    raw = _sse_lines(_delta("<p>"), _delta("Hello"), _delta("</p>"), _finish_chunk())
+    cleaned = list(iter_cleaned_sse(iter(raw)))
+    assert _reassemble(cleaned) == "<p>Hello</p>"
+    assert cleaned[-1] == "data: [DONE]"
+
+
+def test_iter_cleaned_sse_flushes_on_stream_end_without_finish_or_done():
+    """Defensive fallback: upstream connection closes without ever sending
+    a finish chunk or ``[DONE]`` — the held-back tail must still reach the
+    client instead of vanishing with the dropped connection."""
+    raw = _sse_lines(_delta("<p>"), _delta("Hello"), _delta("</p>"))[:-1]  # drop [DONE]
+    cleaned = list(iter_cleaned_sse(iter(raw)))
+    assert _reassemble(cleaned) == "<p>Hello</p>"
 
 
 # ---- end-to-end against /v1/chat/completions ----

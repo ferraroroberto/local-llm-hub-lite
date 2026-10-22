@@ -91,6 +91,10 @@ def resolve() -> HostProfile:
       2. Any host row whose `hostname` equals `socket.gethostname()`.
       3. Any host row matching `sys.platform` with `default: true`.
       4. Any host row matching `sys.platform`.
+      5. Lite-fork fallback: the sole host row, or the `default: true` row,
+         regardless of `platform` (#51) — this fork ships exactly one row
+         (`platform: win32`), so a Linux/macOS box running the cross-platform
+         `run_hub.sh` would otherwise fail every route with a 500.
     """
     cfg = _load_config()
     hosts: Dict[str, Any] = cfg.get("hosts") or {}
@@ -121,6 +125,21 @@ def resolve() -> HostProfile:
     for host_id, row in hosts.items():
         if row.get("platform") == this_platform:
             return _row_to_profile(host_id, row, source=f"first match for {this_platform}")
+
+    if len(hosts) == 1:
+        (only_id, only_row), = hosts.items()
+        return _row_to_profile(
+            only_id, only_row,
+            source=f"sole host row (platform={this_platform} unmatched)",
+        )
+
+    default_rows = [(hid, row) for hid, row in hosts.items() if row.get("default")]
+    if len(default_rows) == 1:
+        hid, row = default_rows[0]
+        return _row_to_profile(
+            hid, row,
+            source=f"default host row (platform={this_platform} unmatched)",
+        )
 
     raise RuntimeError(
         f"no host row matched platform={this_platform} "
