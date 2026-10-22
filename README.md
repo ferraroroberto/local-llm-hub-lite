@@ -163,8 +163,10 @@ The canonical restart is **`tray.bat --restart`** — an orphan-proof reclaim-th
 Before shipping a change, run the local gate:
 
 ```powershell
-powershell -File scripts\verify-before-ship.ps1   # byte-compile + static ratchet + pytest + e2e (chromium)
+powershell -File scripts\verify-before-ship.ps1   # byte-compile + static ratchet + pytest + routed e2e (chromium)
 ```
+
+The e2e stage asks `scripts/classify_e2e.py` what the diff needs (rules in the `[e2e]` table of `.fleet.toml`): a docs/backend-only diff skips the browser suite, inert assets run the smoke test, anything touching `app_web/` or `tray/` runs the full suite. An unclassified path, an empty diff or a router failure runs the full suite and prints why. `-RouteOnly` prints the decision without running any stage.
 
 CI (`.github/workflows/e2e.yml`) runs the same three steps on every PR/push to `main` — advisory, the local gate is the contract.
 
