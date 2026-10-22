@@ -48,6 +48,11 @@ VENDOR_WHISPER = PROJECT_ROOT / "vendor" / "whisper.cpp"
 LOG_DIR = PROJECT_ROOT / "data" / "logs"
 # Tail size returned by ``log_lines`` — replaces the old 1000-line ring.
 LOG_TAIL_LINES = 400
+# Listen address passed to every backend. The hub is the only intended
+# client and reaches each backend over loopback (``Model.url``); other
+# machines go through the hub on :8000. A row's own ``args`` come later on
+# the command line, so ``--host`` there still overrides this.
+BACKEND_LISTEN_HOST = "127.0.0.1"
 
 
 def _log_path(model_id: str) -> Path:
@@ -247,7 +252,7 @@ def build_command(model: Model) -> list[str]:
             )
         cmd = [
             str(bin_path),
-            "--host", "0.0.0.0",
+            "--host", BACKEND_LISTEN_HOST,
             "--port", str(model.port),
             "--model", str(model_path),
         ]
@@ -262,7 +267,7 @@ def build_command(model: Model) -> list[str]:
     cmd = [
         str(bin_path),
         "-m", str(model_path),
-        "--host", "0.0.0.0",
+        "--host", BACKEND_LISTEN_HOST,
         "--port", str(model.port),
     ]
     cmd.extend(model.args or [])
