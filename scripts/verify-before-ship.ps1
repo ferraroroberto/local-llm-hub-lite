@@ -10,8 +10,12 @@
 #      import/variable (ruff F401,F841) beyond .static-ratchet-baseline.json.
 #      Whole tree, never routed; exit 3 (a detector could not run) is NOT
 #      CONFIRMED and fails, never a pass or a skip.
-#   3. `pytest -q` (unit tests, no GPU / no real CLIs)
-#   4. e2e, routed by scripts/classify_e2e.py against the [e2e] table in
+#   3. docs ratchet: README.md within its size budget and no new history marker
+#      (issue reference, dated or changelog heading) in README.md / docs/**/*.md
+#      beyond .docs-ratchet-baseline.json. Whole tree, never routed; exit 3
+#      (a file could not be read) is NOT CONFIRMED and fails.
+#   4. `pytest -q` (unit tests, no GPU / no real CLIs)
+#   5. e2e, routed by scripts/classify_e2e.py against the [e2e] table in
 #      .fleet.toml: nothing for a diff with no browser surface, the smoke
 #      target for inert assets, a surface slice or the full suite otherwise.
 #      An unclassified path, an empty diff or a router failure runs the
@@ -96,6 +100,12 @@ Step "static ratchet" {
     # (tests/test_static_ratchet_gate.py pins it); call it, never
     # scripts/static_ratchet.py directly.
     & $Python -m scripts.static_ratchet_gate
+}
+
+Step "docs ratchet" {
+    # Same wrapper shape as the static ratchet: exit 3 (a file could not be
+    # read) is NOT CONFIRMED and fails (tests/test_docs_ratchet_gate.py pins it).
+    & $Python -m scripts.docs_ratchet_gate
 }
 
 Step "pytest (unit)" {
