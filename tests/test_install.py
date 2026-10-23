@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from types import SimpleNamespace
 
-os.environ.setdefault("LOCAL_LLM_HUB_HOST", "local")
 
 from src import install as install_mod
 

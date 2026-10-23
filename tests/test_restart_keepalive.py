@@ -11,9 +11,7 @@ then adopts the survivors.
 from __future__ import annotations
 
 import asyncio
-import os
 
-os.environ.setdefault("LOCAL_LLM_HUB_HOST", "local")
 
 import pytest
 

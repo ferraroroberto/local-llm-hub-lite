@@ -112,8 +112,8 @@ def _restart_log_path() -> Path:
 def _spawn_respawn_watchdog() -> None:
     """Spawn a detached Python that waits for our PID to die then re-launches us.
 
-    The relaunch is made the way ``src/server_process.start()`` spawns the
-    hub — never a bare ``pythonw`` with no stdout. The actual wait/relaunch
+    The relaunch uses the tray's process-group flags for the hub —
+    never a bare ``pythonw`` with no stdout. The actual wait/relaunch
     logic lives in ``src/_respawn_watchdog.py`` as a real module instead of
     a string literal fed to ``python -c``, so it stays visible to
     lint/type-check. That module is deliberately
@@ -127,7 +127,7 @@ def _spawn_respawn_watchdog() -> None:
     log_path = _restart_log_path()
     log_path.parent.mkdir(parents=True, exist_ok=True)
     logger.info("🔄 respawn watchdog: relaunch log → %s", log_path)
-    # Same flags src.server_process.start() uses for the hub itself —
+    # Same flags the tray uses to spawn the hub —
     # DETACHED_PROCESS is deliberately omitted, it's mutually exclusive
     # with CREATE_NO_WINDOW per the Win32 CreateProcess docs.
     creationflags = WIN_NEW_GROUP

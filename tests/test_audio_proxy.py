@@ -38,11 +38,10 @@ def _single_whisper_config(write_config, monkeypatch):
             "wa": {"display_name": "whisper-a", "backend": "whisper",
                    "engine": "whisper-server", "port": 9001},
             "wdown": {"display_name": "whisper-down", "backend": "whisper",
-                      "engine": "whisper-server", "port": 9003, "host": "elsewhere"},
+                      "engine": "whisper-server", "port": 9003},
             "chatty": {"display_name": "chat-model", "backend": "openai", "port": 9100},
         },
     })
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "pc")
 
 
 # --------------------------------------------------------------------------- #
@@ -210,7 +209,6 @@ def test_no_whisper_enabled_is_503(monkeypatch, write_config):
         "hosts": {"pc": {"platform": "win32", "default": True, "enabled": []}},
         "models": {},
     })
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "pc")
     req = _req_with_ctx()
     with pytest.raises(HTTPException) as ei:
         _proxy(req)

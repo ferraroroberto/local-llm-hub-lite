@@ -249,13 +249,13 @@ def idle_unload_pass(now: Optional[float] = None) -> Dict[str, Any]:
     never. Returns ``{model_id: action}`` for observability/tests.
     """
     from . import backend_process as bp
-    from .model_registry import local_models
+    from .model_registry import enabled_models
 
     t = time.monotonic() if now is None else now
     results: Dict[str, Any] = {}
     try:
         candidates = [
-            m for m in local_models()
+            m for m in enabled_models()
             if is_on_demand(m) and not m.virtual and m.idle_unload_minutes
         ]
     except Exception as exc:  # noqa: BLE001 — config error must not kill the loop

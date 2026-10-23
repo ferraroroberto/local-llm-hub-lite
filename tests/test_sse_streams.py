@@ -13,10 +13,8 @@ HTTP-level SSE test against an infinite stream would.
 from __future__ import annotations
 
 import asyncio
-import os
 import threading
 
-os.environ.setdefault("LOCAL_LLM_HUB_HOST", "local")
 
 from app_web.routers._helpers import sse_pack, sse_stream
 from src.async_fanout import AsyncFanout

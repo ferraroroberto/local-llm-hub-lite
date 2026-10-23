@@ -17,10 +17,8 @@ Covers:
 from __future__ import annotations
 
 import json
-import os
 from typing import Iterator, List
 
-os.environ.setdefault("LOCAL_LLM_HUB_HOST", "local")
 
 from fastapi.testclient import TestClient
 
@@ -482,7 +480,6 @@ def _nothink_config(write_config, monkeypatch):
             },
         },
     })
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "pc")
 
 
 def _capture_call(captured: dict):

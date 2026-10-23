@@ -6,9 +6,6 @@ battery run just to locate one check by fix_id.
 
 from __future__ import annotations
 
-import os
-
-os.environ.setdefault("LOCAL_LLM_HUB_HOST", "local")
 
 from fastapi.testclient import TestClient
 

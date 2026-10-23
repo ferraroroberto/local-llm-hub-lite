@@ -42,7 +42,6 @@ from typing import Deque, Optional
 from .host_profile import hub_bind_host, hub_port
 from .http_client import get_sync_client
 from .no_window import NO_WINDOW
-from .process_supervisor import ProcessSupervisor, SpawnSpec
 
 logger = logging.getLogger(__name__)
 
@@ -128,59 +127,6 @@ def _reader(proc: subprocess.Popen) -> None:
         line = raw.rstrip("\n")
         with _STATE.lock:
             _STATE.log.append(line)
-
-
-def start() -> tuple[bool, str]:
-    def build_spawn_spec() -> SpawnSpec:
-        clear_log()
-        env = os.environ.copy()
-        env["PYTHONIOENCODING"] = "utf-8"
-        env["PYTHONUTF8"] = "1"
-        return SpawnSpec(
-            cmd=[sys.executable, "-m", "src.server"],
-            cwd=PROJECT_ROOT,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            bufsize=1,
-            env=env,
-            creationflags=WIN_NEW_GROUP,
-        )
-
-    def on_spawned(proc: subprocess.Popen) -> None:
-        t = threading.Thread(target=_reader, args=(proc,), daemon=True)
-        t.start()
-        _STATE.reader = t
-
-    return ProcessSupervisor(
-        already_running=is_running,
-        reachable=lambda: is_reachable(timeout=0.4),
-        external_pid=external_pid,
-        build_spawn_spec=build_spawn_spec,
-        set_process=lambda proc: setattr(_STATE, "proc", proc),
-        on_spawned=on_spawned,
-        adopt_message="adopted external hub",
-    ).start()
-
-
-def stop() -> tuple[bool, str]:
-    p = _STATE.proc
-    if p is None or p.poll() is not None:
-        _STATE.proc = None
-        return False, "not running"
-
-    ok, msg = ProcessSupervisor.stop_popen(
-        p,
-        terminate_timeout=5,
-        kill_timeout=5,
-    )
-    if not ok:
-        return ok, msg
-
-    _STATE.proc = None
-    return True, "stopped"
 
 
 def pid() -> Optional[int]:

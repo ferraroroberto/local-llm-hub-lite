@@ -103,7 +103,7 @@ Single source of truth for models, ports, and roles. Structure:
 hub:    { port: 8000, bind_host: "0.0.0.0" }
 tray:   { autostart_hub: true, hub_ready_timeout_s: 30 }
 hosts:
-  local: { platform: win32, default: true, enabled: [qwen35_4b, whisper] }
+  local: { enabled: [qwen35_4b, whisper] }
 models:
   qwen35_4b:
     display_name: qwen3.5-4b        # the id clients send
@@ -118,7 +118,6 @@ models:
     startup: eager                  # eager | on_demand
     idle_unload_minutes: 30          # on_demand only: unload after N idle minutes
     args: [...]                     # extra backend CLI args
-    host: local                     # owning host id; unset = local everywhere
   qwen35_4b_nothink:
     display_name: qwen3.5-4b-nothink
     virtual: true                   # alias of another backend's port; never

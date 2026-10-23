@@ -15,9 +15,6 @@ Three things are under test, and the third is the one that matters most:
 
 from __future__ import annotations
 
-import os
-
-os.environ.setdefault("LOCAL_LLM_HUB_HOST", "local")
 
 import anthropic
 import pytest

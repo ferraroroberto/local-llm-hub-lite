@@ -7,9 +7,6 @@ mocked `call_openai_chat`) plus the unknown-model 400 branch and the
 
 from __future__ import annotations
 
-import os
-
-os.environ.setdefault("LOCAL_LLM_HUB_HOST", "local")
 
 from fastapi.testclient import TestClient
 

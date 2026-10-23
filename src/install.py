@@ -30,7 +30,7 @@ log = logging.getLogger(__name__)
 
 from .backend_process import llama_server_binary, whisper_server_binary
 from .host_profile import hub_port, resolve as resolve_host
-from .model_registry import local_models
+from .model_registry import enabled_models
 from .no_window import NO_WINDOW
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -106,7 +106,7 @@ def _check_host_profile() -> Check:
     except Exception as e:
         return Check("host", "Host profile resolves", "error", str(e))
     return Check("host", "Host profile resolves", "ok",
-                 f"host={h.id} ({h.source}); enabled local models: {h.enabled or '(none)'}")
+                 f"host={h.id}; enabled local models: {h.enabled or '(none)'}")
 
 
 def _probe_cli_version(
@@ -203,7 +203,7 @@ def _check_llama_cpp() -> Check:
 
 def _check_models() -> List[Check]:
     rows: List[Check] = []
-    for m in local_models():
+    for m in enabled_models():
         if m.backend not in ("openai", "whisper") or not m.model_path:
             continue
         path = (PROJECT_ROOT / m.model_path).resolve()
@@ -222,7 +222,7 @@ def _check_models() -> List[Check]:
 
 
 def _whisper_enabled() -> bool:
-    return any(m.engine == "whisper-server" for m in local_models())
+    return any(m.engine == "whisper-server" for m in enabled_models())
 
 
 def _check_whisper_cpp() -> Check:
@@ -255,7 +255,7 @@ def _check_ports() -> List[Check]:
     rows: List[Check] = []
     for label, port in [("hub", hub_port())] + [
         (m.display_name, m.port)
-        for m in local_models()
+        for m in enabled_models()
         if m.backend in ("openai", "whisper") and m.port and not m.virtual
     ]:
         if _port_in_use(port):

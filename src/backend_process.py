@@ -24,16 +24,15 @@ a port held by someone else.
 from __future__ import annotations
 
 import os
+import signal
 import socket
 import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, Optional
 
-from .host_profile import resolve as resolve_host
 from .http_client import get_sync_client
-from .model_registry import Model, enabled_models, local_models
-from .process_supervisor import ProcessSupervisor, SpawnSpec
+from .model_registry import Model, enabled_models
 from .server_process import (
     OWNERSHIP_NONE,
     WIN_NEW_GROUP,
@@ -278,14 +277,6 @@ def start(model_id: str) -> tuple[bool, str]:
     model = resolve_model_by_id(model_id)
     if model is None:
         return False, f"model {model_id!r} not enabled on this host"
-    # Ownership guard: a row that names a different ``host:`` is never
-    # spawned here.
-    active = resolve_host()
-    if model.host and model.host != active.id:
-        return False, (
-            f"model {model_id!r} is owned by host {model.host!r} — "
-            "start it there"
-        )
     if is_running(model_id):
         return False, "already running"
 
@@ -315,36 +306,25 @@ def start(model_id: str) -> tuple[bool, str]:
     # [Errno 22] this avoids). The file is also readable on disk and
     # via ``log_lines`` / the admin log endpoint. Roll first for a fresh log.
     log_file = _roll_log(model_id).open("ab")
-
-    def build_spawn_spec() -> SpawnSpec:
-        return SpawnSpec(
-            cmd=cmd,
-            cwd=PROJECT_ROOT,
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=str(PROJECT_ROOT),
             stdout=log_file,
             stderr=subprocess.STDOUT,
             env=env,
             creationflags=WIN_NEW_GROUP,
         )
-
-    def on_spawned(proc: subprocess.Popen) -> None:
+    except Exception as e:
+        return False, f"failed to launch: {e}"
+    finally:
         # The child duplicated the handle at spawn; the hub no longer needs
         # its own copy (and keeping it open would pin the file). Closing it is
         # exactly what makes the log restart-safe — only the child holds the fd.
         log_file.close()
 
-    try:
-        return ProcessSupervisor(
-            already_running=lambda: is_running(model_id),
-            reachable=lambda: is_reachable(model, timeout=0.4),
-            external_pid=lambda: external_pid(model_id),
-            build_spawn_spec=build_spawn_spec,
-            set_process=lambda proc: setattr(state, "proc", proc),
-            on_spawned=on_spawned,
-            adopt_message="adopted external instance",
-        ).start()
-    finally:
-        if not log_file.closed:
-            log_file.close()
+    state.proc = proc
+    return True, f"started (pid={proc.pid})"
 
 
 def stop(model_id: str) -> tuple[bool, str]:
@@ -362,13 +342,20 @@ def stop(model_id: str) -> tuple[bool, str]:
     if p.poll() is not None:
         state.proc = None
         return False, "not running"
-    ok, msg = ProcessSupervisor.stop_popen(
-        p,
-        terminate_timeout=8,
-        kill_timeout=5,
-    )
-    if not ok:
-        return ok, msg
+    try:
+        if sys.platform == "win32":
+            try:
+                p.send_signal(signal.CTRL_BREAK_EVENT)
+            except (OSError, ValueError):
+                pass
+        p.terminate()
+        try:
+            p.wait(timeout=8)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            p.wait(timeout=5)
+    except Exception as e:
+        return False, f"error stopping: {e}"
     state.proc = None
     return True, "stopped"
 
@@ -393,7 +380,7 @@ def inherit_running_backends() -> int:
 
     listening = snapshot_listening_pids()
     count = 0
-    for m in local_models():
+    for m in enabled_models():
         if m.backend not in ("openai", "whisper"):
             continue
         if not m.port:
@@ -440,7 +427,7 @@ def resolve_model_by_id(model_id: str) -> Optional[Model]:
 def running_backends() -> Dict[str, Model]:
     """Return {model_id: Model} for each local backend whose process is alive."""
     out: Dict[str, Model] = {}
-    for m in local_models():
+    for m in enabled_models():
         if m.backend in ("openai", "whisper") and is_running(m.id):
             out[m.id] = m
     return out

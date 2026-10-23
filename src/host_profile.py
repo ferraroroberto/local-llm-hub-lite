@@ -1,10 +1,8 @@
-"""Resolve which host profile from config/models.yaml applies to this machine.
+"""Resolve the host profile from config/models.yaml.
 
-The registry keeps per-host settings (which models are enabled, etc.)
-keyed by a short id. Lite fork: the ``hosts:`` block holds exactly one
-row (with ``default: true``); at runtime we pick it by hostname /
-platform / default, with the `LOCAL_LLM_HUB_HOST` env var as an explicit
-override.
+The ``hosts:`` block holds exactly one row (this fork serves a single
+machine): its ``enabled:`` list names the registry rows the hub serves and
+its optional ``vram_mb`` is the on-demand overcommit ceiling.
 
 ``_load_config()`` below is also the single cached YAML loader for
 ``config/models.yaml`` — ``src/model_registry.py`` imports it directly
@@ -14,9 +12,6 @@ admin roles router reads the raw ``roles:`` block through it.
 
 from __future__ import annotations
 
-import os
-import socket
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -25,26 +20,16 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = PROJECT_ROOT / "config" / "models.yaml"
-ENV_OVERRIDE = "LOCAL_LLM_HUB_HOST"
 
 
 @dataclass(frozen=True)
 class HostProfile:
     id: str
-    platform: str
     enabled: List[str]
-    hostname: Optional[str] = None
-    default: bool = False
-    source: str = ""  # human-readable description of how we picked it
-    # A human label + one-line role for display surfaces. Optional.
-    display_name: Optional[str] = None
-    role: Optional[str] = None
     # Discrete-GPU VRAM ceiling in MB. The on-demand lifecycle sums
     # the running models' ``est_vram_mb`` and warns (advisory only, never
     # blocks) when a load would exceed this. Unset disables the warning.
     vram_mb: Optional[int] = None
-    # Total system RAM in MB — display-only context. Optional.
-    ram_mb: Optional[int] = None
 
 
 # Parsed-YAML cache, keyed by the resolved config path. The README's
@@ -68,82 +53,16 @@ def _load_config() -> Dict[str, Any]:
     return data
 
 
-def _row_to_profile(host_id: str, row: Dict[str, Any], *, source: str) -> HostProfile:
-    return HostProfile(
-        id=host_id,
-        platform=str(row.get("platform", "")),
-        enabled=list(row.get("enabled", []) or []),
-        hostname=row.get("hostname"),
-        default=bool(row.get("default", False)),
-        source=source,
-        display_name=row.get("display_name"),
-        role=row.get("role"),
-        vram_mb=int(row["vram_mb"]) if row.get("vram_mb") is not None else None,
-        ram_mb=int(row["ram_mb"]) if row.get("ram_mb") is not None else None,
-    )
-
-
 def resolve() -> HostProfile:
-    """Pick the host profile for this machine.
-
-    Precedence:
-      1. `LOCAL_LLM_HUB_HOST` env var selects an exact id.
-      2. Any host row whose `hostname` equals `socket.gethostname()`.
-      3. Any host row matching `sys.platform` with `default: true`.
-      4. Any host row matching `sys.platform`.
-      5. Lite-fork fallback: the sole host row, or the `default: true` row,
-         regardless of `platform` — this fork ships exactly one row
-         (`platform: win32`), so a Linux/macOS box running the cross-platform
-         `run_hub.sh` would otherwise fail every route with a 500.
-    """
-    cfg = _load_config()
-    hosts: Dict[str, Any] = cfg.get("hosts") or {}
+    """Return the profile for the sole ``hosts:`` row."""
+    hosts: Dict[str, Any] = _load_config().get("hosts") or {}
     if not hosts:
         raise RuntimeError(f"no 'hosts' defined in {CONFIG_PATH}")
-
-    override = os.environ.get(ENV_OVERRIDE)
-    if override:
-        if override not in hosts:
-            raise RuntimeError(
-                f"{ENV_OVERRIDE}={override!r} but {override!r} is not in "
-                f"config hosts: {sorted(hosts.keys())}"
-            )
-        return _row_to_profile(override, hosts[override], source=f"env {ENV_OVERRIDE}")
-
-    this_host = socket.gethostname().lower()
-    this_platform = sys.platform
-
-    for host_id, row in hosts.items():
-        hn = row.get("hostname")
-        if hn and str(hn).lower() == this_host:
-            return _row_to_profile(host_id, row, source=f"hostname match {this_host}")
-
-    for host_id, row in hosts.items():
-        if row.get("platform") == this_platform and row.get("default"):
-            return _row_to_profile(host_id, row, source=f"default for {this_platform}")
-
-    for host_id, row in hosts.items():
-        if row.get("platform") == this_platform:
-            return _row_to_profile(host_id, row, source=f"first match for {this_platform}")
-
-    if len(hosts) == 1:
-        (only_id, only_row), = hosts.items()
-        return _row_to_profile(
-            only_id, only_row,
-            source=f"sole host row (platform={this_platform} unmatched)",
-        )
-
-    default_rows = [(hid, row) for hid, row in hosts.items() if row.get("default")]
-    if len(default_rows) == 1:
-        hid, row = default_rows[0]
-        return _row_to_profile(
-            hid, row,
-            source=f"default host row (platform={this_platform} unmatched)",
-        )
-
-    raise RuntimeError(
-        f"no host row matched platform={this_platform} "
-        f"hostname={this_host} (available: {sorted(hosts.keys())})"
+    host_id, row = next(iter(hosts.items()))
+    return HostProfile(
+        id=host_id,
+        enabled=list(row.get("enabled", []) or []),
+        vram_mb=int(row["vram_mb"]) if row.get("vram_mb") is not None else None,
     )
 
 
