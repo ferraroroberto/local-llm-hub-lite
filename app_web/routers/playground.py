@@ -79,7 +79,7 @@ async def playground_send(
     except Exception:  # noqa: BLE001
         body = {}
     if not r.is_success:
-        # /v1/messages answers errors in the Anthropic envelope (#460);
+        # /v1/messages answers errors in the Anthropic envelope;
         # `detail` is kept as a fallback for anything else on this path.
         err = body.get("error") if isinstance(body, dict) else None
         detail = (

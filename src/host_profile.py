@@ -39,11 +39,11 @@ class HostProfile:
     # A human label + one-line role for display surfaces. Optional.
     display_name: Optional[str] = None
     role: Optional[str] = None
-    # Discrete-GPU VRAM ceiling in MB (#375). The on-demand lifecycle sums
+    # Discrete-GPU VRAM ceiling in MB. The on-demand lifecycle sums
     # the running models' ``est_vram_mb`` and warns (advisory only, never
     # blocks) when a load would exceed this. Unset disables the warning.
     vram_mb: Optional[int] = None
-    # Total system RAM in MB (#431) — display-only context. Optional.
+    # Total system RAM in MB — display-only context. Optional.
     ram_mb: Optional[int] = None
 
 
@@ -92,7 +92,7 @@ def resolve() -> HostProfile:
       3. Any host row matching `sys.platform` with `default: true`.
       4. Any host row matching `sys.platform`.
       5. Lite-fork fallback: the sole host row, or the `default: true` row,
-         regardless of `platform` (#51) — this fork ships exactly one row
+         regardless of `platform` — this fork ships exactly one row
          (`platform: win32`), so a Linux/macOS box running the cross-platform
          `run_hub.sh` would otherwise fail every route with a 500.
     """

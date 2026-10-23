@@ -2,8 +2,8 @@
 the repo, so the icon can be tinted by hub health state.
 
 Renders Lucide's ``share-2`` glyph (24x24 viewBox) — the fleet's canonical
-"hub-with-3-arms" identity for this project (app-launcher#65's shared icon
-family; the vendored master lives at ``project-scaffolding/brand/hub.svg``).
+"hub-with-3-arms" identity for this project, from the shared icon family
+whose vendored master lives at ``project-scaffolding/brand/hub.svg``.
 The path data below is embedded here rather than read from that repo at
 runtime: this module is called on every tray health-state change, and a live
 cross-repo file read on that hot path is more fragile than a one-shot

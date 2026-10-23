@@ -15,7 +15,7 @@ from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
-# Response headers naming the model/host pair behind an audio request (#412).
+# Response headers naming the model/host pair behind an audio request.
 # Additive metadata — every OpenAI/Anthropic client ignores unknown headers —
 # so a caller can tell exactly which model answered without reading the
 # hub's admin API.
@@ -35,8 +35,8 @@ def _header_safe(value: str) -> str:
     body by regex. That pattern rejects CR/LF but nothing else, so a
     ``model=`` carrying a NUL (or any other control byte) used to reach h11
     verbatim and raise ``LocalProtocolError`` — after the upstream
-    transcription had already run, turning a completed request into a 500
-    (#412). Strip to printable ASCII and cap the length instead.
+    transcription had already run, turning a completed request into a 500.
+    Strip to printable ASCII and cap the length instead.
     """
     return _NON_PRINTABLE_ASCII.sub("", value or "")[:_HEADER_VALUE_MAX]
 
@@ -51,7 +51,7 @@ def _audio_upstream_error(exc: Exception, *, backend: str, port: int) -> HTTPExc
     message names the port and says the backend isn't running, instead of the
     opaque ``502 "whisper upstream error: All connection attempts failed"`` that
     gave downstream consumers no way to tell "down" from "in flight past
-    timeout" (issue #147). Every other upstream error stays a ``502``.
+    timeout". Every other upstream error stays a ``502``.
     """
     import httpx as _httpx
 

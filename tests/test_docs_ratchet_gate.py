@@ -19,16 +19,16 @@ from pathlib import Path
 import pytest
 
 from scripts import docs_ratchet_gate as gate
-from tests.test_static_ratchet_gate import _fake_script
+from tests.test_static_ratchet_gate import (
+    _fake_script,
+    assert_only_zero_passes_and_three_is_not_confirmed,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_only_exit_zero_passes_and_exit_three_is_never_a_skip() -> None:
-    verdicts = {code: gate.classify_exit(code) for code in range(-1, 5)}
-    assert [code for code, (ok, _) in verdicts.items() if ok] == [0]
-    assert "NOT CONFIRMED" in verdicts[3][1]
-    assert "skip" not in verdicts[3][1].lower()
+    assert_only_zero_passes_and_three_is_not_confirmed(gate.classify_exit)
 
 
 def test_run_fails_every_nonzero_exit_and_names_a_tree_it_could_not_read(

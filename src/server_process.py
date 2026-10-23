@@ -311,8 +311,7 @@ def resolve_ownership(running: bool, port: int) -> str:
 
     Factored out of :func:`ownership` so :mod:`backend_process` — which
     tracks a *dict* of per-model states instead of one singleton — can
-    reuse the identical decision instead of reimplementing it per model
-    (issue #242).
+    reuse the identical decision instead of reimplementing it per model.
     """
     if running:
         return OWNERSHIP_OURS

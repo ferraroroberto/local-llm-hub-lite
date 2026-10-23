@@ -22,7 +22,7 @@ export async function fetchPlaygroundModels() {
   } catch (_) { /* ignore */ }
 }
 
-/* Hidden-input file picker (#215): a ghost "Choose file" button proxies the
+/* Hidden-input file picker: a ghost "Choose file" button proxies the
  * native input; the selected filename shows in the label to its right. */
 function wireFilePicker(input, btn, nameEl) {
   if (!input || !btn) return;

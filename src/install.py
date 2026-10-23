@@ -270,7 +270,7 @@ def _check_ports() -> List[Check]:
 
 # ---------- report + fixes ----------
 
-# Brief cache for run_all_checks(use_cache=True) (issue #198). The battery
+# Brief cache for run_all_checks(use_cache=True). The battery
 # shells out to `nvidia-smi` / `llama-server --version` via blocking
 # subprocess.run and "can pin the entire uvicorn worker for
 # seconds" (see app_web/routers/hub.py's install_status docstring) — yet

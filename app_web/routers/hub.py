@@ -114,10 +114,9 @@ def _spawn_respawn_watchdog() -> None:
 
     The relaunch is made the way ``src/server_process.start()`` spawns the
     hub — never a bare ``pythonw`` with no stdout. The actual wait/relaunch
-    logic lives in ``src/_respawn_watchdog.py`` (issue #198 — this used to
-    be a ~60-line string literal built up line-by-line and fed to
-    ``python -c``, invisible to lint/type-check and one quoting slip away
-    from a silently-failed restart). That module is deliberately
+    logic lives in ``src/_respawn_watchdog.py`` as a real module instead of
+    a string literal fed to ``python -c``, so it stays visible to
+    lint/type-check. That module is deliberately
     stdlib-only with no import from any other ``src.*`` module: it's the
     thing recovering *from* a broken deploy, so it can't assume the rest
     of the hub's package still imports cleanly — only its own module and
@@ -130,7 +129,7 @@ def _spawn_respawn_watchdog() -> None:
     logger.info("🔄 respawn watchdog: relaunch log → %s", log_path)
     # Same flags src.server_process.start() uses for the hub itself —
     # DETACHED_PROCESS is deliberately omitted, it's mutually exclusive
-    # with CREATE_NO_WINDOW per the Win32 CreateProcess docs (#282/#283).
+    # with CREATE_NO_WINDOW per the Win32 CreateProcess docs.
     creationflags = WIN_NEW_GROUP
     # Capture the watchdog's own stdout/stderr to the same log so a
     # failure *before* it opens its own handle (e.g. a bad argv) is still
@@ -255,7 +254,7 @@ async def install_status() -> Dict[str, Any]:
 async def install_fix(request: Request) -> Dict[str, Any]:
     """Run a single fix by ``fix_id``.
 
-    Uses the brief use_cache=True report (issue #198): the admin UI always
+    Uses the brief use_cache=True report: the admin UI always
     calls install_status() — which populates that cache — moments before a
     user clicks a fix button, so locating one check by fix_id doesn't need
     to force a second full (expensive) battery run.

@@ -56,8 +56,8 @@ def _whisper_model_for_request(model_name: str) -> Model:
     * No ``model=``, a role alias (``audio_transcribe``), or a name the
       registry has never heard of (OpenAI clients must send something, and
       the SDK's default is ``whisper-1``) → the single local whisper model.
-    * An explicit **known** model id/alias (matched case-insensitively,
-      #412) must actually be the whisper model — a known id this hub cannot
+    * An explicit **known** model id/alias (matched case-insensitively)
+      must actually be the whisper model — a known id this hub cannot
       serve gets a distinct 400/503 rather than being silently answered by
       a different model.
 
@@ -113,7 +113,7 @@ def _whisper_model_for_request(model_name: str) -> Model:
 
 
 def _observable_audio_error(exc: HTTPException, ctx, requested: str) -> HTTPException:
-    """Make an audio *failure* as observable as an audio success (#412).
+    """Make an audio *failure* as observable as an audio success.
 
     A strict rejection is precisely the event an operator has to be able to
     see, yet it used to be the least visible thing the hub emitted: the reject
@@ -140,7 +140,7 @@ async def _proxy_audio(request: Request, *, ctx_path: str) -> Response:
     The whisper-server already speaks the OpenAI ``/v1/audio/*`` shape, so we
     forward the bytes and pass the response back — the point of going through
     the hub is the observability ring. Who served is stamped on the request
-    record and echoed in the response headers (#412).
+    record and echoed in the response headers.
     """
     body = await request.body()
 
@@ -153,7 +153,7 @@ async def _proxy_audio(request: Request, *, ctx_path: str) -> Response:
     # serialize plain form fields before the file part, so ``model``
     # lands in the head). Fall back to the whole body if it's not there:
     # a client that puts a large file *before* the model field would
-    # otherwise misroute (#128).
+    # otherwise misroute.
     model_name = ""
     try:
         pattern = rb'name="model"\r?\n\r?\n([^\r\n]+)'
@@ -168,7 +168,7 @@ async def _proxy_audio(request: Request, *, ctx_path: str) -> Response:
     except Exception:  # noqa: BLE001
         pass
 
-    # Stamp the observability context *before* anything below can raise (#412).
+    # Stamp the observability context *before* anything below can raise.
     # A strict rejection is the event that most needs to be visible, and the
     # middleware cannot fill these in for a multipart request.
     ctx = getattr(request.state, "obs_ctx", None)
@@ -194,13 +194,13 @@ async def _dispatch_audio(
 
     Split out of :func:`_proxy_audio` purely so every ``HTTPException``
     raised on the way is funnelled through one observability wrapper
-    instead of each raise site remembering to stamp the context (#412).
+    instead of each raise site remembering to stamp the context.
     """
     import httpx as _httpx
 
     target = _whisper_model_for_request(model_name)
 
-    # On-demand lifecycle (#422): a cold ``startup: on_demand`` whisper
+    # On-demand lifecycle: a cold ``startup: on_demand`` whisper
     # backend is spawned here and the request blocks until it answers
     # (distinct 503 on load failure). No-op for eager rows. Off-loop —
     # ensure_ready blocks polling readiness.
@@ -221,7 +221,7 @@ async def _dispatch_audio(
     except _httpx.HTTPError as exc:
         raise _audio_upstream_error(exc, backend="whisper-server", port=target.port)
 
-    # Who served (#412): the single local backend, on the active host.
+    # Who served: the single local backend, on the active host.
     served_model = target.id
     try:
         from .host_profile import resolve as _resolve_host
@@ -264,7 +264,7 @@ async def audio_transcriptions(request: Request) -> Response:
 @router.get("/v1/audio/health")
 def audio_health() -> Response:
     """Probe-only liveness of the audio backend — lets a consumer preflight
-    instead of discovering an outage one failed transcription at a time (#147).
+    instead of discovering an outage one failed transcription at a time.
 
     Reports the enabled whisper backend with its port and whether it is
     currently reachable (a cheap GET to the backend, never a transcription).

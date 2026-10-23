@@ -1,7 +1,7 @@
 """FastAPI startup/shutdown lifecycle wiring + the background resource
 sampler for the hub app.
 
-Extracted out of ``server.py`` (issue #198) — startup/shutdown event bodies
+Extracted out of ``server.py`` — startup/shutdown event bodies
 and the 2s-tick resource sampler live here so ``server.py`` stays app
 construction + route registration.
 
@@ -34,7 +34,7 @@ async def stop_background_tasks() -> None:
     On a real process exit this wouldn't matter (the OS reclaims everything),
     but the ASGI lifespan also tears down on every ``with TestClient(app) as
     c:`` exit in the test suite -- a still-running loop task would otherwise
-    keep mutating module-global state in a torn-down loop (issue #416)."""
+    keep mutating module-global state in a torn-down loop."""
     tasks, _BACKGROUND_TASKS[:] = list(_BACKGROUND_TASKS), []
     if not tasks:
         return
@@ -104,7 +104,7 @@ async def wire_observatory_loop() -> None:
     # The hub owns configured backend autostart so every launch surface
     # (tray, run_hub.bat, python -m src.run_backend hub) behaves the same.
     _BACKGROUND_TASKS.append(loop.create_task(_autostart_configured_backends()))
-    # On-demand idle watchdog (issue #422): periodically unloads a
+    # On-demand idle watchdog: periodically unloads a
     # ``startup: on_demand`` model that has sat idle past its
     # ``idle_unload_minutes`` window. Cheap when no row opts in — the pass
     # scans the registry and finds no candidates.
@@ -133,7 +133,7 @@ async def _autostart_configured_backends() -> None:
 
 
 async def _on_demand_idle_loop() -> None:
-    """Idle unload for ``startup: on_demand`` models (issue #422).
+    """Idle unload for ``startup: on_demand`` models.
 
     Thin lifecycle shim — the sweep cadence, the idle decision, and the
     in-flight guard live in ``src.on_demand`` (``idle_unload_loop``),
@@ -150,7 +150,7 @@ async def _on_demand_idle_loop() -> None:
 async def _resource_sampler() -> None:
     """Background task that samples RAM + CPU + GPU usage every 2 s.
 
-    The sampling itself runs in a worker thread (#392): ``gpu_stats()``
+    The sampling itself runs in a worker thread: ``gpu_stats()``
     shells out to nvidia-smi, which stalls for seconds when the GPU is
     busy serving models — calling it inline here blocked the whole event
     loop every 2 s, and any HTTP client with a 5 s timeout (the e2e

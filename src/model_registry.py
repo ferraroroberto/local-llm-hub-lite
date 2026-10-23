@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from .host_profile import HostProfile, _load_config, resolve as resolve_host
 
-# ``startup:`` policy values (#422) — see the field docstring on ``Model``.
+# ``startup:`` policy values — see the field docstring on ``Model``.
 STARTUP_EAGER = "eager"
 STARTUP_ON_DEMAND = "on_demand"
 
@@ -47,11 +47,11 @@ class Model:
     # Owning host id — a bare ``host: <id>`` in the YAML. Unset means "local
     # everywhere" (which, on a single-host config, is the same thing).
     host: Optional[str] = None
-    # Rough static GPU-VRAM footprint in MB (#375) — enough for the on-demand
+    # Rough static GPU-VRAM footprint in MB — enough for the on-demand
     # overcommit warning, NOT live telemetry. CPU-only / virtual rows are 0;
     # a None value contributes 0 to any sum.
     est_vram_mb: Optional[int] = None
-    # Process-lifecycle policy (#422). ``eager`` (the default) means the
+    # Process-lifecycle policy. ``eager`` (the default) means the
     # model is autostarted with the hub. ``on_demand`` means nothing starts
     # it eagerly: the first request that routes to it spawns the backend
     # (the request waits for readiness), and ``src.on_demand``'s idle
@@ -83,7 +83,7 @@ class Model:
 
 
 def _parse_startup(row: Dict) -> str:
-    """Normalize a row's ``startup:`` to a known policy (#422).
+    """Normalize a row's ``startup:`` to a known policy.
 
     Anything other than the literal ``on_demand`` reads as ``eager`` — a
     typo'd value must degrade to the always-on behavior, never to a
@@ -165,11 +165,11 @@ def launchable_local_ids(host: Optional[HostProfile] = None) -> List[str]:
 
 def desired_model_ids(host: Optional[HostProfile] = None) -> List[str]:
     """The models ``host`` should be running right now, derived from the
-    registry (#430) — no separate desired-state file.
+    registry — no separate desired-state file.
 
     A model belongs to the desired running set when it is launchable here
     (enabled ∧ spawnable ∧ non-virtual, exactly ``launchable_local_ids``)
-    and declares ``startup: eager`` (#422 — ``on_demand`` rows are never
+    and declares ``startup: eager`` (``on_demand`` rows are never
     desired; ``src.on_demand`` owns their lifecycle). This one derivation
     feeds hub autostart on boot
     (``server_lifecycle._autostart_configured_backends``).
@@ -205,7 +205,7 @@ def resolve_any(name: str) -> Optional[Model]:
     The host-blind companion to :func:`resolve`. Answers a different question:
     not "can I serve this here?" but "is this name one of *our* model ids at
     all?". The audio proxy needs exactly that distinction to keep an explicit
-    ``model=`` strict (issue #412): a configured id that can't be served here
+    ``model=`` strict: a configured id that can't be served here
     must fail loudly rather than be answered by a different model, while a
     name the registry has never heard of (a client-side placeholder like
     OpenAI's ``whisper-1``) is not a model request at all and still addresses

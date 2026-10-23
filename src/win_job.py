@@ -1,4 +1,4 @@
-"""Windows Job Object containment for hub subprocesses (#468).
+"""Windows Job Object containment for hub subprocesses.
 
 The single implementation of "assign a child to a job that kills its whole
 membership when the last handle closes". Caller: ``tests/e2e``'s
@@ -16,7 +16,7 @@ behaviour (``inherit_running_backends``). It's wrong for a throwaway test
 hub: the fixture's teardown only ``proc.terminate()``s the hub PID itself,
 which never reaches a grandchild in a different process group, so the
 backend outlives the hub that spawned it and pins the worktree it's
-rooted in (#468).
+rooted in.
 
 A Windows Job Object fixes this without caring about process-group
 boundaries: assigning the hub's ``Popen`` to a job created with
@@ -175,11 +175,12 @@ def terminate_and_close(job_handle: Optional[int]) -> None:
 
     Explicit ``TerminateJobObject`` gives immediate, deterministic cleanup
     on the happy path (a clean fixture teardown) and reaches a member whose
-    immediate parent has already exited — the exact shape of #468's
-    incident. The ``KILL_ON_JOB_CLOSE`` flag set at creation is what makes
-    the same cleanup happen automatically if this line is never reached at
-    all (the caller itself killed mid-run) — Windows closes a dying
-    process's handles for it. No-op if ``job_handle`` is ``None``.
+    immediate parent has already exited — the exact grandchild-outlives-
+    parent shape this module exists to close. The ``KILL_ON_JOB_CLOSE`` flag
+    set at creation is what makes the same cleanup happen automatically if
+    this line is never reached at all (the caller itself killed mid-run) —
+    Windows closes a dying process's handles for it. No-op if ``job_handle``
+    is ``None``.
     """
     if not _IS_WINDOWS or not job_handle:
         return

@@ -3,9 +3,7 @@
 Constructing an ``httpx.Client`` / ``httpx.AsyncClient`` is **expensive** —
 each construction builds an SSL context and a fresh connection pool. On the
 reference Windows box that measured ~0.26 s *per construction*, independent of
-the request itself (a reused client answers a loopback call in ~1 ms). The hub
-used to build a new client on every proxied / upstream call, so every request
-paid that ~0.26 s tax on top of the actual work (issue #165).
+the request itself (a reused client answers a loopback call in ~1 ms).
 
 These module-level singletons are built once and reused for the lifetime of
 the process, so each call pays ~1 ms instead. Both are created lazily — the
@@ -42,7 +40,7 @@ _sync_client: Optional[httpx.Client] = None
 # (never awaits between check and assignment, so race-free under asyncio),
 # this one is called from real OS threads in a threadpool, where two
 # concurrent first-callers could otherwise both construct a client and leak
-# the loser's connection pool (issue #297).
+# the loser's connection pool.
 _sync_client_lock = threading.Lock()
 
 

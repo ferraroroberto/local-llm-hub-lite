@@ -39,8 +39,8 @@ def main() -> int:
     try:
         from .single_instance import SingleInstance
 
-        # In-process named-mutex single-instance (project-scaffolding#39),
-        # replacing the former PID-file lock. Held for the tray's lifetime
+        # In-process named-mutex single-instance, replacing the former
+        # PID-file lock. Held for the tray's lifetime
         # (tray_main blocks); the OS frees the mutex on exit.
         instance = SingleInstance(r"Global\local-llm-hub-tray")
         if not instance.acquired:

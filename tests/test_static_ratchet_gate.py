@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import sys
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -28,17 +29,21 @@ def _fake_script(tmp_path: Path, code: int, message: str = "") -> Path:
     return script
 
 
-def test_only_exit_zero_passes() -> None:
-    assert gate.classify_exit(0)[0] is True
-    for code in (1, 2, 3, 4, -1):
-        assert gate.classify_exit(code)[0] is False, code
+def assert_only_zero_passes_and_three_is_not_confirmed(
+    classify_exit: Callable[[int], tuple[bool, str]],
+) -> None:
+    """Shared shape every ratchet-gate wrapper's `classify_exit` must hold:
+    only 0 passes, and 3 (a detector/file could not be read) is NOT CONFIRMED,
+    never folded into a pass or a skip. The static/docs/comment ratchet gates
+    all reuse this instead of re-asserting it per module."""
+    verdicts = {code: classify_exit(code) for code in (-1, 0, 1, 2, 3, 4)}
+    assert [code for code, (ok, _) in verdicts.items() if ok] == [0]
+    assert "NOT CONFIRMED" in verdicts[3][1]
+    assert "skip" not in verdicts[3][1].lower()
 
 
-def test_exit_three_is_not_confirmed_and_never_a_skip() -> None:
-    ok, label = gate.classify_exit(3)
-    assert not ok
-    assert "NOT CONFIRMED" in label
-    assert "skip" not in label.lower()
+def test_only_exit_zero_passes_and_exit_three_is_never_a_skip() -> None:
+    assert_only_zero_passes_and_three_is_not_confirmed(gate.classify_exit)
 
 
 @pytest.mark.parametrize(("code", "expected"), [(0, 0), (1, 1), (2, 1), (3, 1)])
