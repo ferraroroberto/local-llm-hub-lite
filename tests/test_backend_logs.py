@@ -17,10 +17,8 @@ tmp dir so we never touch the repo's ``data/logs``.
 
 from __future__ import annotations
 
-import os
 import sys
 
-os.environ.setdefault("LOCAL_LLM_HUB_HOST", "local")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -39,9 +37,7 @@ def _echo_cmd(token: str) -> list[str]:
 
 
 class _FakeModel:
-    """Minimal stand-in for a registry row on the spawn path — unowned
-    (``host=None``) so ``start()``'s ownership guard lets it through."""
-    host = None
+    """Minimal stand-in for a registry row on the spawn path."""
     port = None
 
 
@@ -71,6 +67,37 @@ def test_start_captures_stdout_to_per_backend_file(monkeypatch, tmp_path):
     assert log_file.exists()
     assert "HELLO_LOG" in log_file.read_text(encoding="utf-8")
     assert any("HELLO_LOG" in ln for ln in bp.log_lines("xqwen"))
+
+
+def test_start_reports_launch_failure(monkeypatch, tmp_path):
+    _patch_spawn(monkeypatch, tmp_path, "unused")
+
+    def boom(*a, **k):
+        raise OSError("no such binary")
+
+    monkeypatch.setattr(bp.subprocess, "Popen", boom)
+
+    ok, msg = bp.start("xfail")
+    assert not ok
+    assert msg == "failed to launch: no such binary"
+    assert bp._state_for("xfail").proc is None
+
+
+def test_stop_terminates_a_spawned_backend(monkeypatch, tmp_path):
+    _patch_spawn(monkeypatch, tmp_path, "unused")
+    monkeypatch.setattr(
+        bp, "build_command",
+        lambda m: [sys.executable, "-c", "import time; time.sleep(60)"],
+    )
+
+    ok, msg = bp.start("xstop")
+    assert ok, msg
+    proc = bp._state_for("xstop").proc
+    assert proc is not None and proc.poll() is None
+
+    assert bp.stop("xstop") == (True, "stopped")
+    assert proc.poll() is not None
+    assert bp._state_for("xstop").proc is None
 
 
 def test_start_rolls_previous_log_to_backup(monkeypatch, tmp_path):

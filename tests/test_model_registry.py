@@ -5,63 +5,31 @@ from __future__ import annotations
 from src import host_profile, model_registry
 
 
-def test_resolves_hostname_match(monkeypatch, write_config):
+def test_enabled_models_follow_the_hosts_enabled_list(write_config):
     write_config({
         "hub": {"port": 8000},
-        "hosts": {
-            "pc":  {"platform": "win32", "hostname": "TEST-PC", "enabled": ["qwen"]},
-            "mac": {"platform": "darwin", "default": True, "enabled": []},
-        },
+        "hosts": {"local": {"enabled": ["qwen"]}},
         "models": {
             "qwen": {"display_name": "qwen3.5-9b", "backend": "openai", "port": 8081},
             "other": {"display_name": "other-model", "backend": "openai", "port": 8082},
         },
     })
-    monkeypatch.delenv("LOCAL_LLM_HUB_HOST", raising=False)
-    monkeypatch.setattr("socket.gethostname", lambda: "test-pc")
 
     prof = host_profile.resolve()
-    assert prof.id == "pc"
+    assert prof.id == "local"
     assert prof.enabled == ["qwen"]
 
     ids = {m.id for m in model_registry.enabled_models()}
     assert ids == {"qwen"}   # only the enabled row surfaces
 
 
-def test_env_override_wins(monkeypatch, write_config):
+def test_desired_model_ids_filters_to_launchable_eager_rows(write_config):
+    """The desired set derives from the registry — eager ∧ launchable.
+    Virtual aliases, non-enabled rows, and unknown ids can never appear."""
     write_config({
         "hub": {"port": 8000},
-        "hosts": {
-            "pc":  {"platform": "win32", "default": True, "enabled": ["qwen", "glm"]},
-            "mac": {"platform": "darwin", "enabled": ["qwen"]},
-        },
+        "hosts": {"pc": {"enabled": ["qwen", "qwen_virtual", "whisp"]}},
         "models": {
-            "qwen": {"display_name": "qwen3.5-9b", "backend": "openai", "port": 8081},
-            "glm":  {"display_name": "glm-4.5-air", "backend": "openai", "port": 8082},
-        },
-    })
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "mac")
-
-    prof = host_profile.resolve()
-    assert prof.id == "mac"
-    ids = {m.id for m in model_registry.enabled_models()}
-    assert "glm" not in ids
-    assert "qwen" in ids
-
-
-def test_desired_model_ids_filters_to_launchable_eager_rows(monkeypatch, write_config):
-    """#430: the desired set derives from the registry — eager ∧ launchable.
-    Virtual aliases, other-host rows, and unknown ids can never appear; an
-    unowned eager row (no ``host:`` = local everywhere) is included."""
-    write_config({
-        "hub": {"port": 8000},
-        "hosts": {
-            "pc": {"platform": "win32", "default": True,
-                   "enabled": ["qwen", "qwen_virtual", "whisp", "remote"]},
-            "mac": {"platform": "darwin", "enabled": ["remote"]},
-        },
-        "models": {
-            # Unowned (no host:) → local everywhere it is enabled.
             "qwen": {"display_name": "qwen3.5-9b", "backend": "openai", "port": 8081},
             "qwen_virtual": {
                 "display_name": "qwen3.5-9b-nothink", "backend": "openai",
@@ -69,52 +37,34 @@ def test_desired_model_ids_filters_to_launchable_eager_rows(monkeypatch, write_c
             },
             "whisp": {"display_name": "w", "backend": "whisper",
                       "engine": "whisper-server", "port": 8090},
-            # Cross-enabled here but owned by mac — never desired here.
-            "remote": {"display_name": "r", "backend": "openai", "port": 8082,
-                       "host": "mac"},
             "disabled": {"display_name": "gemma", "backend": "openai", "port": 8087},
         },
     })
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "pc")
 
     # Order follows the YAML `models:` mapping — safe_dump sorts keys here.
     assert model_registry.desired_model_ids() == ["qwen", "whisp"]
 
 
-def test_launchable_local_ids_excludes_remote_virtual_and_nonspawnable(monkeypatch, write_config):
+def test_launchable_local_ids_excludes_virtual_and_nonspawnable(write_config):
     """The bulk launchers (run_all.*) enumerate this. It must honour every
     rule run_backend enforces: only enabled rows, only spawnable backends
-    (openai/whisper), drop virtual aliases, and drop rows owned by another
-    host (cross-enabled but not run here).
+    (openai/whisper), and no virtual aliases.
     """
     write_config({
         "hub": {"port": 8000},
-        "hosts": {
-            "pc":  {"platform": "win32", "default": True,
-                    "enabled": ["local_llm", "virt", "whisp", "remote"]},
-            "mac": {"platform": "darwin",
-                    "enabled": ["local_llm", "virt", "whisp", "remote"]},
-        },
+        "hosts": {"pc": {"enabled": ["local_llm", "virt", "whisp", "tts"]}},
         "models": {
             "local_llm": {"display_name": "local", "backend": "openai", "port": 8081},
             "virt": {"display_name": "virt", "backend": "openai", "port": 8081,
                      "virtual": True},
             "whisp": {"display_name": "w", "backend": "whisper", "engine": "whisper-server",
                       "port": 8090},
-            # Cross-enabled here but owned by mac — never spawned locally.
-            "remote": {"display_name": "r", "backend": "openai", "port": 8082,
-                       "host": "mac"},
+            "tts": {"display_name": "t", "backend": "tts", "port": 8096},
+            "unlisted": {"display_name": "u", "backend": "openai", "port": 8082},
         },
     })
 
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "pc")
-    ids = model_registry.launchable_local_ids()
-    assert ids == ["local_llm", "whisp"]          # virt/remote both dropped
-
-    # On the owning host, the previously-remote row becomes launchable.
-    # (Order follows the YAML `models:` mapping — safe_dump sorts keys here.)
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "mac")
-    assert model_registry.launchable_local_ids() == ["local_llm", "remote", "whisp"]
+    assert model_registry.launchable_local_ids() == ["local_llm", "whisp"]
 
 
 def test_resolve_by_alias(monkeypatch, write_config):
@@ -132,7 +82,6 @@ def test_resolve_by_alias(monkeypatch, write_config):
             },
         },
     })
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "pc")
 
     m = model_registry.resolve("qwen3.5")
     assert m is not None
@@ -140,44 +89,28 @@ def test_resolve_by_alias(monkeypatch, write_config):
     assert model_registry.resolve("nonexistent") is None
 
 
-def test_gemma_per_host_filtering(monkeypatch, write_config):
-    """Both gemma4 rows must show on tower and stay hidden on mac-mini-m4."""
+def test_resolve_ignores_rows_the_host_does_not_enable(write_config):
     write_config({
         "hub": {"port": 8000},
-        "hosts": {
-            "tower":     {"platform": "win32", "default": True, "enabled": ["qwen", "glm", "gemma4_e4b", "gemma4_26b"]},
-            "mac-mini-m4": {"platform": "darwin", "enabled": ["qwen"]},
-        },
+        "hosts": {"tower": {"enabled": ["qwen", "gemma4_e4b"]}},
         "models": {
             "qwen":       {"display_name": "qwen3.5-9b",        "backend": "openai", "port": 8081},
-            "glm":        {"display_name": "glm-4.5-air",       "backend": "openai", "port": 8082},
             "gemma4_e4b": {"display_name": "gemma4-e4b-it",     "backend": "openai", "port": 8086},
             "gemma4_26b": {"display_name": "gemma4-26b-a4b-it", "backend": "openai", "port": 8087},
         },
     })
 
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "tower")
-    names_pc = {m.display_name for m in model_registry.enabled_models()}
-    assert {"qwen3.5-9b", "glm-4.5-air", "gemma4-e4b-it", "gemma4-26b-a4b-it"} <= names_pc
+    names = {m.display_name for m in model_registry.enabled_models()}
+    assert names == {"qwen3.5-9b", "gemma4-e4b-it"}
     assert model_registry.resolve("gemma4-e4b-it").port == 8086
-    assert model_registry.resolve("gemma4-26b-a4b-it").port == 8087
-
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "mac-mini-m4")
-    names_mac = {m.display_name for m in model_registry.enabled_models()}
-    assert "gemma4-e4b-it" not in names_mac
-    assert "gemma4-26b-a4b-it" not in names_mac
-    assert model_registry.resolve("gemma4-e4b-it") is None
     assert model_registry.resolve("gemma4-26b-a4b-it") is None
 
 
 def test_whisper_entry(monkeypatch, write_config):
-    """Whisper is a distinct backend; runs on 8090, surfaces on tower only."""
+    """Whisper is a distinct backend that runs on 8090."""
     write_config({
         "hub": {"port": 8000},
-        "hosts": {
-            "tower":     {"platform": "win32", "default": True, "enabled": ["qwen", "whisper"]},
-            "mac-mini-m4": {"platform": "darwin", "enabled": ["qwen"]},
-        },
+        "hosts": {"tower": {"enabled": ["qwen", "whisper"]}},
         "models": {
             "qwen":    {"display_name": "qwen3.5-9b",    "backend": "openai",  "port": 8081},
             "whisper": {
@@ -193,7 +126,6 @@ def test_whisper_entry(monkeypatch, write_config):
         },
     })
 
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "tower")
     m = model_registry.resolve("whisper-large-v3-turbo")
     assert m is not None
     assert m.id == "whisper"
@@ -202,9 +134,6 @@ def test_whisper_entry(monkeypatch, write_config):
     assert m.port == 8090
     assert m.url == "http://127.0.0.1:8090/v1"
     assert "--gpu" in m.args
-
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "mac-mini-m4")
-    assert model_registry.resolve("whisper-large-v3-turbo") is None
 
 
 def test_resolve_by_registry_id(monkeypatch, write_config):
@@ -237,7 +166,6 @@ def test_resolve_by_registry_id(monkeypatch, write_config):
             },
         },
     })
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "pc")
 
     # Resolve via every channel: id, display_name, alias — all three
     # land on the same model.
@@ -286,7 +214,6 @@ def test_virtual_nothink_alias_shares_backend(monkeypatch, write_config):
             },
         },
     })
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "pc")
 
     # Resolves via id, display_name, and role alias — all to the same row,
     # pointing at qwen's running backend (no own port/process).
@@ -315,7 +242,6 @@ def test_model_url_from_port(monkeypatch, write_config):
             "qwen": {"display_name": "qwen3.5-9b", "backend": "openai", "port": 8081},
         },
     })
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "pc")
 
     m = model_registry.resolve("qwen3.5-9b")
     assert m.url == "http://127.0.0.1:8081/v1"
@@ -343,7 +269,6 @@ def test_startup_and_idle_unload_fields(monkeypatch, write_config):
             },
         },
     })
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "pc")
 
     gemma = model_registry.resolve("gemma4-26b-a4b-it")
     assert gemma.startup == model_registry.STARTUP_ON_DEMAND
@@ -374,7 +299,6 @@ def test_desired_model_ids_excludes_on_demand_rows(monkeypatch, write_config):
             },
         },
     })
-    monkeypatch.setenv("LOCAL_LLM_HUB_HOST", "pc")
 
     assert model_registry.desired_model_ids() == ["qwen"]
 

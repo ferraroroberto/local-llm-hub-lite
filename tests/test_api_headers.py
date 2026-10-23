@@ -16,9 +16,6 @@ under test here — which is exactly the path that would otherwise have left
 
 from __future__ import annotations
 
-import os
-
-os.environ.setdefault("LOCAL_LLM_HUB_HOST", "local")
 
 from fastapi.testclient import TestClient
 

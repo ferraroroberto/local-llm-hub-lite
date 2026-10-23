@@ -65,12 +65,6 @@ def _run_backend(model_id: str) -> int:
     if model.backend not in ("openai", "whisper"):
         log.error("model %r is backend=%s; nothing to spawn", model_id, model.backend)
         return 2
-    if model.host and model.host != host.id:
-        log.error(
-            "model %r is owned by host %r, not %r — run it there",
-            model_id, model.host, host.id,
-        )
-        return 2
 
     # Same adopt-check as the hub: skip if something already answers on
     # this model's port.

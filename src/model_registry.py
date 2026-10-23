@@ -1,12 +1,10 @@
-"""Load models.yaml and expose typed entries filtered by the active host.
+"""Load models.yaml and expose typed entries filtered by the host's ``enabled:`` list.
 
 One source of truth for: which models exist, how to launch them, which
 port they listen on, and how the hub should route by model-name alias.
 
-Lite fork: single-host only. A row may still carry a bare ``host:`` (or
-none — "local"), but there are no ordered host chains, no CPU-offload
-tiers, and no fleet placement. The ``hosts:`` block in the YAML holds
-exactly one row (with ``default: true`` and an ``enabled:`` list).
+Single-host: the ``hosts:`` block in the YAML holds exactly one row with an
+``enabled:`` list.
 """
 
 from __future__ import annotations
@@ -44,9 +42,6 @@ class Model:
     # the no-think alias to deliver ``chat_template_kwargs={enable_thinking:
     # false}`` to clients that can't send it themselves.
     inject_extra: Optional[Dict[str, Any]] = None
-    # Owning host id — a bare ``host: <id>`` in the YAML. Unset means "local
-    # everywhere" (which, on a single-host config, is the same thing).
-    host: Optional[str] = None
     # Rough static GPU-VRAM footprint in MB — enough for the on-demand
     # overcommit warning, NOT live telemetry. CPU-only / virtual rows are 0;
     # a None value contributes 0 to any sum.
@@ -107,7 +102,6 @@ def _row_to_model(model_id: str, row: Dict) -> Model:
         args=list(row.get("args", []) or []),
         virtual=bool(row.get("virtual", False)),
         inject_extra=row.get("inject_extra") or None,
-        host=str(row["host"]) if row.get("host") else None,
         est_vram_mb=int(row["est_vram_mb"]) if row.get("est_vram_mb") is not None else None,
         startup=_parse_startup(row),
         idle_unload_minutes=(
@@ -132,16 +126,6 @@ def enabled_models(host: Optional[HostProfile] = None) -> List[Model]:
     return [m for m in all_models() if m.id in whitelist]
 
 
-def local_models(host: Optional[HostProfile] = None) -> List[Model]:
-    """``enabled_models()`` filtered to rows this host may actually run —
-    excludes any row whose ``host:`` names a different machine. The
-    generalization of "give me the models I might spawn, manage, download
-    weights for, or health-check": install checks, port-liveness checks,
-    spawn/inherit loops, tray menus."""
-    profile = host or resolve_host()
-    return [m for m in enabled_models(host) if not m.host or m.host == profile.id]
-
-
 # Backends that own a spawnable local process. A `virtual` row shares
 # another model's process. Everything a `run_backend <id>` can actually
 # start is one of these engines and non-virtual.
@@ -151,14 +135,14 @@ _SPAWNABLE_BACKENDS = ("openai", "whisper")
 def launchable_local_ids(host: Optional[HostProfile] = None) -> List[str]:
     """Ids of models this host can actually spawn as its own local process.
 
-    ``local_models()`` narrowed to rows with a spawnable backend, dropping
+    ``enabled_models()`` narrowed to rows with a spawnable backend, dropping
     virtual aliases (which share another row's process). This is exactly the
     set ``run_backend <id>`` starts without erroring — the single source the
     bulk launchers enumerate so they can never drift from the active host's
     ``enabled:`` contract.
     """
     return [
-        m.id for m in local_models(host)
+        m.id for m in enabled_models(host)
         if m.backend in _SPAWNABLE_BACKENDS and not m.virtual
     ]
 

@@ -13,9 +13,6 @@ Two coupled fixes (issue #46, also resolving the #39 reachability finding):
 
 from __future__ import annotations
 
-import os
-
-os.environ.setdefault("LOCAL_LLM_HUB_HOST", "local")
 
 import wave  # noqa: E402
 from io import BytesIO  # noqa: E402

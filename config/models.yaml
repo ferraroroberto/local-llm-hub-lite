@@ -23,8 +23,6 @@
 #                  payload on every /v1/chat/completions call for this id
 #                  (caller-sent fields win) — the mechanism behind a
 #                  no-think alias
-#   host           owning host id (bare `host: <id>`); unset means "local
-#                  everywhere", the same thing on a single-host config
 
 hub:
   port: 8000
@@ -37,9 +35,6 @@ tray:
 
 hosts:
   local:
-    platform: win32
-    default: true
-    display_name: this machine
     enabled: [qwen35_4b, whisper]
 
 models:

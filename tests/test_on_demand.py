@@ -136,7 +136,7 @@ def test_vram_check_skips_ceilingless_hosts(monkeypatch):
 # Idle-unload decision
 # --------------------------------------------------------------------------- #
 def _wire_sweep(monkeypatch, models, running=True):
-    monkeypatch.setattr(model_registry, "local_models", lambda host=None: models)
+    monkeypatch.setattr(model_registry, "enabled_models", lambda host=None: models)
     monkeypatch.setattr(bp, "is_running", lambda mid: running)
     stopped: list[str] = []
     monkeypatch.setattr(bp, "stop", lambda mid: (stopped.append(mid), (True, "stopped"))[1])

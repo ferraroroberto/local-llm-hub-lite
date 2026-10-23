@@ -41,7 +41,7 @@ import pystray
 import yaml
 
 from src.host_profile import CONFIG_PATH, hub_port
-from src.model_registry import Model, local_models
+from src.model_registry import Model, enabled_models
 from src.no_window import NO_WINDOW
 from src.server_process import WIN_NEW_GROUP
 from src.webapp_config import append_auth_token, ensure_auth_token, load_webapp_config
@@ -211,13 +211,9 @@ class TrayApp:
         self.hub = HubProcess()
         self._icon: Optional[pystray.Icon] = None
         self._stop_event = threading.Event()
-        # Remote-owned rows (m.host set to a *different* host, e.g. a
-        # Mac-hosted model cross-enabled here for hub routing) are excluded
-        # from the tray menu — the tray only launches/stops processes on
-        # this machine; use the admin webapp's Models tab to control a
-        # remote host's backend (it proxies there automatically).
+        # Menu entries are the enabled rows that run a local llama/whisper server.
         self._models: List[Model] = [
-            m for m in local_models() if m.backend in ("openai", "whisper")
+            m for m in enabled_models() if m.backend in ("openai", "whisper")
         ]
         # The webapp config holds the bearer token we append to copied URLs.
         # Generate one on first boot so we never have an unprotected non-

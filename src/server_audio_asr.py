@@ -42,9 +42,9 @@ _ROLE_ALIASES = {"audio_transcribe"}
 
 def _local_whisper() -> Optional[Model]:
     """The single locally-enabled whisper backend, or ``None``."""
-    from .model_registry import local_models
+    from .model_registry import enabled_models
 
-    for m in local_models():
+    for m in enabled_models():
         if m.backend == "whisper" and m.port:
             return m
     return None

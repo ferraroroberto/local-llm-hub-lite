@@ -9,9 +9,6 @@ that all ran token-less/loopback).
 
 from __future__ import annotations
 
-import os
-
-os.environ.setdefault("LOCAL_LLM_HUB_HOST", "local")
 
 from fastapi.testclient import TestClient
 
