@@ -1,18 +1,20 @@
 r"""Ratchet on issue-number narratives inside source-code comments.
 
 Catches the claude-md-drift class the docs ratchet (`scripts/docs_ratchet.py`)
-doesn't cover: upstream issue references (`#412`, `issue #198`,
-`home-automation#118`, ...) baked into `src/`, `app_web/`, `scripts/`,
+doesn't cover: upstream issue references (`#NNN`, `issue #NNN`,
+`other-repo#NNN`, ...) baked into `src/`, `app_web/`, `scripts/`,
 `tray/` and `launchers/` comments and docstrings, instead of the issue and
 git log the global CLAUDE.md says decision history belongs in. A reader who
 follows one of these numbers into *this* repo's tracker lands on nothing, or
-on an unrelated issue -- audit#53's finding, repeated across two consecutive
-audits.
+on an unrelated issue -- the recurring claude-md-drift audit finding that
+motivated this script.
 
 Counts the same `#<digits>` reference shape the docs ratchet uses (hex
 colors like `#1f2328` and HTML entities like `&#39;` are excluded by the same
 lookaround), per file, against a committed baseline: it fails only when a
-count *rises*. Existing debt never blocks work, but it cannot grow.
+count *rises*. Existing debt never blocks work, but it cannot grow. (This
+docstring deliberately spells examples as `#NNN` rather than real digits --
+real digits here would trip the scan below against its own source.)
 
 Scope: `git ls-files` restricted to `src/`, `app_web/`, `scripts/`, `tray/`,
 `launchers/`, extensions `.py .js .css .html .bat .sh .ps1`, minus every
@@ -70,7 +72,7 @@ SCOPE_EXTENSIONS = {".py", ".js", ".css", ".html", ".bat", ".sh", ".ps1"}
 # in a file (lowercase, a different word) never matches.
 _VENDORED_MARKER = re.compile(r"VENDORED (COPY|VERBATIM)")
 
-# Same shape + lookaround as docs_ratchet.py's `_REF`: `#123`, not preceded by
+# Same shape + lookaround as docs_ratchet.py's `_REF`: `#NNN`, not preceded by
 # `&`/`#`/`/` (entity, doubled hash, URL path) and not followed by a word
 # character or `-` (so `#1f2328` -- a hex color -- never matches: the digit
 # run stops at the first letter and the lookahead then rejects it).
