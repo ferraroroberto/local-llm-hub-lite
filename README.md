@@ -87,7 +87,7 @@ Status pill + uptime, the **install checks** card (with Fix buttons), **live req
 
 ### Models
 
-One card per registry row: engine, port, PID, live/reachable state, startup policy (`eager` / `on-demand · loaded` / `on-demand · idle-unloaded`), start/stop/force-stop, a log-tail drawer, and a ping button. The **roles card** shows which model currently fills each role (`agentic_light`, `agentic_heavy`, `audio.transcribe`).
+One card per registry row: backend, port, PID, live/reachable state, startup policy (`eager` / `on-demand · loaded` / `on-demand · idle-unloaded`), start/stop/force-stop, and a ping button. The SPA has no per-model log drawer — a managed backend's log tails to `data/logs/backend-<id>.log` (also readable via `GET /admin/api/models/{id}/log`), while the Hub tab's own log stream covers hub-level activity. The **roles card** shows which model currently fills each role (`agentic_light`, `agentic_heavy`, `audio.transcribe`).
 
 ### Playground
 
