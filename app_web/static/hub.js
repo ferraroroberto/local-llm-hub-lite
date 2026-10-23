@@ -1,6 +1,6 @@
 /* Hub tab — status card, install panel, live request stream,
  * counters, errors, log tail. The four diagnostic surfaces are vendored
- * disclosure cards, folded by default (#215).
+ * disclosure cards, folded by default.
  */
 
 import { els, state } from './state.js';
@@ -243,7 +243,7 @@ async function renderSparklines() {
   container.innerHTML = '';
   const history = stats.history || [];
   const g0 = stats.gpus && stats.gpus.length ? stats.gpus[0] : null;
-  // Utilization tiles on top, memory tiles on bottom (#288).
+  // Utilization tiles on top, memory tiles on bottom.
   const groups = [
     { label: 'CPU', value: stats.cpu && stats.cpu.percent, series: history.map(function (h) { return h.cpu_percent; }) },
   ];
@@ -274,7 +274,7 @@ function buildSparkline(g) {
       path += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
     });
   }
-  // Energy-tab chart look (#215): a 2px accent line over a translucent
+  // Energy-tab chart look: a 2px accent line over a translucent
   // accent area (fill closed down to the baseline). Both pull from the live
   // --accent token so the tiles re-theme for free.
   const area = path ? path + 'L' + w + ',' + h + ' L0,' + h + ' Z' : '';
@@ -289,4 +289,4 @@ function buildSparkline(g) {
 }
 
 
-/* escapeHtml / fmtClock live in api.js (sibling dedup, #211). */
+/* escapeHtml / fmtClock live in api.js — one shared definition. */

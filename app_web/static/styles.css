@@ -4,7 +4,7 @@
  * Fleet design system (~/.claude/design.md + design.dark.md). Token *names*
  * are this app's; their *values* are the spec's. Light = :root, dark =
  * [data-theme="dark"] (stamped pre-paint by the boot script in index.html;
- * the Hub-card sun/moon button flips it — local-llm-hub#211).
+ * the Hub-card sun/moon button flips it).
  * P3 wide-gamut (oklch) twins override the saturated tokens behind
  * @media (color-gamut: p3) below.
  *
@@ -89,8 +89,8 @@
   /* elevation — cards lean on surface + hairline border; only floating
      elements (toast) carry a real shadow. */
   --shadow: 0 8px 24px rgba(31, 35, 40, 0.12);
-  /* Mobile floating bottom tab bar — the phone-validated fleet geometry
-     (home-automation#118), consumed by _vendored/nav/nav-tabs.css. */
+  /* Mobile floating bottom tab bar — the phone-validated fleet geometry,
+     consumed by _vendored/nav/nav-tabs.css. */
   --bottom-tabs-height: 61px;
   --bottom-tabs-margin: 21px;
   --bottom-tabs-pill-height: 53px;
@@ -102,13 +102,13 @@
   --tabbar-border: rgba(31, 35, 40, 0.12);
   /* Follow the html[data-theme] stamp, not the OS: `light dark` here let the
      UA paint native widgets (checkboxes, selects) by OS preference, so a
-     dark-mode phone showed black checkboxes on the light theme (#428). The
+     dark-mode phone showed black checkboxes on the light theme. The
      boot script always stamps data-theme pre-paint, so this never flashes. */
   color-scheme: light;
 }
 
 [data-theme="dark"] {
-  color-scheme: dark;       /* native widgets match the stamped theme (#428) */
+  color-scheme: dark;       /* native widgets match the stamped theme */
   --bg: #0d1117;            /* canvas (GitHub dark canvas) */
   --card: #161b22;          /* elevated card surface */
   --card-off: #010409;      /* canvas-subtle (true black inset) */
@@ -194,12 +194,12 @@ html, body {
   min-height: 100vh;
 }
 
-/* Controls take the app font, not the UA's (project-scaffolding#266). */
+/* Controls take the app font, not the UA's. */
 button, input, select, textarea { font: inherit; }
 
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
-/* One app font everywhere (#215): monospace only where console output
+/* One app font everywhere: monospace only where console output
  * genuinely lives — <pre> panes (log tail, model reply, trace bodies) and the
  * Recent-sessions id/token line (code_usage.css). Inline <code> chips render
  * in the app font. */
@@ -210,7 +210,7 @@ pre code { font-family: inherit; } /* …but code inside a pre stays mono */
 .small { font-size: var(--font-caption); }
 /* "requested → served @host" tail on a request row whose model was resolved to
  * a different one (role chain / fallback) and/or served by another machine —
- * see api.js modelLabel (#412). */
+ * see api.js modelLabel. */
 .model-served { color: var(--muted); }
 .model-host { color: var(--muted); }
 
@@ -239,7 +239,7 @@ h2 { display: flex; align-items: center; gap: 8px; }
   max-width: 772px;
   margin: 0 auto;
   /* Bottom padding equals the side gutter, so the build footer sits as
-   * close to the bottom edge as the cards do to the sides (#217). */
+   * close to the bottom edge as the cards do to the sides. */
   padding: env(safe-area-inset-top, 0) var(--gap) calc(env(safe-area-inset-bottom, 0) + var(--gap));
   display: flex;
   flex-direction: column;
@@ -273,10 +273,10 @@ h2 { display: flex; align-items: center; gap: 8px; }
   gap: 10px;
   margin-bottom: 10px;
 }
-/* One card-title scale app-wide (#215): --font-body, matching the vendored
+/* One card-title scale app-wide: --font-body, matching the vendored
  * disclosure's .collapse-title and home-automation's card-identity scale.
  * The leading glyph is pinned to icons.size.title (18px) so plain card
- * headers match the disclosure summaries' icon size too (#217). */
+ * headers match the disclosure summaries' icon size too. */
 .card-header h2 { margin: 0; font-size: var(--font-body); font-weight: 600; }
 .card-header h2 .icon { width: var(--icon-title); height: var(--icon-title); }
 .card-header-actions {
@@ -324,7 +324,7 @@ h2 { display: flex; align-items: center; gap: 8px; }
 .icon-header-btn:hover { color: var(--ink); background: var(--card-off); }
 .icon-header-btn:active { background: var(--bg); }
 /* Toggled-on state — same accent-tint recipe as .app-item .app-icons
- * .icon-btn.active (#266's Models "Active only" filter). */
+ * .icon-btn.active (the Models tab's "Active only" filter). */
 .icon-header-btn.active { color: var(--accent); background: var(--accent-soft); }
 
 /* Hub card header — title + inline live status (dot + word), then
@@ -409,7 +409,7 @@ h2 { display: flex; align-items: center; gap: 8px; }
 .ghost-btn.danger:hover { background: var(--danger-soft); }
 /* Accent-tint variant — same size as .ghost-btn but the primary action
  * (Playground Send / Generate / Speak / Download). Transparent accent tint,
- * never a solid fill — home-automation's .range-tab.active recipe (#215). */
+ * never a solid fill — home-automation's .range-tab.active recipe. */
 .ghost-btn.primary {
   background: var(--accent-soft);
   color: var(--accent);
@@ -443,20 +443,20 @@ h2 { display: flex; align-items: center; gap: 8px; }
 .icon-btn.danger:active { color: var(--danger); background: var(--danger-strong); }
 
 /* ---------- preset-tab row (Playground max tokens) ----------
- * Home-automation's ghost .range-tabs pattern (#215): transparent container,
+ * Home-automation's ghost .range-tabs pattern: transparent container,
  * each option a card-off pill, the active one a subtle accent tint — never a
  * solid fill. The ::before extends the tap target to >=44px vertically.
- * Named apart from the vendored `_vendored/segmented/` component (fleet-
- * config#1407, local-llm-hub-lite#39): this is a value-preset tablist
- * (role="tablist", plain .active toggling), not the fleet's single-choice
- * aria-pressed segmented control that now owns the `.segmented` class name. */
+ * Named apart from the vendored `_vendored/segmented/` component: this is a
+ * value-preset tablist (role="tablist", plain .active toggling), not the
+ * fleet's single-choice aria-pressed segmented control that now owns the
+ * `.segmented` class name. */
 .preset-tabs {
   display: inline-flex;
   gap: 5px;
 }
 /* flex-wrap: a button row that outgrows the card wraps to a second line
-   instead of driving page-level horizontal overflow (issue #280: the vendor
-   selector gained a fifth button); min-width lets a button shrink below its
+   instead of driving page-level horizontal overflow (the vendor selector
+   can gain a fifth button); min-width lets a button shrink below its
    label's min-content before the row wraps. */
 .preset-tabs.stretch { display: flex; width: 100%; flex-wrap: wrap; }
 .preset-tabs button {
@@ -566,7 +566,7 @@ h2 { display: flex; align-items: center; gap: 8px; }
 .logpane-actions { display: flex; justify-content: flex-end; margin-bottom: 8px; }
 
 /* ---------- sparklines (RAM / VRAM / GPU) ----------
- * Energy-tab chart look (#215): a 2px line over a translucent accent area. */
+ * Energy-tab chart look: a 2px line over a translucent accent area. */
 .sparklines {
   display: flex; gap: var(--gap); flex-wrap: wrap; margin-top: 10px;
 }
@@ -588,12 +588,12 @@ h2 { display: flex; align-items: center; gap: 8px; }
 
 /* ---------- Models tab: .app-item rows (canonical pattern) ----------
  * Flat full-bleed rows inside one wrapping `.card` (design.md `list-row`
- * contract, #265) — never nested per-item cards. The card's own
+ * contract) — never nested per-item cards. The card's own
  * `spacing.md` padding supplies the horizontal inset; rows only need
  * `list-row.rowPadding` (12px 0) and a top hairline on every row after
  * the first. */
 
-/* Card-header actions cluster for a `.card--collapsible` summary (#266) —
+/* Card-header actions cluster for a `.card--collapsible` summary —
  * the toggle button sits before the chevron rather than its own row, so
  * per-app markup nests both inside grid-column 2 (the vendored
  * .collapse-chevron's own `grid-column: 2` is then a no-op, since it's no
@@ -604,7 +604,7 @@ h2 { display: flex; align-items: center; gap: 8px; }
   align-items: center;
   /* Same 14px as disclosure.summaryPadding — the gap from the card's left
    * edge to the .collapse-main icon, mirrored here between the action
-   * button and the chevron (#266: 2px read as the icon crowding the arrow). */
+   * button and the chevron (2px reads as the icon crowding the arrow). */
   gap: 14px;
 }
 .models-list {
@@ -673,7 +673,7 @@ h2 { display: flex; align-items: center; gap: 8px; }
   background: var(--accent-soft);
 }
 
-/* ---------- Models tab: read-only placement cards (#423) ----------
+/* ---------- Models tab: read-only placement cards ----------
  * A per-row intent section under the runtime meta line: host-chain pills in
  * priority order (owner = the accent-soft "selected" tint, same recipe as
  * .preset-tabs button.active), a startup-policy .badge, the static VRAM
@@ -720,7 +720,7 @@ h2 { display: flex; align-items: center; gap: 8px; }
   resize: vertical;
   min-height: 80px;
 }
-/* File pickers (#215): the native input is hidden; a ghost "Choose file"
+/* File pickers: the native input is hidden; a ghost "Choose file"
  * button + the selected filename to its right stand in — no bordered box. */
 .file-row {
   display: flex;
@@ -785,7 +785,7 @@ h2 { display: flex; align-items: center; gap: 8px; }
 .badge.warn   { color: var(--attention); border-color: var(--attention-border); }
 .badge.danger { color: var(--danger);    border-color: var(--danger-border); }
 
-/* ---------- Startup card — per-item toggle rows (#265) ---------- */
+/* ---------- Startup card — per-item toggle rows ---------- */
 .startup-list {
   list-style: none;
   padding: 0;
@@ -822,7 +822,7 @@ h2 { display: flex; align-items: center; gap: 8px; }
   min-width: 0;
 }
 
-/* ---------- Model decisions card — role/placement summary rows (#373) ----------
+/* ---------- Model decisions card — role/placement summary rows ----------
  * Same .startup-row/.startup-list rhythm as the Startup + Fleet placement
  * cards; only the right-hand value column is new (those two cards put a
  * switch there instead of text). Right-aligned, allowed to wrap onto a
@@ -859,10 +859,10 @@ h2 { display: flex; align-items: center; gap: 8px; }
 
 /* ---------- footer ----------
  * Build-identity line only (which build the PWA is running) — home-automation's
- * .page-foot: one centered muted caption, no links, no separator (#215). */
+ * .page-foot: one centered muted caption, no links, no separator. */
 .page-foot {
   /* No bottom margin — .app's bottom padding (one --gap) is the whole gap
-   * below the build line (#217). */
+   * below the build line. */
   margin: var(--space-xs) var(--space-xs) 0;
   text-align: center;
 }

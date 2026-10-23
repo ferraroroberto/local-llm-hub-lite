@@ -1,6 +1,6 @@
 @echo off
 REM ==========================================================
-REM  local-llm-hub - parameterized per-model launcher (#448 dedup).
+REM  local-llm-hub - parameterized per-model launcher.
 REM  Replaces the 22 hand-rolled run_<id>.bat files, each of which
 REM  re-derived the same cd / title / echo-banner / pause around a
 REM  hand-retyped port already declared in config/models.yaml (and

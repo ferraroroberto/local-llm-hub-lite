@@ -1,9 +1,8 @@
 /* Models tab — per-backend .app-item row (canonical pattern).
  *
- * Process control only: start / stop / ping / force-stop. Per-model log
- * tailing was tried in #10 but pulled back — adopted backends have no
- * captured stdout, and the central Hub log tab already shows every
- * request that flows through the hub.
+ * Process control only: start / stop / ping / force-stop. No per-model log
+ * tailing — adopted backends have no captured stdout, and the central
+ * Hub log tab already shows every request that flows through the hub.
  */
 
 import { els, state, MODELS_ACTIVE_ONLY_KEY } from './state.js';
@@ -21,7 +20,7 @@ export async function fetchModels() {
 // A row counts as "active" only if it's a controllable backend that's
 // currently running/adopted. Claude/Gemini are excluded outright — they're
 // subscription-backed with no on/off state, always "on", so listing them
-// here is just noise rather than a signal (#266).
+// here is just noise rather than a signal.
 function isActive(m) {
   return m.controllable && (m.ownership === 'ours' || m.ownership === 'external');
 }
@@ -93,7 +92,7 @@ function fillItem(li, m) {
   // names (whisper-large-v3-turbo, gemma4-26b-a4b-it), and a pill nested
   // inside it gets pushed past the clip boundary and vanishes. As a sibling
   // in the title row it is never clipped. PID/host details moved to the
-  // meta line (#215) — as title-row extras they crushed the name on phones.
+  // meta line — as title-row extras they crushed the name on phones.
   titleRow.innerHTML =
     '<span class="app-title"><span class="app-name">' + escapeHtml(m.display_name) + '</span></span>' + badge(m);
 
@@ -128,7 +127,7 @@ function fillItem(li, m) {
 
   const meta = document.createElement('div');
   meta.className = 'app-meta';
-  // Adopted PID lives here with the port (#215): in the title row they
+  // Adopted PID lives here with the port: in the title row they
   // wrapped the tile to two title lines and squeezed the name to nothing
   // on a phone.
   meta.textContent =
@@ -137,11 +136,11 @@ function fillItem(li, m) {
     (m.pid && adopted ? ' · PID ' + m.pid : '') +
     // Resolved TTS device (cpu/cuda/mps), reported once the backend has
     // finished loading and answered its own /health — see
-    // app_web/routers/models.py's _probe_device (#371). Omitted (not
+    // app_web/routers/models.py's _probe_device. Omitted (not
     // guessed) for stopped/loading rows and backends with no device concept.
     (m.device ? ' · ' + m.device : '') +
     (m.aliases && m.aliases.length ? ' · ' + m.aliases.join(', ') : '') +
-    // Model footprint (#436) — the registry's static est_vram_mb as a
+    // Model footprint — the registry's static est_vram_mb as a
     // meta-line suffix. Truthy-only: shown only for rows that actually load
     // a model process of their own — virtual aliases sharing another row's
     // process and CPU/ANE rows declare 0 and show nothing; subscription
@@ -150,7 +149,7 @@ function fillItem(li, m) {
   main.appendChild(meta);
 
   // Startup-policy line — the eager / on-demand badge under the runtime
-  // meta (the lite remnant of the #423 placement card).
+  // meta (the lite remnant of the upstream placement card).
   const startupLine = buildStartupLine(m);
   if (startupLine) main.appendChild(startupLine);
 
@@ -234,12 +233,12 @@ async function handleAction(m, act) {
   }
 }
 
-/* escapeHtml lives in api.js (sibling dedup, #211). */
+/* escapeHtml lives in api.js — one shared definition. */
 
 function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
 // "Active only" toggle — lives in the card's own collapse-summary header
-// (#266) as an .icon-header-btn, same recipe as the Hub card's theme/restart
+// as an .icon-header-btn, same recipe as the Hub card's theme/restart
 // buttons, with the toggled-on state borrowed from .app-item .icon-btn.active.
 // Persisted like home-automation Plugs' show-hidden localStorage flag.
 function renderActiveToggle() {

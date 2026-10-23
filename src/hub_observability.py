@@ -39,13 +39,12 @@ class RequestRecord:
     # requested name to something else — a role alias (``audio_transcribe``)
     # resolving to its backing model id. Empty when nothing resolved it (the
     # ordinary chat paths) — never guess: a consumer reads "requested=X
-    # served=Y" only when this is set (issue #412).
+    # served=Y" only when this is set.
     served_model: str = ""
     # Host id that actually served the request — this is a single-host fork
     # (no chains, no remote hops, no peer hubs), so this is simply the
     # active host's id when a served backend is known. Set on the audio
-    # paths alongside served_model. Empty when nothing resolved it
-    # (issue #412).
+    # paths alongside served_model. Empty when nothing resolved it.
     served_host: str = ""
     backend: str = ""         # "openai" | "whisper" | ""
     status: int = 0           # HTTP status of the response
@@ -137,7 +136,7 @@ class Observatory:
             # Count against the model that *served*: a role-addressed audio
             # request would otherwise pile every call onto the alias
             # ("audio_transcribe") and hide which backend actually carried the
-            # traffic (issue #412). ``served_model`` is only ever set once a
+            # traffic. ``served_model`` is only ever set once a
             # model has really answered, so a request nothing served (a strict
             # rejection, or a chain where every candidate was down) falls back
             # to the requested name and is never charged to a model that never

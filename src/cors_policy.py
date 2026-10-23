@@ -1,4 +1,4 @@
-"""CORS policy for browser-based clients (#462).
+"""CORS policy for browser-based clients.
 
 Without CORS headers a page's JavaScript cannot call the hub at all: the
 preflight fails and the ``fetch`` never reaches a route, so every sister
@@ -99,7 +99,8 @@ CORS_ALLOW_HEADERS = [
 # ``Content-Language``, ``Content-Type``, ``Expires``, ``Last-Modified``
 # and ``Pragma`` are readable by default, so every header the hub adds as
 # a contract has to be listed here or it is invisible to the caller —
-# which is the same silence #461 closed on the server side.
+# the same kind of silence the Anthropic header-parity module closes on
+# the server side.
 CORS_EXPOSE_HEADERS = [
     "request-id",
     "x-trace-id",

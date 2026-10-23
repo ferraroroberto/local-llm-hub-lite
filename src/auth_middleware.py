@@ -8,7 +8,7 @@ panel's), which only ever depends on ``src/``, never the reverse.
 
 Loopback callers (PC itself) bypass the bearer token. Non-loopback
 callers must present ``Authorization: Bearer <token>``, ``x-api-key:
-<token>`` (the Anthropic SDK's own credential header, #461), or
+<token>`` (the Anthropic SDK's own credential header), or
 ``?token=…`` on the URL (the last is what bookmarked / shared
 URLs use; the SPA strips it from ``window.location`` on first load).
 
@@ -131,7 +131,7 @@ def _caller_is_trusted(
     if auth_header.lower().startswith("bearer "):
         presented = auth_header[7:].strip()
     if not presented:
-        # ``x-api-key`` is how the Anthropic SDK authenticates (#461), so an
+        # ``x-api-key`` is how the Anthropic SDK authenticates, so an
         # SDK pointed at the hub the ordinary way — ``api_key=<hub token>``,
         # no ``default_headers`` special-casing — presents its credential
         # here. Accepted as an equal alternative to the bearer token: same

@@ -13,7 +13,7 @@ export const THEME_KEY = 'llmhub.theme';
  * where you left it (fleet nav contract). */
 export const TAB_KEY = 'llmhub.tab';
 /* Models tab "Active only" filter — persisted like Plugs' show-hidden
- * toggle in home-automation (#266). */
+ * toggle in home-automation. */
 export const MODELS_ACTIVE_ONLY_KEY = 'llmhub.models.activeOnly';
 
 export const STATUS_POLL_MS = 4000;
@@ -35,7 +35,7 @@ export const state = {
   hubStreamCtl: null,     // EventSource abort handles
   hubLogStreamCtl: null,
 
-  // Models tab — "Active only" filter, default on (issue #266).
+  // Models tab — "Active only" filter, default on.
   modelsActiveOnly: true,
 };
 
@@ -60,7 +60,7 @@ export const els = {
   installFixAllBtn: document.getElementById('installFixAllBtn'),
   installRefreshBtn: document.getElementById('installRefreshBtn'),
 
-  // Diagnostic disclosure cards (Live / Counters / Errors / Log — #215)
+  // Diagnostic disclosure cards (Live / Counters / Errors / Log)
   liveRequestsList: document.getElementById('liveRequestsList'),
   liveRequestsBadge: document.getElementById('liveRequestsBadge'),
   liveRequestsEmpty: document.getElementById('liveRequestsEmpty'),
@@ -76,7 +76,7 @@ export const els = {
   modelsEmpty: document.getElementById('modelsEmpty'),
   modelsActiveToggle: document.getElementById('modelsActiveToggle'),
 
-  // Model decisions card (issue #373) — Models tab, role → model list
+  // Model decisions card — Models tab, role → model list
   rolesCard: document.getElementById('rolesCard'),
   rolesStatus: document.getElementById('rolesStatus'),
   rolesList: document.getElementById('rolesList'),

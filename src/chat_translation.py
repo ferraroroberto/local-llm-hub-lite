@@ -74,7 +74,7 @@ def _system_to_text(system: Optional[Union[str, List[ContentBlock]]]) -> Optiona
 # ---- routing ----
 
 def _run_openai_backend(model: Model, req: MessagesRequest) -> Dict[str, Any]:
-    # On-demand lifecycle (#422): a cold ``startup: on_demand`` local backend
+    # On-demand lifecycle: a cold ``startup: on_demand`` local backend
     # is spawned here and the request blocks until it answers (503 on load
     # failure) — same hook the OpenAI-shape route applies in server.py.
     from .server_common import ensure_backend_ready_or_503

@@ -1,4 +1,4 @@
-/* Models tab — "Model decisions" card (issue #373).
+/* Models tab — "Model decisions" card.
  *
  * Folded by default, styled with the same vendored disclosure idiom as the
  * other collapsibles (_vendored/disclosure). Mirrors app-launcher's

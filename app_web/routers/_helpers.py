@@ -51,9 +51,8 @@ def sse_stream(
     poll_timeout: float = 10.0,
 ) -> StreamingResponse:
     """Generic subscribe -> seed -> disconnect/keepalive -> unsubscribe SSE
-    skeleton — shared by hub.py's ``log_tail``/``requests_stream`` (issue
-    #195), which were near-identical copies of this generator before this
-    helper existed.
+    skeleton — shared by hub.py's ``log_tail``/``requests_stream``, which
+    were near-identical copies of this generator before this helper existed.
 
     ``seed`` items are already in the shape ``sse_pack`` expects (the seed
     accessors — ``recent_requests()``, ``lines()`` — already return that

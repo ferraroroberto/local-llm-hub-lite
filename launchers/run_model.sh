@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# local-llm-hub - parameterized per-model launcher (#448 dedup).
+# local-llm-hub - parameterized per-model launcher.
 # Replaces the 11 hand-rolled run_<id>.sh files, each of which was an
 # identical shebang / set -euo pipefail / cd / exec around one hardcoded
 # model id.

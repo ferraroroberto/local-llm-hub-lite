@@ -1,4 +1,4 @@
-"""Shared Windows console-suppression flag for subprocess spawns (issue #450).
+"""Shared Windows console-suppression flag for subprocess spawns.
 
 Every parent process that shells out from this hub (the tray running under
 ``pythonw``, the FastAPI hub itself when launched windowless, or a script
@@ -7,11 +7,10 @@ dispatched from either) has no console of its own — any bare
 under such a parent flashes a fresh console window per spawn unless the
 child is told to suppress it.
 
-Previously this one-line ternary was re-derived independently in ~11
-modules (two different spellings — most matched ``subprocess.CREATE_NO_WINDOW``,
-one hardcoded the magic number ``0x08000000``), so a new call site was a
-fresh chance to forget it (issues #169, #174, #282, #317). Import
-``NO_WINDOW`` from here instead of re-deriving the ternary.
+Re-deriving this one-line ternary independently per call site (two different
+spellings are possible — ``subprocess.CREATE_NO_WINDOW`` or the hardcoded
+magic number ``0x08000000``) makes every new call site a fresh chance to
+forget it. Import ``NO_WINDOW`` from here instead of re-deriving the ternary.
 
 ``NO_WINDOW`` is ``0`` on non-Windows platforms, so it is always safe to
 pass as ``creationflags=NO_WINDOW`` unconditionally — ``subprocess.Popen``

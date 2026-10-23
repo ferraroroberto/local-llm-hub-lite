@@ -88,7 +88,7 @@ def _envelope_to_anthropic(env: Dict[str, Any], requested_model: str) -> Dict[st
 app = FastAPI(title="Local LLM Hub Lite", version="0.3.0")
 # Errors raised on the Anthropic-shape routes serialise as Anthropic's
 # {"type": "error", "error": {...}} envelope instead of FastAPI's
-# {"detail": ...} (#460), so the anthropic SDK's typed exceptions and
+# {"detail": ...}, so the anthropic SDK's typed exceptions and
 # retry logic behave against the hub as they do against the real API.
 # Path-scoped: /v1/chat/completions keeps its existing shape.
 install_anthropic_error_handlers(app)
@@ -131,7 +131,7 @@ try:
 except Exception as _exc:  # noqa: BLE001
     logger.warning("⚠️ could not load webapp_config: %s", _exc)
 
-# CORS for browser-based clients (#462) — added LAST so it sits outside
+# CORS for browser-based clients — added LAST so it sits outside
 # every layer above, including the bearer gate. A preflight OPTIONS
 # carries no Authorization header by the browser's design, so it has to
 # be answered here rather than 401'd downstream; real requests still
@@ -143,7 +143,7 @@ install_cors(app, getattr(app.state, "webapp_config", None))
 
 
 # Startup/shutdown handlers + the background resource sampler live in
-# server_lifecycle.py (issue #198) — server.py stays app construction +
+# server_lifecycle.py — server.py stays app construction +
 # route registration. ``_stop_backend_children`` is re-exported under its
 # original name since tests/test_restart_keepalive.py calls it directly.
 from .server_lifecycle import (  # noqa: E402
@@ -330,7 +330,7 @@ def _stream_openai_passthrough(
     if not base_url:
         raise HTTPException(status_code=500, detail="model has no url")
     extra = _build_openai_extra(model, req)
-    # On-demand idle tracking (#422): a locally-served on_demand model must
+    # On-demand idle tracking: a locally-served on_demand model must
     # not be idle-unloaded while a stream is in flight — pair the start here
     # with the finish in the generator's ``finally`` (which also runs on a
     # client disconnect, via GeneratorExit).
@@ -392,7 +392,7 @@ def chat_completions(req: ChatCompletionRequest, request: Request) -> Response:
     )
 
     if model.backend == "openai":
-        # On-demand lifecycle (#422): a cold ``startup: on_demand`` local
+        # On-demand lifecycle: a cold ``startup: on_demand`` local
         # backend is spawned here and the request blocks until it answers
         # (distinct 503 on load failure). No-op for eager/virtual rows.
         _ensure_backend_ready(model)
@@ -416,7 +416,7 @@ def chat_completions(req: ChatCompletionRequest, request: Request) -> Response:
         if not base_url:
             raise HTTPException(status_code=500, detail="model has no url")
         extra = _build_openai_extra(model, req)
-        # On-demand idle tracking (#422) — see _stream_openai_passthrough.
+        # On-demand idle tracking — see _stream_openai_passthrough.
         try:
             with _on_demand.tracking(model):
                 raw = call_openai_chat(

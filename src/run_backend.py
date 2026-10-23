@@ -5,9 +5,9 @@
     python -m src.run_backend whisper    # run whisper-server with the whisper entry
 
 ``launchers/run_model.bat`` / ``run_model.sh`` are the sole entry point for
-every per-model launcher (#448 dedup — 22 near-identical hand-rolled scripts
-used to each hardcode their own title/port/banner, with nothing to catch a
-copy-paste port typo). ``--banner <id>`` below is what the ``.bat`` pulls its
+every per-model launcher — one dispatcher instead of near-identical
+hand-rolled scripts each hardcoding their own title/port/banner, with
+nothing to catch a copy-paste port typo. ``--banner <id>`` below is what the ``.bat`` pulls its
 window title + console banner from, live off ``config/models.yaml``, so
 there is exactly one place a model's port/name can come from.
 """

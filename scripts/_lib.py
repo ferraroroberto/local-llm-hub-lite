@@ -2,9 +2,9 @@
 
 ``install_llama_cpp.py`` and ``install_whisper_cpp.py`` both download a
 GitHub release archive, extract it into a ``vendor/`` directory, and
-collapse a single-subdir extraction — near line-for-line duplicates before
-this module existed (issue #195). Consolidated here so a fix to the
-download/extract/flatten logic lands once instead of twice.
+collapse a single-subdir extraction — consolidated here instead of kept as
+near line-for-line duplicates, so a fix to the download/extract/flatten
+logic lands once instead of twice.
 
 Not a package ``__init__`` — a plain sibling module. Each install script
 inserts its own directory onto ``sys.path`` before importing this (works
@@ -36,7 +36,7 @@ class InstallError(RuntimeError):
 
 def no_window_flags() -> int:
     """CREATE_NO_WINDOW on Windows — this also runs from the windowless hub
-    when triggered via the admin SPA's "Fix" button (issue #174)."""
+    when triggered via the admin SPA's "Fix" button."""
     return subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
@@ -44,7 +44,7 @@ def detect_cuda_arch() -> str:
     """The host GPU's CUDA compute capability as a bare arch (e.g. ``61`` for a
     GTX 1070's sm_61), from ``nvidia-smi --query-gpu=compute_cap``. Empty string
     if nvidia-smi is absent/unreadable — the caller supplies a default. Used by
-    the Linux from-source build hints (#368), where the vendored-release path
+    the Linux from-source build hints, where the vendored-release path
     upstream ships for Windows/macOS has no Linux equivalent.
     """
     try:
@@ -170,9 +170,8 @@ def flatten_nested_bin(vendor_dir: Path, binary_name: str) -> None:
     ``rglob``, then moves every sibling in its parent directory up into
     ``vendor_dir``, overwriting an existing file/dir of the same name.
     No-op if the binary is already directly in ``vendor_dir``, or absent.
-    Both install scripts wrote this walk-and-lift by hand before this
-    helper existed (issue #5) — consolidated here for the same reason
-    ``flatten_if_nested`` was.
+    Both install scripts wrote this walk-and-lift by hand — consolidated
+    here for the same reason ``flatten_if_nested`` was.
     """
     for candidate in vendor_dir.rglob(binary_name):
         src_dir = candidate.parent

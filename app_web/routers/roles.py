@@ -1,10 +1,10 @@
-"""Role → model mapping API (issue #373, broadened by its follow-up comment).
+"""Role → model mapping API.
 
 Exposes ``config/models.yaml``'s ``roles:`` section as a single, flat,
 general-purpose representation. Built as shared infrastructure rather than a
-card-specific shim: issue #342 (dynamic model fallback) will read the same
-role→model chain data to reason about failover, not just display it, so the
-shape here is a clean role_key → {model_id, display_name, notes, fallback}
+card-specific shim: a future dynamic-model-fallback consumer would read the
+same role→model chain data to reason about failover, not just display it, so
+the shape here is a clean role_key → {model_id, display_name, notes, fallback}
 map, not tailored to what the Hub tab's card happens to render.
 
   * ``GET /admin/api/roles`` — every configured role, agentic + audio, keyed

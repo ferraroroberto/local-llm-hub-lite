@@ -14,8 +14,12 @@
 #      (issue reference, dated or changelog heading) in README.md / docs/**/*.md
 #      beyond .docs-ratchet-baseline.json. Whole tree, never routed; exit 3
 #      (a file could not be read) is NOT CONFIRMED and fails.
-#   4. `pytest -q` (unit tests, no GPU / no real CLIs)
-#   5. e2e, routed by scripts/classify_e2e.py against the [e2e] table in
+#   4. comment ratchet: no new issue-number reference in a src/ app_web/
+#      scripts/ tray/ launchers/ comment or docstring beyond
+#      .comment-ratchet-baseline.json. Exit 3 (a file could not be read) is
+#      NOT CONFIRMED and fails.
+#   5. `pytest -q` (unit tests, no GPU / no real CLIs)
+#   6. e2e, routed by scripts/classify_e2e.py against the [e2e] table in
 #      .fleet.toml: nothing for a diff with no browser surface, the smoke
 #      target for inert assets, a surface slice or the full suite otherwise.
 #      An unclassified path, an empty diff or a router failure runs the
@@ -106,6 +110,12 @@ Step "docs ratchet" {
     # Same wrapper shape as the static ratchet: exit 3 (a file could not be
     # read) is NOT CONFIRMED and fails (tests/test_docs_ratchet_gate.py pins it).
     & $Python -m scripts.docs_ratchet_gate
+}
+
+Step "comment ratchet" {
+    # Same wrapper shape as the static ratchet: exit 3 (a file could not be
+    # read) is NOT CONFIRMED and fails (tests/test_comment_ratchet_gate.py pins it).
+    & $Python -m scripts.comment_ratchet_gate
 }
 
 Step "pytest (unit)" {

@@ -68,7 +68,7 @@ class TrayConfig:
 
 def load_tray_config() -> TrayConfig:
     # Model autostart is not a tray concern: hub startup derives it from the
-    # registry (model_registry.desired_model_ids, #430) — the legacy
+    # registry (model_registry.desired_model_ids) — the legacy
     # `tray.autostart_models` list is gone.
     raw_path = Path(CONFIG_PATH)
     try:
@@ -110,7 +110,7 @@ class HubProcess:
         return (not self.is_running()) and self.is_reachable(0.3)
 
     def start(self) -> Tuple[bool, str]:
-        # Race-safe adopt-or-spawn (project-scaffolding#39): serialize the
+        # Race-safe adopt-or-spawn: serialize the
         # is_running/is_reachable check-then-Popen across processes so two trays
         # can't both spawn the hub. The loser re-checks inside the lock and
         # adopts the now-listening hub. self._lock is in-process only;

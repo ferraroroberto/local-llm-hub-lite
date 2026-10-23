@@ -1,4 +1,4 @@
-"""Respawn watchdog for the hub's admin-triggered restart (issue #198).
+"""Respawn watchdog for the hub's admin-triggered restart.
 
 Spawned by ``app_web/routers/hub.py``'s ``_spawn_respawn_watchdog()`` as a
 detached ``python -m src._respawn_watchdog`` child right before the hub

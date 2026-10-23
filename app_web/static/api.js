@@ -144,8 +144,8 @@ export function toast(msg, kind) {
 }
 
 // --------------------------------------------------------------- fmt
-/* Shared across hub.js / models.js — one definition (the sibling-dedup
- * pass of local-llm-hub#211; the copies had drifted). */
+/* Shared across hub.js / models.js — one definition instead of copies
+ * that would drift. */
 export function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
     return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]);
@@ -155,7 +155,7 @@ export function escapeHtml(s) {
 /* Escaped-HTML label for a request record's model: the requested name, the
  * model that actually served it when the hub resolved one to the other
  * (muted), and the host that served it. Used by the Hub tab's live-request
- * / error lists (#412). */
+ * / error lists. */
 export function modelLabel(rec, fallback) {
   const requested = (rec && rec.model) || '';
   const served = (rec && rec.served_model) || '';
@@ -169,8 +169,8 @@ export function modelLabel(rec, fallback) {
 }
 
 /* Trim the vendor prefix off an nvidia-smi GPU name ("NVIDIA GeForce RTX
- * 4080" -> "RTX 4080") — used by the Hub sparkline labels (#309
- * sibling-dedup, same pattern as escapeHtml). */
+ * 4080" -> "RTX 4080") — used by the Hub sparkline labels, same
+ * sibling-dedup pattern as escapeHtml. */
 export function shortGpu(name) {
   if (!name) return '';
   return name.replace('NVIDIA ', '').replace('GeForce ', '').trim();
@@ -184,7 +184,7 @@ export function fmtClock(ts) {
   return d.toTimeString().slice(0, 8);
 }
 
-/* Compact token count — 1.2k / 3.4M (used by the Hub counters; #215 dedup). */
+/* Compact token count — 1.2k / 3.4M (used by the Hub counters). */
 export function fmtTok(n) {
   if (!n) return '—';
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
@@ -193,7 +193,7 @@ export function fmtTok(n) {
 }
 
 /* Latency in seconds — two decimals under 1s, one above ("0.35s", "12.4s"),
- * so the p50/p95 columns stay narrow on a phone (#215). */
+ * so the p50/p95 columns stay narrow on a phone. */
 export function fmtSecs(ms) {
   const n = Number(ms) || 0;
   return (n / 1000).toFixed(n < 995 ? 2 : 1) + 's';
@@ -208,7 +208,7 @@ export function tokPair(inTok, outTok) {
 
 /* Fill a per-backend counter table's <tbody>: one empty-state row, else one
  * row per record with the same Backend/Model · Req · Err · p50 · p95 ·
- * I/O-tok cells (#470). No-op when the table (or its tbody) isn't in the
+ * I/O-tok cells. No-op when the table (or its tbody) isn't in the
  * DOM. */
 export function renderCounterTable(table, rows) {
   if (!table) return;
@@ -235,8 +235,8 @@ export function renderCounterTable(table, rows) {
   });
 }
 
-/* MB (VRAM/RAM figure) -> compact "X.X GB" label, unit baked in (#448
- * dedup — was defined verbatim in multiple tabs). */
+/* MB (VRAM/RAM figure) -> compact "X.X GB" label, unit baked in — one
+ * definition instead of being defined verbatim in multiple tabs. */
 export function fmtGb(mb) {
   return (Number(mb || 0) / 1024).toFixed(1) + ' GB';
 }

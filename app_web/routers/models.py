@@ -197,8 +197,8 @@ def _silent_wav(seconds: float = 0.5, rate: int = 16000) -> bytes:
 
     Just enough for whisper-server to decode and return a (blank)
     transcription — proves the backend can actually run inference, not
-    merely that its port is open. 0.5s (not the original 0.1s): FluidAudio's
-    Parakeet worker (#138) rejects anything under ~0.3s as invalidAudioData;
+    merely that its port is open. 0.5s, not 0.1s: FluidAudio's
+    Parakeet worker rejects anything under ~0.3s as invalidAudioData;
     whisper.cpp tolerates any length so the longer default doesn't regress it.
     """
     buf = io.BytesIO()
@@ -216,8 +216,8 @@ async def _probe(url: str, *, timeout: float, **kwargs: Any) -> tuple[Any, float
     Both ``model_ping`` arms (whisper/chat) only differ in URL, payload
     shape, and timeout — this is that shared probe. Goes through
     ``get_async_client()`` rather than constructing a fresh ``httpx.AsyncClient``
-    per call, which is exactly what that shared client exists to avoid (issue
-    #165: ~0.26s per construction vs ~1ms reused).
+    per call, which is exactly what that shared client exists to avoid
+    (~0.26s per construction vs ~1ms reused).
 
     On success returns ``(response, latency_ms, None)``; on ``httpx.HTTPError``
     returns ``(None, latency_ms, str(exc))`` — callers shape the two cases into

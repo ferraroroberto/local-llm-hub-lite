@@ -1,7 +1,7 @@
 /* Three-tab switcher: Hub | Models | Playground.
  *
- * Thin adapter over the vendored fleet nav (_vendored/nav/nav-tabs.js —
- * local-llm-hub#211). The vendored component owns tab discovery, ARIA +
+ * Thin adapter over the vendored fleet nav (_vendored/nav/nav-tabs.js).
+ * The vendored component owns tab discovery, ARIA +
  * roving tabindex, localStorage persistence, scroll reset, and the iOS
  * pin behaviour; this file only bridges it to the app's existing
  * onTabChange/setTab API and mirrors the active tab into state.tab.

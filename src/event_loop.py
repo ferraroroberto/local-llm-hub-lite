@@ -1,4 +1,4 @@
-"""Windows event-loop shim for uvicorn (issue #222).
+"""Windows event-loop shim for uvicorn.
 
 On Windows, asyncio's default proactor event loop closes its listening
 socket the moment ``accept()`` raises any ``OSError`` (see CPython's
@@ -15,7 +15,7 @@ phone-facing webapp: any LAN client dropping a connection mid-request
 can trigger the wedge.
 
 The selector event loop's accept path has no such failure mode -- verified
-empirically (in the sister app-launcher repo, issue #388): 800 concurrent
+empirically in the sister app-launcher repo: 800 concurrent
 aborted connections against a bare ``SelectorEventLoop`` server left it
 accepting fine, while the same abuse killed a ``ProactorEventLoop`` server
 after ~20. None of this repo's servers spawn asyncio subprocesses

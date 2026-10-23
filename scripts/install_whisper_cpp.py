@@ -3,7 +3,7 @@
 Picks a release asset from ggerganov/whisper.cpp that matches this machine:
   - Windows x64 + NVIDIA  -> whisper-cublas-<cuda>-bin-x64.zip
   - macOS arm64           -> built from source (Metal) — upstream ships no
-    prebuilt macOS asset as of the pinned tag (#413); see
+    prebuilt macOS asset as of the pinned tag; see
     ``_macos_build_from_source``.
 
 Extracts into vendor/whisper.cpp/ at the project root, then renames the
@@ -44,7 +44,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 VENDOR_DIR = PROJECT_ROOT / "vendor" / "whisper.cpp"
 
 # Pinned to a known-good tag rather than floating "latest" so the feature
-# set is deterministic (issue #91). v1.8.5 (2026-05-29, ggml-org/whisper.cpp
+# set is deterministic. v1.8.5 (2026-05-29, ggml-org/whisper.cpp
 # #3781) added server-side `carry_initial_prompt`; v1.8.6 is the newest
 # patch on that line. Bump this tag deliberately when a newer one is
 # vetted. The repo moved ggerganov → ggml-org; the API redirects either way.
@@ -98,7 +98,7 @@ def _linux_cuda_build_hint() -> str:
     """A reproducible from-source CUDA build recipe for a Linux satellite.
 
     Upstream ships no prebuilt Linux CUDA whisper-server; gaming's sm_61 build
-    was compiled by hand (#368). Rather than an untested automated compile,
+    was compiled by hand. Rather than an untested automated compile,
     surface the exact commands with the arch defaulted to this host's detected
     GPU (override via ``LOCAL_LLM_HUB_CUDA_ARCH``). Pinned tag matches the
     Windows/macOS vendored line. The automated build itself is a follow-up.
@@ -107,7 +107,7 @@ def _linux_cuda_build_hint() -> str:
     return (
         "no prebuilt whisper.cpp asset for Linux — build from source with CUDA.\n"
         f"target GPU arch: sm_{arch} (override via LOCAL_LLM_HUB_CUDA_ARCH). "
-        "Reproducible build (run on the satellite; not yet automated — #368):\n"
+        "Reproducible build (run on the satellite; not yet automated):\n"
         f"  git clone --branch {PINNED_TAG} --depth 1 "
         "https://github.com/ggml-org/whisper.cpp /tmp/whisper.cpp\n"
         "  cmake -S /tmp/whisper.cpp -B /tmp/whisper.cpp/build "
@@ -121,7 +121,7 @@ def _macos_find_cmake() -> Optional[str]:
     """cmake's location on macOS, tolerant of a restricted non-interactive
     PATH (``/usr/bin:/bin:/usr/sbin:/sbin``) that a launchd/SSH-triggered
     "Fix" run gets even when an interactive shell's PATH has it via
-    Homebrew (#413 — confirmed on mac-mini-m4: ``cmake`` is on
+    Homebrew (confirmed on mac-mini-m4: ``cmake`` is on
     ``/opt/homebrew/bin``, off that restricted PATH)."""
     found = shutil.which("cmake")
     if found:
@@ -134,9 +134,9 @@ def _macos_find_cmake() -> Optional[str]:
 
 def _macos_build_prereqs() -> str:
     """Returns the cmake path if every from-source build prerequisite is
-    present; raises a clear, actionable InstallError otherwise (#413 scope:
-    "fail with a clear message when a build prerequisite is missing rather
-    than an asset-list dump")."""
+    present; raises a clear, actionable InstallError otherwise — fail with
+    a clear message when a build prerequisite is missing rather than an
+    asset-list dump."""
     cmake_path = _macos_find_cmake()
     if not cmake_path:
         raise InstallError(
@@ -158,7 +158,7 @@ def _macos_build_prereqs() -> str:
 
 
 def _macos_build_from_source() -> None:
-    """Build whisper-server from source for this pinned tag (#413) — no
+    """Build whisper-server from source for this pinned tag — no
     prebuilt macOS asset exists as of ``PINNED_TAG``. Mirrors the recipe
     hand-verified on mac-mini-m4: cmake configure (Metal + Accelerate BLAS
     are auto-detected on Apple platforms), build the ``whisper-server``
@@ -257,7 +257,7 @@ def _purge_vendor() -> None:
 
 def _pick_assets(release: dict) -> List[dict]:
     """Windows only — the darwin platform has no reliable prebuilt asset as
-    of ``PINNED_TAG`` (#413) and is handled separately by ``_find_macos_asset``
+    of ``PINNED_TAG`` and is handled separately by ``_find_macos_asset``
     plus a from-source fallback."""
     assets = release.get("assets") or []
     names = [a["name"] for a in assets]
@@ -283,7 +283,7 @@ def _pick_assets(release: dict) -> List[dict]:
 
 def _find_macos_asset(release: dict) -> Optional[dict]:
     """A prebuilt macOS arm64 asset, if the pinned tag happens to publish one
-    (upstream did not as of v1.8.6 — #413). Checked first so a future
+    (upstream did not as of v1.8.6). Checked first so a future
     ``PINNED_TAG`` bump onto a release that does ship one uses it instead of
     building from source."""
     assets = release.get("assets") or []
