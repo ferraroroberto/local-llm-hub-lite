@@ -196,12 +196,9 @@ def _in_flight(model_id: str) -> int:
     return on_demand._IN_FLIGHT.get(model_id, 0)
 
 
-def test_tracking_is_inactive_for_eager_rows_and_remote_hops():
-    """Only a *locally served* on_demand row is counted: an eager row has no
-    unload window, and a remote hop is the peer hub's to account for."""
+def test_tracking_is_inactive_for_eager_rows():
+    """Only an on_demand row is counted: an eager row has no unload window."""
     with on_demand.tracking(_model(startup="eager")):
-        assert _in_flight("gemma") == 0
-    with on_demand.tracking(_model(), "http://10.0.0.9:8000"):
         assert _in_flight("gemma") == 0
     assert _in_flight("gemma") == 0
 
@@ -218,20 +215,9 @@ def test_tracking_block_balances_on_return_and_on_raise():
     assert _in_flight("gemma") == 0
 
 
-def test_detached_tracking_outlives_the_block_until_finish():
-    """The streaming shape: the response is still being served after the
-    dispatch function returns, so ``detach()`` hands the mark to the
-    generator's ``finally`` instead of the ``with``."""
-    with on_demand.tracking(_model()) as track:
-        track.detach()
-    assert _in_flight("gemma") == 1          # still in flight after the block
-    track.finish()
-    assert _in_flight("gemma") == 0
-
-
 def test_finish_is_idempotent():
-    """A belt-and-braces second finish (a detach racing a raise, a generator
-    closed twice) must not decrement someone else's request."""
+    """A belt-and-braces second finish (a generator closed twice) must not
+    decrement someone else's request."""
     track = on_demand.tracking(_model()).start()
     assert _in_flight("gemma") == 1
     track.finish()

@@ -99,25 +99,21 @@ class RequestTracking:
     a fifth exit path added later silently leaks. Obtain one of these from
     :func:`tracking` instead:
 
-    * ``with tracking(model, remote):`` — the whole request is served inside
-      the block (the two non-streaming chat paths).
-    * ``track = tracking(...); track.start()`` … ``track.finish()`` — the
-      response outlives the dispatch function, so the generator's ``finally``
-      closes it (the SSE passthrough).
-    * ``with tracking(...) as track:`` … ``track.detach()`` — the ``with``
-      covers every exit path up to the point ownership is handed to a
-      streaming generator, which then calls ``track.finish()``.
+    * ``with tracking(model):`` — the whole request is served inside the
+      block (the two non-streaming chat paths).
+    * ``track = tracking(model).start()`` … ``track.finish()`` — the response
+      outlives the dispatch function, so the generator's ``finally`` closes
+      it (the SSE passthrough).
 
-    ``finish`` is idempotent, so a belt-and-braces second call (or a detach
-    that races a raise) can never double-decrement the in-flight count.
+    ``finish`` is idempotent, so a belt-and-braces second call can never
+    double-decrement the in-flight count.
     """
 
-    __slots__ = ("model_id", "active", "_detached", "_finished")
+    __slots__ = ("model_id", "active", "_finished")
 
     def __init__(self, model_id: str, active: bool) -> None:
         self.model_id = model_id
         self.active = active
-        self._detached = False
         self._finished = False
 
     def start(self) -> "RequestTracking":
@@ -130,31 +126,22 @@ class RequestTracking:
             self._finished = True
             request_finished(self.model_id)
 
-    def detach(self) -> None:
-        """Hand the in-flight mark to a caller that outlives this ``with``
-        block — ``__exit__`` stops finishing it, so ``finish()`` must be
-        called explicitly (a streaming generator's ``finally``)."""
-        self._detached = True
-
     def __enter__(self) -> "RequestTracking":
         return self.start()
 
     def __exit__(self, exc_type, exc, tb) -> bool:
-        if not self._detached:
-            self.finish()
+        self.finish()
         return False
 
 
-def tracking(model: Model, remote: Optional[str] = None) -> RequestTracking:
+def tracking(model: Model) -> RequestTracking:
     """Tracker for one request against ``model``.
 
-    Tracking is a no-op unless the request is served *locally* (``remote`` is
-    the resolved peer base URL, ``None`` when this hub serves it) by a row
-    declaring ``startup: on_demand`` — a remote hop is the peer hub's to
-    account for, and an eager row is never unloaded. See
-    :class:`RequestTracking` for the three call shapes.
+    Tracking is a no-op unless the row declares ``startup: on_demand`` — an
+    eager row is never unloaded. See :class:`RequestTracking` for the two
+    call shapes.
     """
-    return RequestTracking(model.id, remote is None and is_on_demand(model))
+    return RequestTracking(model.id, is_on_demand(model))
 
 
 def _idle_state(model_id: str) -> tuple[int, Optional[float]]:

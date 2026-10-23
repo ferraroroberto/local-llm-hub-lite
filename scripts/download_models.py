@@ -1,8 +1,8 @@
 """Download GGUF files for each enabled local model into models/.
 
 Reads config/models.yaml via src.model_registry. Only models enabled for
-the active host profile are downloaded -- the Mac mini skips GLM's ~60 GB
-blob because its host row doesn't enable it.
+the active host profile are downloaded. Files land in the directory of each
+row's `model_path` (`models/` for the shipped rows).
 
 Usage:
     python scripts/download_models.py            # every enabled openai model
@@ -44,12 +44,12 @@ def _files_for(model: Model) -> List[str]:
 
 
 def download_one(model_id: str) -> List[Path]:
-    """Fetch every file in the model's HF pattern into models/.
+    """Fetch every file in the model's HF pattern next to its `model_path`.
 
-    Files are downloaded into `models/<model.id>/` preserving the repo's
-    subdirectory structure when relevant (multi-part GGUFs keep their
-    shard filenames next to each other so llama-server can follow the
-    chain).
+    Files land in the parent directory of `model_path` (`models/` for the
+    shipped rows); shards stored in a repo subdirectory are moved up beside
+    it so multi-part GGUFs keep their shard filenames adjacent and
+    llama-server can follow the chain.
     """
     model = next((m for m in enabled_models() if m.id == model_id), None)
     if model is None:

@@ -18,9 +18,7 @@ export async function fetchModels() {
 }
 
 // A row counts as "active" only if it's a controllable backend that's
-// currently running/adopted. Claude/Gemini are excluded outright — they're
-// subscription-backed with no on/off state, always "on", so listing them
-// here is just noise rather than a signal.
+// currently running or adopted from an earlier hub.
 function isActive(m) {
   return m.controllable && (m.ownership === 'ours' || m.ownership === 'external');
 }
@@ -89,7 +87,7 @@ function fillItem(li, m) {
   const titleRow = document.createElement('div');
   titleRow.className = 'app-title-row';
   // The badge lives OUTSIDE .app-title: that span ellipsises long display
-  // names (whisper-large-v3-turbo, gemma4-26b-a4b-it), and a pill nested
+  // names (whisper-large-v3-turbo, qwen3.5-4b), and a pill nested
   // inside it gets pushed past the clip boundary and vanishes. As a sibling
   // in the title row it is never clipped. PID/host details moved to the
   // meta line — as title-row extras they crushed the name on phones.
@@ -134,17 +132,10 @@ function fillItem(li, m) {
     m.backend +
     (m.port ? ' · :' + m.port : '') +
     (m.pid && adopted ? ' · PID ' + m.pid : '') +
-    // Resolved TTS device (cpu/cuda/mps), reported once the backend has
-    // finished loading and answered its own /health — see
-    // app_web/routers/models.py's _probe_device. Omitted (not
-    // guessed) for stopped/loading rows and backends with no device concept.
-    (m.device ? ' · ' + m.device : '') +
     (m.aliases && m.aliases.length ? ' · ' + m.aliases.join(', ') : '') +
     // Model footprint — the registry's static est_vram_mb as a
-    // meta-line suffix. Truthy-only: shown only for rows that actually load
-    // a model process of their own — virtual aliases sharing another row's
-    // process and CPU/ANE rows declare 0 and show nothing; subscription
-    // rows carry no startup/footprint fields at all.
+    // meta-line suffix. Truthy-only: a row that declares no footprint (0 or
+    // absent) shows nothing.
     (m.est_vram_mb ? ' · ~' + fmtGb(m.est_vram_mb) : '');
   main.appendChild(meta);
 
@@ -158,7 +149,7 @@ function fillItem(li, m) {
 
 /* Startup-policy line — just the eager / on-demand badge (the lite remnant
  * of the placement card; host chains and the placement editor are not part
- * of this fork). Subscription rows carry no `startup` field and get nothing. */
+ * of this fork). A row without a `startup` field gets nothing. */
 function buildStartupLine(m) {
   if (!m.startup) return null;
   const wrap = document.createElement('div');

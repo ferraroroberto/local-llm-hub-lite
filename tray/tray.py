@@ -87,9 +87,9 @@ def load_tray_config() -> TrayConfig:
 # --------------------------------------------------------------- HubProcess
 
 class HubProcess:
-    """Owns the hub subprocess. Adopt-or-spawn semantics — same as the
-    legacy :mod:`src.server_process` but here in the tray so the hub
-    *is* a child of the tray."""
+    """Owns the hub subprocess. Adopt-or-spawn: a hub already answering on
+    the port is adopted rather than duplicated, otherwise it is spawned as a
+    child of the tray."""
 
     def __init__(self) -> None:
         self.proc: Optional[subprocess.Popen] = None
