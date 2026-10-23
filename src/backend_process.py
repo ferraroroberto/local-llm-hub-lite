@@ -14,11 +14,10 @@ Two engine families share this manager:
 The shape differences (binary location, -m vs --model flag, health
 endpoint) are absorbed in `build_command` and `is_reachable`.
 
-Ownership semantics mirror :mod:`src.server_process` — see its module
-docstring. ``start(model_id)`` adopts an already-reachable backend on
-the model's port instead of spawning a duplicate; ``stop(model_id)``
-only stops what we spawned. Use :func:`force_stop_external` to reclaim
-a port held by someone else.
+``start(model_id)`` adopts an already-reachable backend on the model's
+port instead of spawning a duplicate; ``stop(model_id)`` only stops what
+we spawned. Use :func:`force_stop_external` to reclaim a port held by
+someone else.
 """
 
 from __future__ import annotations
@@ -33,13 +32,7 @@ from typing import Dict, Optional
 
 from .http_client import get_sync_client
 from .model_registry import Model, enabled_models
-from .server_process import (
-    OWNERSHIP_NONE,
-    WIN_NEW_GROUP,
-    kill_pid,
-    resolve_external_pid,
-    resolve_ownership,
-)
+from .server_process import WIN_NEW_GROUP, kill_pid, resolve_external_pid
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 VENDOR_LLAMA = PROJECT_ROOT / "vendor" / "llama.cpp"
@@ -223,15 +216,6 @@ def log_lines(model_id: str, limit: int = LOG_TAIL_LINES) -> list[str]:
     except OSError:
         return []
     return lines[-limit:] if limit else lines
-
-
-def clear_log(model_id: str) -> None:
-    """Truncate the backend's log file (no-op if it doesn't exist yet)."""
-    path = _log_path(model_id)
-    try:
-        path.open("w", encoding="utf-8").close()
-    except OSError:
-        pass
 
 
 def build_command(model: Model) -> list[str]:
@@ -431,14 +415,6 @@ def running_backends() -> Dict[str, Model]:
         if m.backend in ("openai", "whisper") and is_running(m.id):
             out[m.id] = m
     return out
-
-
-def ownership(model_id: str) -> str:
-    """Tri-state ownership of the port for *model_id* — see server_process docstring."""
-    model = resolve_model_by_id(model_id)
-    if model is None or model.port is None:
-        return OWNERSHIP_NONE
-    return resolve_ownership(is_running(model_id), model.port)
 
 
 def external_pid(model_id: str) -> Optional[int]:

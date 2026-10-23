@@ -197,9 +197,7 @@ def _silent_wav(seconds: float = 0.5, rate: int = 16000) -> bytes:
 
     Just enough for whisper-server to decode and return a (blank)
     transcription — proves the backend can actually run inference, not
-    merely that its port is open. 0.5s, not 0.1s: FluidAudio's
-    Parakeet worker rejects anything under ~0.3s as invalidAudioData;
-    whisper.cpp tolerates any length so the longer default doesn't regress it.
+    merely that its port is open.
     """
     buf = io.BytesIO()
     with wave.open(buf, "wb") as w:

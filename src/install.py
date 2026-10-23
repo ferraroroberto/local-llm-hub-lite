@@ -152,7 +152,7 @@ def _probe_cli_version(
 
 def _nvidia_smi_gpu_check() -> Check:
     """nvidia-smi name+VRAM probe — shared by the Windows and Linux branches
-    (the tower and the CUDA satellites both read their GPU the same way)."""
+    (both read their GPU the same way)."""
     nv = shutil.which("nvidia-smi")
     if not nv:
         return Check("gpu", "GPU / accelerator detected", "warn", "nvidia-smi not found")
@@ -180,8 +180,7 @@ def _check_gpu() -> Check:
         return Check("gpu", "GPU / accelerator detected", "warn",
                      f"darwin but arch={mach} — MLX / Metal expect arm64")
     if sys.platform.startswith("linux"):
-        # The CUDA satellites (gaming, later openclaw) read their NVIDIA GPU
-        # exactly like the tower does.
+        # A Linux box reads its NVIDIA GPU exactly like Windows does.
         return _nvidia_smi_gpu_check()
     return Check("gpu", "GPU / accelerator detected", "warn",
                  f"unknown platform {sys.platform}")
