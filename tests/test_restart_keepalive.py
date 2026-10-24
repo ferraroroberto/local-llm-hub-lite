@@ -16,7 +16,7 @@ import asyncio
 import pytest
 
 from src import backend_process as bp
-from src import server as server_mod
+from src import server_lifecycle
 
 
 def _run(coro):
@@ -72,7 +72,7 @@ def test_restart_pending_defaults_false():
 def test_shutdown_tears_down_backends_normally(monkeypatch):
     stopped = _patch_backends(monkeypatch)
 
-    _run(server_mod._stop_backend_children())
+    _run(server_lifecycle.stop_backend_children())
 
     assert sorted(stopped) == ["qwen", "whisper"]
 
@@ -81,7 +81,7 @@ def test_shutdown_skips_teardown_during_restart(monkeypatch):
     stopped = _patch_backends(monkeypatch)
 
     bp.set_restart_pending(True)
-    _run(server_mod._stop_backend_children())
+    _run(server_lifecycle.stop_backend_children())
 
     # Survivors are left alive for the respawned hub to adopt.
     assert stopped == []

@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import os
 import signal
-import socket
 import subprocess
 import sys
 from pathlib import Path
