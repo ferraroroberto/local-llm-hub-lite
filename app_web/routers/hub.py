@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 
 from src.hub_log import HUB_LOG
 from src.hub_observability import OBS

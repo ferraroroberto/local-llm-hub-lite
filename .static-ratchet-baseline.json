@@ -3,16 +3,8 @@
   "tools": {"jscpd": "5.4.0", "ruff": "0.17.1"},
   "entries": [
     {"key": "dup:5e99079fe241:scripts/install_llama_cpp.py|scripts/install_whisper_cpp.py", "files": ["scripts/install_llama_cpp.py", "scripts/install_whisper_cpp.py"]},
-    {"key": "unused:F401:app_web/routers/hub.py:fastapi.responses.JSONResponse", "files": ["app_web/routers/hub.py"]},
-    {"key": "unused:F401:scripts/install_llama_cpp.py:typing.Tuple", "files": ["scripts/install_llama_cpp.py"]},
-    {"key": "unused:F401:src/backend_process.py:socket", "files": ["src/backend_process.py"]},
-    {"key": "unused:F401:src/server.py:.server_lifecycle.stop_backend_children", "files": ["src/server.py"]},
     {"key": "unused:F401:tests/test_backend_logs.py:pytest", "files": ["tests/test_backend_logs.py"]},
     {"key": "unused:F401:tests/test_respawn_watchdog.py:time", "files": ["tests/test_respawn_watchdog.py"]},
-    {"key": "unused:F401:tests/test_roles_router.py:src.model_registry", "files": ["tests/test_roles_router.py"]},
-    {"key": "unused:F401:tray/tray.py:psutil", "files": ["tray/tray.py"]},
-    {"key": "unused:F401:tray/tray.py:src.webapp_config.load_webapp_config", "files": ["tray/tray.py"]},
-    {"key": "unused:F841:app_web/routers/models.py:target", "files": ["app_web/routers/models.py"]},
-    {"key": "unused:F841:app_web/routers/models.py:target#2", "files": ["app_web/routers/models.py"]}
+    {"key": "unused:F401:tests/test_roles_router.py:src.model_registry", "files": ["tests/test_roles_router.py"]}
   ]
 }

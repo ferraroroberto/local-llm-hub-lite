@@ -145,7 +145,7 @@ async def model_start(model_id: str) -> Dict[str, Any]:
 
 @router.post("/api/models/{model_id}/stop")
 async def model_stop(model_id: str) -> Dict[str, Any]:
-    target = _require_model(model_id)
+    _require_model(model_id)
     ok, msg = bp.stop(model_id)
     if not ok:
         raise HTTPException(status_code=409, detail=msg)
@@ -162,7 +162,7 @@ async def model_force_stop(model_id: str) -> Dict[str, Any]:
     know what's listening — that's the whole point — so the caller
     is implicitly saying "I take responsibility for this PID".
     """
-    target = _require_model(model_id)
+    _require_model(model_id)
     ok, msg = bp.force_stop_external(model_id)
     if not ok:
         raise HTTPException(status_code=409, detail=msg)
