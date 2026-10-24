@@ -7,7 +7,8 @@
 # Steps:
 #   1. byte-compile every .py file under src/, app_web/, tray/, scripts/
 #   2. static ratchet: no new duplicate block (jscpd via npx) or unused
-#      import/variable (ruff F401,F841) beyond .static-ratchet-baseline.json.
+#      import/variable (ruff F401,F841) or curated ruff bug (B) / security (S, S113
+#      strict) finding beyond .static-ratchet-baseline.json.
 #      Whole tree, never routed; exit 3 (a detector could not run) is NOT
 #      CONFIRMED and fails, never a pass or a skip.
 #   3. docs ratchet: README.md within its size budget and no new history marker
@@ -39,8 +40,13 @@
 #      never routed (deleting the last caller in one file strands a definition in
 #      another). Any non-zero exit fails, so exit 3 (git unusable, a file that does
 #      not parse) is NOT CONFIRMED and never a pass.
-#   9. `pytest -q` (unit tests, no GPU / no real CLIs)
-#  10. e2e, routed by scripts/classify_e2e.py against the [e2e] table in
+#   9. conventions ratchet: no rise in a fleet-convention hit (no-window,
+#      logging-not-print, no-drive-path) per file beyond
+#      .conventions-ratchet-baseline.json. Whole tree, never routed. Any
+#      non-zero exit fails, so exit 3 (git unusable, a file that does not
+#      parse) is NOT CONFIRMED and never a pass.
+#  10. `pytest -q` (unit tests, no GPU / no real CLIs)
+#  11. e2e, routed by scripts/classify_e2e.py against the [e2e] table in
 #      .fleet.toml: nothing for a diff with no browser surface, the smoke
 #      target for inert assets, a surface slice or the full suite otherwise.
 #      An unclassified path, an empty diff or a router failure runs the
@@ -161,6 +167,13 @@ Step "dead code ratchet" {
     # Called directly, like the doc refs ratchet: Step fails on any non-zero
     # exit, so exit 3 (not confirmed) stops the gate like a finding does.
     & $Python scripts\dead_code_ratchet.py
+}
+
+Step "conventions ratchet" {
+    # Called directly, like the dead code ratchet: Step fails on any non-zero
+    # exit, so exit 3 (not confirmed) stops the gate like a finding does
+    # (tests/ratchets/test_conventions_ratchet_stage.py pins it).
+    & $Python scripts\conventions_ratchet.py
 }
 
 Step "pytest (unit)" {
