@@ -176,6 +176,7 @@ def test_real_rules_route_representative_paths() -> None:
     assert tier(".instruction-ratchet-baseline.json") == "skip"
     assert tier(".doc-refs-ratchet-baseline.json") == "skip"
     assert tier(".dead-code-ratchet-baseline.json") == "skip"
+    assert tier(".conventions-ratchet-baseline.json") == "skip"
 
     # Mixed real diff (static asset + backend) -> static; add a page -> full.
     assert tier("app_web/static/icon-192.png", "src/x.py") == "static"
