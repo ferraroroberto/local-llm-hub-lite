@@ -7,6 +7,11 @@ icon         = "🧠"
 port         = ":8000"
 display_name = "Local LLM Hub Lite"
 description  = "Single-machine lite fork of local-llm-hub: local models and whisper on :8000."
+# Root layout for the structure ratchet (project-scaffolding docs/repo-layout.md):
+# the `service` shape requires src/, tests/, app_web/ and tray/ and allows scripts/,
+# config/, launchers/ and assets/, so no extra_roots are needed. docs/layout.md gives
+# each folder a line.
+shape        = "service"
 
 # Diff-proportionate e2e routing (project-scaffolding#180). scripts/verify-
 # before-ship.ps1's browser phase classifies the branch's changed files
@@ -21,6 +26,18 @@ classify_e2e = { src = "scripts/classify_e2e.py", sha = "bede95f00aee0b17d500724
 build_info = { src = "src/build_info.py", sha = "c9e54e917fd3cbc96011d6c09f9d363af460b205", dest = "src/build_info.py" }
 static_ratchet = { src = "scripts/static_ratchet.py", sha = "f0e6f5449ecf64c9b188ed394c2a9fd8ff678406", dest = "scripts/static_ratchet.py" }
 docs_ratchet = { src = "scripts/docs_ratchet.py", sha = "fdb750461997c4a13eacea8091f115ff12bba564", dest = "scripts/docs_ratchet.py" }
+structure_ratchet = { src = "scripts/structure_ratchet.py", sha = "84d2b12ab416551762e4a615e4a706df91cea69f", dest = "scripts/structure_ratchet.py" }
+# Admin-SPA components, byte-identical to project-scaffolding at the recorded sha. icons/ is not
+# listed: its sprite is trimmed to the glyphs this app uses, so it is not a verbatim copy.
+button       = { src = "app/webapp/static/_vendored/button", sha = "a46f8b028dc08885c259290206f3f677b2af786c", dest = "app_web/static/_vendored/button" }
+card         = { src = "app/webapp/static/_vendored/card", sha = "67a4112488110e0a4c943c5290f4165b5a14e836", dest = "app_web/static/_vendored/card" }
+disclosure   = { src = "app/webapp/static/_vendored/disclosure", sha = "1e7edc2fff6d6bf9f1d236da9bb4f4049815a6a0", dest = "app_web/static/_vendored/disclosure" }
+empty-state  = { src = "app/webapp/static/_vendored/empty-state", sha = "69351311c9c4d6500c79f45ddd3c4441b1e90fa4", dest = "app_web/static/_vendored/empty-state" }
+modal        = { src = "app/webapp/static/_vendored/modal", sha = "f94fd8019c07a1c3f8e7759f270badc36cd5e062", dest = "app_web/static/_vendored/modal" }
+nav          = { src = "app/webapp/static/_vendored/nav", sha = "48d578069abf376e99252c8b7aac4cb922f0eaf9", dest = "app_web/static/_vendored/nav" }
+segmented    = { src = "app/webapp/static/_vendored/segmented", sha = "f52eb75625cbfd8dcef8a71731390a47b795508d", dest = "app_web/static/_vendored/segmented" }
+switch       = { src = "app/webapp/static/_vendored/switch", sha = "7e1433c70cac1bdcdbd160e874d3f486ba9e2a08", dest = "app_web/static/_vendored/switch" }
+text-size    = { src = "app/webapp/static/_vendored/text-size", sha = "4c699636afecd5cae5e966bc2bcb17fa49744390", dest = "app_web/static/_vendored/text-size" }
 
 # [static_ratchet] -- the scaffold's baseline-and-ratchet static analysis. The gate
 # (scripts/verify-before-ship.ps1) runs scripts/static_ratchet.py, which fails on a
@@ -59,6 +76,19 @@ baseline = ".docs-ratchet-baseline.json"
 [comment_ratchet]
 enabled  = true
 baseline = ".comment-ratchet-baseline.json"
+
+# [structure_ratchet] -- the scaffold's baseline-and-ratchet layout stage. The gate
+# (scripts/verify-before-ship.ps1) runs scripts/structure_ratchet.py, which fails when
+# a new file passes 1,000 lines, a new function 100 lines or a flat directory 40
+# modules, when a baselined offender grows past its size in
+# .structure-ratchet-baseline.json, and when the root folders fall outside `shape`.
+# Existing offenders are baselined at today's size and nothing is excluded; the
+# [vendored] dests are skipped by the script itself. Exit 3 (git unusable, an
+# unparseable file, an unknown shape) fails the gate. Procedure + limits:
+# project-scaffolding docs/structure-ratchet.md.
+[structure_ratchet]
+enabled  = true
+baseline = ".structure-ratchet-baseline.json"
 
 [e2e]
 static_pytest_target = "tests/e2e/test_smoke.py"
@@ -127,6 +157,9 @@ path = ".docs-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = ".comment-ratchet-baseline.json"
+[[e2e.rule]]
+tier = "none"
+path = ".structure-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = ".gitignore"
