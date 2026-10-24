@@ -2,9 +2,6 @@
   "version": 1,
   "tools": {"jscpd": "5.4.0", "ruff": "0.17.1"},
   "entries": [
-    {"key": "dup:5e99079fe241:scripts/install_llama_cpp.py|scripts/install_whisper_cpp.py", "files": ["scripts/install_llama_cpp.py", "scripts/install_whisper_cpp.py"]},
-    {"key": "unused:F401:tests/test_backend_logs.py:pytest", "files": ["tests/test_backend_logs.py"]},
-    {"key": "unused:F401:tests/test_respawn_watchdog.py:time", "files": ["tests/test_respawn_watchdog.py"]},
-    {"key": "unused:F401:tests/test_roles_router.py:src.model_registry", "files": ["tests/test_roles_router.py"]}
+    {"key": "dup:5e99079fe241:scripts/install_llama_cpp.py|scripts/install_whisper_cpp.py", "files": ["scripts/install_llama_cpp.py", "scripts/install_whisper_cpp.py"]}
   ]
 }
