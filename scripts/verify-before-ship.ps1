@@ -29,8 +29,13 @@
 #      its size cap, against .instruction-ratchet-baseline.json. Whole tree,
 #      never routed. Any non-zero exit fails, so exit 3 (git unusable, an
 #      unreadable file) is NOT CONFIRMED and never a pass.
-#   7. `pytest -q` (unit tests, no GPU / no real CLIs)
-#   8. e2e, routed by scripts/classify_e2e.py against the [e2e] table in
+#   7. doc references ratchet: no README.md / CLAUDE.md / docs/**/*.md reference
+#      to a repo path, `python -m` module, relative link or loopback port that
+#      does not exist, beyond .doc-refs-ratchet-baseline.json. Whole tree, never
+#      routed. Any non-zero exit fails, so exit 3 (git unusable, an unreadable
+#      file) is NOT CONFIRMED and never a pass.
+#   8. `pytest -q` (unit tests, no GPU / no real CLIs)
+#   9. e2e, routed by scripts/classify_e2e.py against the [e2e] table in
 #      .fleet.toml: nothing for a diff with no browser surface, the smoke
 #      target for inert assets, a surface slice or the full suite otherwise.
 #      An unclassified path, an empty diff or a router failure runs the
@@ -139,6 +144,12 @@ Step "instruction ratchet" {
     # Called directly, like the structure ratchet: Step fails on any non-zero
     # exit, so exit 3 (not confirmed) stops the gate like a finding does.
     & $Python scripts\instruction_ratchet.py
+}
+
+Step "doc refs ratchet" {
+    # Called directly, like the instruction ratchet: Step fails on any non-zero
+    # exit, so exit 3 (not confirmed) stops the gate like a finding does.
+    & $Python scripts\doc_refs_ratchet.py
 }
 
 Step "pytest (unit)" {
