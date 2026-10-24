@@ -433,3 +433,23 @@ def test_extract_zip_normal_member_still_works(tmp_path):
     dest = tmp_path / "dest"
     _lib.extract(archive, dest)
     assert (dest / "llama-server.exe").read_text() == "binary-contents"
+
+
+def test_install_assets_extracts_flattens_and_removes_archive(monkeypatch, tmp_path):
+    import io
+    import zipfile
+    from scripts import _lib
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("release-dir/llama-server.exe", "binary-contents")
+    payload = buf.getvalue()
+    monkeypatch.setattr(_lib.urllib.request, "urlopen", lambda url, timeout=120: _FakeResponse(payload))
+
+    vendor = tmp_path / "vendor" / "llama.cpp"
+    asset = {"name": "rel.zip", "browser_download_url": "http://example.invalid/rel.zip"}
+    _lib.install_assets([asset], vendor)
+
+    assert (vendor / "llama-server.exe").read_text() == "binary-contents"
+    assert not (vendor / "rel.zip").exists()
+    assert not (vendor / "release-dir").exists()

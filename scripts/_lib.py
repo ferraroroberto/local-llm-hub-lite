@@ -161,6 +161,19 @@ def flatten_if_nested(target: Path) -> None:
         inner.rmdir()
 
 
+def install_assets(assets: List[dict], vendor_dir: Path) -> None:
+    """Download each release asset into ``vendor_dir``, extract it, delete the
+    archive, then collapse a single-subdir extraction."""
+    vendor_dir.mkdir(parents=True, exist_ok=True)
+    for a in assets:
+        archive = vendor_dir / a["name"]
+        if not archive.exists():
+            download(a["browser_download_url"], archive, expected_sha256=asset_sha256(a))
+        extract(archive, vendor_dir)
+        archive.unlink(missing_ok=True)
+    flatten_if_nested(vendor_dir)
+
+
 def flatten_nested_bin(vendor_dir: Path, binary_name: str) -> None:
     """Lift a nested ``bin/``-style directory holding ``binary_name`` up into
     ``vendor_dir``, so sibling files (DLLs, configs) travel with it.

@@ -29,12 +29,9 @@ from typing import List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _lib import (  # noqa: E402
     InstallError,
-    asset_sha256,
     detect_cuda_arch,
-    download,
-    extract,
-    flatten_if_nested,
     flatten_nested_bin,
+    install_assets,
     no_window_flags,
 )
 
@@ -340,12 +337,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         VENDOR_DIR.mkdir(parents=True, exist_ok=True)
         if asset:
             log.info("release %s: macOS arm64 asset found", tag)
-            archive = VENDOR_DIR / asset["name"]
-            if not archive.exists():
-                download(asset["browser_download_url"], archive, expected_sha256=asset_sha256(asset))
-            extract(archive, VENDOR_DIR)
-            archive.unlink(missing_ok=True)
-            flatten_if_nested(VENDOR_DIR)
+            install_assets([asset], VENDOR_DIR)
             _normalise_binary_name()
         else:
             log.info(
@@ -366,15 +358,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     assets = _pick_assets(release)
     log.info("release %s: picking %d asset(s)", tag, len(assets))
 
-    VENDOR_DIR.mkdir(parents=True, exist_ok=True)
-    for a in assets:
-        archive = VENDOR_DIR / a["name"]
-        if not archive.exists():
-            download(a["browser_download_url"], archive, expected_sha256=asset_sha256(a))
-        extract(archive, VENDOR_DIR)
-        archive.unlink(missing_ok=True)
-
-    flatten_if_nested(VENDOR_DIR)
+    install_assets(assets, VENDOR_DIR)
     _normalise_binary_name()
 
     if not already_installed():

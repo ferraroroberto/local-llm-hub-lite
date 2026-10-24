@@ -1,7 +1,5 @@
 {
   "version": 1,
   "tools": {"jscpd": "5.4.0", "ruff": "0.17.1"},
-  "entries": [
-    {"key": "dup:5e99079fe241:scripts/install_llama_cpp.py|scripts/install_whisper_cpp.py", "files": ["scripts/install_llama_cpp.py", "scripts/install_whisper_cpp.py"]}
-  ]
+  "entries": []
 }
