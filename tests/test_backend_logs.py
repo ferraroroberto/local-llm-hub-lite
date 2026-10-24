@@ -20,7 +20,6 @@ from __future__ import annotations
 import sys
 
 
-import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from src import backend_process as bp  # noqa: E402
