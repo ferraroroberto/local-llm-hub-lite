@@ -34,8 +34,13 @@
 #      does not exist, beyond .doc-refs-ratchet-baseline.json. Whole tree, never
 #      routed. Any non-zero exit fails, so exit 3 (git unusable, an unreadable
 #      file) is NOT CONFIRMED and never a pass.
-#   8. `pytest -q` (unit tests, no GPU / no real CLIs)
-#   9. e2e, routed by scripts/classify_e2e.py against the [e2e] table in
+#   8. dead code ratchet: no function, class or method that nothing in the tracked
+#      Python tree refers to, beyond .dead-code-ratchet-baseline.json. Whole tree,
+#      never routed (deleting the last caller in one file strands a definition in
+#      another). Any non-zero exit fails, so exit 3 (git unusable, a file that does
+#      not parse) is NOT CONFIRMED and never a pass.
+#   9. `pytest -q` (unit tests, no GPU / no real CLIs)
+#  10. e2e, routed by scripts/classify_e2e.py against the [e2e] table in
 #      .fleet.toml: nothing for a diff with no browser surface, the smoke
 #      target for inert assets, a surface slice or the full suite otherwise.
 #      An unclassified path, an empty diff or a router failure runs the
@@ -150,6 +155,12 @@ Step "doc refs ratchet" {
     # Called directly, like the instruction ratchet: Step fails on any non-zero
     # exit, so exit 3 (not confirmed) stops the gate like a finding does.
     & $Python scripts\doc_refs_ratchet.py
+}
+
+Step "dead code ratchet" {
+    # Called directly, like the doc refs ratchet: Step fails on any non-zero
+    # exit, so exit 3 (not confirmed) stops the gate like a finding does.
+    & $Python scripts\dead_code_ratchet.py
 }
 
 Step "pytest (unit)" {
