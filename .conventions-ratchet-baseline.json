@@ -1,10 +1,4 @@
 {
   "version": 1,
-  "entries": [
-    {"key": "scripts/install_whisper_cpp.py", "counts": {"no-window": 3}},
-    {"key": "src/run_backend.py", "counts": {"no-window": 1}},
-    {"key": "tests/test_comment_ratchet.py", "counts": {"no-window": 4}},
-    {"key": "tests/test_event_loop.py", "counts": {"no-window": 1}},
-    {"key": "tests/test_respawn_watchdog.py", "counts": {"no-window": 1}}
-  ]
+  "entries": []
 }
