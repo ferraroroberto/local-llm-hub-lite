@@ -27,6 +27,7 @@ build_info = { src = "src/build_info.py", sha = "c9e54e917fd3cbc96011d6c09f9d363
 static_ratchet = { src = "scripts/static_ratchet.py", sha = "f0e6f5449ecf64c9b188ed394c2a9fd8ff678406", dest = "scripts/static_ratchet.py" }
 docs_ratchet = { src = "scripts/docs_ratchet.py", sha = "fdb750461997c4a13eacea8091f115ff12bba564", dest = "scripts/docs_ratchet.py" }
 structure_ratchet = { src = "scripts/structure_ratchet.py", sha = "84d2b12ab416551762e4a615e4a706df91cea69f", dest = "scripts/structure_ratchet.py" }
+instruction_ratchet = { src = "scripts/instruction_ratchet.py", sha = "60fdd0350f18d28838428b2e773f7868f6381fbf", dest = "scripts/instruction_ratchet.py" }
 # Admin-SPA components, byte-identical to project-scaffolding at the recorded sha. icons/ is not
 # listed: its sprite is trimmed to the glyphs this app uses, so it is not a verbatim copy.
 button       = { src = "app/webapp/static/_vendored/button", sha = "a46f8b028dc08885c259290206f3f677b2af786c", dest = "app_web/static/_vendored/button" }
@@ -89,6 +90,18 @@ baseline = ".comment-ratchet-baseline.json"
 [structure_ratchet]
 enabled  = true
 baseline = ".structure-ratchet-baseline.json"
+
+# [instruction_ratchet] -- the scaffold's baseline-and-ratchet check of the weekly
+# prompt audit's deterministic rules over the instruction files (CLAUDE.md,
+# AGENTS.md, .claude/rules/*.md, any SKILL.md). The gate runs
+# scripts/instruction_ratchet.py: a per-file, per-rule count above
+# .instruction-ratchet-baseline.json, or a file past its size cap, fails. This repo
+# keeps no skills, so the defaults apply. Exit 3 (git unusable, an unreadable file)
+# fails the gate as NOT CONFIRMED. Procedure + limits: project-scaffolding
+# docs/instruction-ratchet.md.
+[instruction_ratchet]
+enabled  = true
+baseline = ".instruction-ratchet-baseline.json"
 
 [e2e]
 static_pytest_target = "tests/e2e/test_smoke.py"
@@ -160,6 +173,9 @@ path = ".comment-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = ".structure-ratchet-baseline.json"
+[[e2e.rule]]
+tier = "none"
+path = ".instruction-ratchet-baseline.json"
 [[e2e.rule]]
 tier = "none"
 path = ".gitignore"

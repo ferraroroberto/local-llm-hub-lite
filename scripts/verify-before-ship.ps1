@@ -24,8 +24,13 @@
 #      .structure-ratchet-baseline.json. Any non-zero exit fails, so exit 3
 #      (git unusable, an unparseable file, an unknown shape) is NOT CONFIRMED
 #      and never a pass.
-#   6. `pytest -q` (unit tests, no GPU / no real CLIs)
-#   7. e2e, routed by scripts/classify_e2e.py against the [e2e] table in
+#   6. instruction ratchet: no rise in a weekly-prompt-audit rule hit per
+#      instruction file (CLAUDE.md, AGENTS.md, rules, skills) and no file past
+#      its size cap, against .instruction-ratchet-baseline.json. Whole tree,
+#      never routed. Any non-zero exit fails, so exit 3 (git unusable, an
+#      unreadable file) is NOT CONFIRMED and never a pass.
+#   7. `pytest -q` (unit tests, no GPU / no real CLIs)
+#   8. e2e, routed by scripts/classify_e2e.py against the [e2e] table in
 #      .fleet.toml: nothing for a diff with no browser surface, the smoke
 #      target for inert assets, a surface slice or the full suite otherwise.
 #      An unclassified path, an empty diff or a router failure runs the
@@ -128,6 +133,12 @@ Step "structure ratchet" {
     # Called directly: Step fails on any non-zero exit, so exit 3 (not
     # confirmed) stops the gate like a finding does.
     & $Python scripts\structure_ratchet.py
+}
+
+Step "instruction ratchet" {
+    # Called directly, like the structure ratchet: Step fails on any non-zero
+    # exit, so exit 3 (not confirmed) stops the gate like a finding does.
+    & $Python scripts\instruction_ratchet.py
 }
 
 Step "pytest (unit)" {
