@@ -14,14 +14,17 @@ from pathlib import Path
 import pytest
 
 from scripts import comment_ratchet as cr
+from src.no_window import NO_WINDOW
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _init_repo(tmp_path: Path) -> Path:
-    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
-    subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=tmp_path, check=True)
-    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True, creationflags=NO_WINDOW)
+    subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=tmp_path, check=True,
+                   creationflags=NO_WINDOW)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True,
+                   creationflags=NO_WINDOW)
     return tmp_path
 
 
@@ -29,7 +32,7 @@ def _write(root: Path, rel: str, text: str) -> None:
     path = root / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
-    subprocess.run(["git", "add", rel], cwd=root, check=True)
+    subprocess.run(["git", "add", rel], cwd=root, check=True, creationflags=NO_WINDOW)
 
 
 @pytest.mark.parametrize(

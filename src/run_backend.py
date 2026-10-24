@@ -82,6 +82,7 @@ def _run_backend(model_id: str) -> int:
         env["PATH"] = str(vendor_dir_for(model)) + os.pathsep + env.get("PATH", "")
     log.info("-> %s", " ".join(cmd))
     # Foreground execution so Ctrl+C works.
+    # no-window-exempt: runs in the launcher's own visible console; hiding it would swallow the server output
     return subprocess.call(cmd, env=env, cwd=str(PROJECT_ROOT))
 
 
