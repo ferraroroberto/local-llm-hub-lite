@@ -18,8 +18,14 @@
 #      scripts/ tray/ launchers/ comment or docstring beyond
 #      .comment-ratchet-baseline.json. Exit 3 (a file could not be read) is
 #      NOT CONFIRMED and fails.
-#   5. `pytest -q` (unit tests, no GPU / no real CLIs)
-#   6. e2e, routed by scripts/classify_e2e.py against the [e2e] table in
+#   5. structure ratchet: no new file over 1,000 lines, function over 100 lines
+#      or directory over 40 modules, no baselined one grown, and the root
+#      folders inside the `service` shape (.fleet.toml), against
+#      .structure-ratchet-baseline.json. Any non-zero exit fails, so exit 3
+#      (git unusable, an unparseable file, an unknown shape) is NOT CONFIRMED
+#      and never a pass.
+#   6. `pytest -q` (unit tests, no GPU / no real CLIs)
+#   7. e2e, routed by scripts/classify_e2e.py against the [e2e] table in
 #      .fleet.toml: nothing for a diff with no browser surface, the smoke
 #      target for inert assets, a surface slice or the full suite otherwise.
 #      An unclassified path, an empty diff or a router failure runs the
@@ -116,6 +122,12 @@ Step "comment ratchet" {
     # Same wrapper shape as the static ratchet: exit 3 (a file could not be
     # read) is NOT CONFIRMED and fails (tests/test_comment_ratchet_gate.py pins it).
     & $Python -m scripts.comment_ratchet_gate
+}
+
+Step "structure ratchet" {
+    # Called directly: Step fails on any non-zero exit, so exit 3 (not
+    # confirmed) stops the gate like a finding does.
+    & $Python scripts\structure_ratchet.py
 }
 
 Step "pytest (unit)" {

@@ -155,6 +155,8 @@ vendor/            llama.cpp + whisper.cpp binaries (downloaded, gitignored)
 models/            GGUF/BIN weights (downloaded, gitignored)
 ```
 
+Where new code goes, and the structure ratchet that enforces it: [`docs/layout.md`](docs/layout.md).
+
 ## Restart & verify
 
 The canonical restart is **`tray.bat --restart`** — an orphan-proof reclaim-then-start (kills the tray subtree, reclaims `:8000` by repo-scoped PID via the vendored `scripts\tray_lifecycle.ps1`, starts fresh, verifies the new build's `git_sha`). It never touches the model backend ports. Confirm with `GET /health` (the `/admin/api/version` payload carries `git_sha`).
