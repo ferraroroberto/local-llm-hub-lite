@@ -24,7 +24,7 @@ from scripts.classify_e2e import (
     load_config,
 )
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 REAL_FLEET_TOML = REPO_ROOT / ".fleet.toml"
 
 

@@ -128,20 +128,20 @@ Step "byte-compile" {
 
 Step "static ratchet" {
     # The wrapper maps the script's exit 3 to NOT CONFIRMED
-    # (tests/test_static_ratchet_gate.py pins it); call it, never
+    # (tests/ratchets/test_static_ratchet_gate.py pins it); call it, never
     # scripts/static_ratchet.py directly.
     & $Python -m scripts.static_ratchet_gate
 }
 
 Step "docs ratchet" {
     # Same wrapper shape as the static ratchet: exit 3 (a file could not be
-    # read) is NOT CONFIRMED and fails (tests/test_docs_ratchet_gate.py pins it).
+    # read) is NOT CONFIRMED and fails (tests/ratchets/test_docs_ratchet_gate.py pins it).
     & $Python -m scripts.docs_ratchet_gate
 }
 
 Step "comment ratchet" {
     # Same wrapper shape as the static ratchet: exit 3 (a file could not be
-    # read) is NOT CONFIRMED and fails (tests/test_comment_ratchet_gate.py pins it).
+    # read) is NOT CONFIRMED and fails (tests/ratchets/test_comment_ratchet_gate.py pins it).
     & $Python -m scripts.comment_ratchet_gate
 }
 

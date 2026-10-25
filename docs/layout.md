@@ -10,7 +10,7 @@ The structure ratchet (`scripts/structure_ratchet.py`, configured in `.fleet.tom
 | `app_web/` | The `/admin` sub-app: `routers/` for the API, `static/` for the vanilla-JS SPA (no bundler). Declared by the shape instead of the scaffold's `app/webapp/`. |
 | `app_web/static/_vendored/` | Admin-SPA components copied from project-scaffolding. Those declared in `.fleet.toml` `[vendored]` are re-vendored, never edited here; `icons/` is a trimmed local sprite. |
 | `tray/` | The pystray tray app that owns the hub process. Declared by the shape instead of the scaffold's `app/tray/`. |
-| `tests/` | Unit tests, with `tests/e2e/` for the Playwright suite. The flat directory is baselined, so a new test goes in a subfolder. |
+| `tests/` | Unit tests, with `tests/e2e/` for the Playwright suite. The flat directory is close to the 40-module limit, so a new test goes in a subfolder (`tests/ratchets/` holds the gate and ratchet tests). |
 | `scripts/` | The gate, the ratchets, installers for llama.cpp / whisper.cpp / weights, the smoke test and the vendored `tray_lifecycle.ps1`. |
 | `config/` | The committed model registry (`models.yaml`) and the web-config sample. |
 | `launchers/` | Registry-driven per-model consoles (`.bat` and `.sh`). |
@@ -19,4 +19,4 @@ The structure ratchet (`scripts/structure_ratchet.py`, configured in `.fleet.tom
 
 ## What the baseline holds
 
-`.structure-ratchet-baseline.json` records every offender at today's size and excludes nothing. The flat `tests/` directory is past 40 modules, so it takes no new module. A baselined entry may not grow; shrinking one is `scripts/structure_ratchet.py --update-baseline`, and raising or adding needs `--allow-additions` and shows in review.
+`.structure-ratchet-baseline.json` records every offender at today's size and excludes nothing; it is empty now, so every file, function and directory is under its limit. A baselined entry may not grow; shrinking one is `scripts/structure_ratchet.py --update-baseline`, and raising or adding needs `--allow-additions` and shows in review.
