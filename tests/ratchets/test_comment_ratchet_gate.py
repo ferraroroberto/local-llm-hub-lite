@@ -17,12 +17,12 @@ from pathlib import Path
 import pytest
 
 from scripts import comment_ratchet_gate as gate
-from tests.test_static_ratchet_gate import (
+from tests.ratchets.test_static_ratchet_gate import (
     _fake_script,
     assert_only_zero_passes_and_three_is_not_confirmed,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_only_exit_zero_passes_and_exit_three_is_never_a_skip() -> None:

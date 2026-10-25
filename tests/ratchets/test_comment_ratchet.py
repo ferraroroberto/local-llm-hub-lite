@@ -16,7 +16,7 @@ import pytest
 from scripts import comment_ratchet as cr
 from src.no_window import NO_WINDOW
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _init_repo(tmp_path: Path) -> Path:
