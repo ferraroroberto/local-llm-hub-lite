@@ -97,7 +97,7 @@ def test_transient_httperror_stays_502(monkeypatch):
 def test_audio_health_ok_when_reachable(monkeypatch):
     """All audio backends reachable → 200 + status=ok."""
     monkeypatch.setattr(
-        "src.backend_process.is_reachable", lambda m, timeout=1.0: True
+        "src.process.backend_process.is_reachable", lambda m, timeout=1.0: True
     )
 
     client = TestClient(server_mod.app)
@@ -115,7 +115,7 @@ def test_audio_health_ok_when_reachable(monkeypatch):
 def test_audio_health_degraded_when_down(monkeypatch):
     """A down audio backend → 503 + status=degraded (preflight catches it)."""
     monkeypatch.setattr(
-        "src.backend_process.is_reachable", lambda m, timeout=1.0: False
+        "src.process.backend_process.is_reachable", lambda m, timeout=1.0: False
     )
 
     client = TestClient(server_mod.app)

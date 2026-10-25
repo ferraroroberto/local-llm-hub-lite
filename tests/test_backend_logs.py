@@ -22,7 +22,7 @@ import sys
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from src import backend_process as bp  # noqa: E402
+from src.process import backend_process as bp  # noqa: E402
 
 
 # --------------------------------------------------------------------------

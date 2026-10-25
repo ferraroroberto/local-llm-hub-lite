@@ -29,11 +29,11 @@ import sys
 from pathlib import Path
 from typing import Dict, Optional
 
-from .http_client import get_sync_client
-from .model_registry import Model, enabled_models
+from ..http_client import get_sync_client
+from ..model_registry import Model, enabled_models
 from .server_process import WIN_NEW_GROUP, kill_pid, resolve_external_pid
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 VENDOR_LLAMA = PROJECT_ROOT / "vendor" / "llama.cpp"
 VENDOR_WHISPER = PROJECT_ROOT / "vendor" / "whisper.cpp"
 LOG_DIR = PROJECT_ROOT / "data" / "logs"

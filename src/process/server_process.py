@@ -1,7 +1,7 @@
 """Port and PID helpers for the hub and its backends.
 
 The tray (``tray.tray.HubProcess``) owns the hub process; the per-model
-backends are owned by :mod:`src.backend_process`. This module holds what
+backends are owned by :mod:`src.process.backend_process`. This module holds what
 both share: the hub's loopback URL and reachability probe, listening-port
 and PID lookups, and a force-kill.
 
@@ -28,9 +28,9 @@ import subprocess
 import sys
 from typing import Optional
 
-from .host_profile import hub_port
-from .http_client import get_sync_client
-from .no_window import NO_WINDOW
+from ..host_profile import hub_port
+from ..http_client import get_sync_client
+from ..no_window import NO_WINDOW
 
 logger = logging.getLogger(__name__)
 

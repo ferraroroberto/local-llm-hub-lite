@@ -25,7 +25,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
-from .anthropic_errors import install_anthropic_error_handlers
+from .routes.anthropic_errors import install_anthropic_error_handlers
 from .auth_middleware import ParentBearerTokenMiddleware
 from .chat_translation import MessagesRequest, _run_openai_backend
 from .cors_policy import install_cors
@@ -35,7 +35,7 @@ from .hub_observability import ObservatoryMiddleware
 from .model_registry import Model, enabled_models
 from .server_common import ensure_backend_ready_or_503 as _ensure_backend_ready, resolve_model_or_400 as _resolve
 from . import on_demand as _on_demand
-from .server_audio_asr import router as _audio_router
+from .audio.server_audio_asr import router as _audio_router
 from .openai_upstream import (
     UpstreamError,
     call_openai_chat,

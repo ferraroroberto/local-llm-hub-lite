@@ -22,7 +22,7 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-from .backend_process import (
+from .process.backend_process import (
     build_command,
     external_pid as backend_external_pid,
     is_reachable as backend_is_reachable,
@@ -31,7 +31,7 @@ from .backend_process import (
 )
 from .host_profile import resolve as resolve_host
 from .model_registry import enabled_models, launchable_local_ids
-from .server_process import (
+from .process.server_process import (
     BASE_URL as HUB_BASE_URL,
     external_pid as hub_external_pid,
     is_reachable as hub_is_reachable,

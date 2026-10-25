@@ -33,7 +33,7 @@ from fastapi.responses import StreamingResponse
 
 from src.hub_log import HUB_LOG
 from src.hub_observability import OBS
-from src.server_process import WIN_NEW_GROUP, lan_ip
+from src.process.server_process import WIN_NEW_GROUP, lan_ip
 
 from ._helpers import maybe_json, sse_stream
 
@@ -163,7 +163,7 @@ async def hub_restart() -> Dict[str, Any]:
     # Tell the shutdown handler to leave the model backends running so the
     # respawned hub adopts them, instead of killing the survivors that
     # inherit_running_backends() exists to reclaim.
-    from src import backend_process as bp
+    from src.process import backend_process as bp
 
     bp.set_restart_pending(True)
 
