@@ -11,7 +11,7 @@ import logging
 
 import pytest
 
-from src import backend_process as bp
+from src.process import backend_process as bp
 from src import host_profile, model_registry, on_demand
 from src.model_registry import Model
 

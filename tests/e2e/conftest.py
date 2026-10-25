@@ -19,7 +19,7 @@ from typing import Iterator
 import httpx
 import pytest
 
-from src import win_job
+from src.process import win_job
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 

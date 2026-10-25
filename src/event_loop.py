@@ -20,7 +20,7 @@ aborted connections against a bare ``SelectorEventLoop`` server left it
 accepting fine, while the same abuse killed a ``ProactorEventLoop`` server
 after ~20. None of this repo's servers spawn asyncio subprocesses
 in-process (backends are launched via plain ``subprocess.Popen`` in
-``src/backend_process.py``, never ``asyncio.create_subprocess_*``), so the
+``src/process/backend_process.py``, never ``asyncio.create_subprocess_*``), so the
 selector loop's lack of subprocess support is a non-issue here.
 
 Wired into the ``uvicorn.run(...)`` call in ``src/server.py`` (the main

@@ -7,7 +7,7 @@ spawns — the incident this module was written for, below.
 
 A verification run (``tests/e2e``'s ``hub_url`` fixture) boots a throwaway
 hub as a plain ``subprocess.Popen``. If a test drives an ``on_demand``
-backend row (``src.backend_process.start``), that backend is spawned with
+backend row (``src.process.backend_process.start``), that backend is spawned with
 ``CREATE_NEW_PROCESS_GROUP`` (see ``server_process.WIN_NEW_GROUP``) —
 deliberately detached so ``CTRL_BREAK_EVENT`` aimed at the hub during its
 own polite shutdown doesn't propagate to it. That's correct for the

@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src import backend_process as lp  # noqa: E402
+from src.process import backend_process as lp  # noqa: E402
 from src.model_registry import enabled_models  # noqa: E402
 
 BASE_URL = "http://127.0.0.1:8000"

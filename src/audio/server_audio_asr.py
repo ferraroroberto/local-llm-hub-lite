@@ -19,8 +19,8 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 
-from .http_client import get_async_client
-from .model_registry import Model
+from ..http_client import get_async_client
+from ..model_registry import Model
 from .server_audio_common import (
     HEADER_REQUESTED_MODEL,
     HEADER_SERVED_HOST,
@@ -28,7 +28,7 @@ from .server_audio_common import (
     _audio_upstream_error,
     _header_safe,
 )
-from .server_common import ensure_backend_ready_or_503
+from ..server_common import ensure_backend_ready_or_503
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ _ROLE_ALIASES = {"audio_transcribe"}
 
 def _local_whisper() -> Optional[Model]:
     """The single locally-enabled whisper backend, or ``None``."""
-    from .model_registry import enabled_models
+    from ..model_registry import enabled_models
 
     for m in enabled_models():
         if m.backend == "whisper" and m.port:
@@ -65,7 +65,7 @@ def _whisper_model_for_request(model_name: str) -> Model:
     400 when the named model is not a transcription backend, 503 when it is
     a configured transcription model this host does not serve.
     """
-    from .model_registry import resolve as _resolve_model, resolve_any
+    from ..model_registry import resolve as _resolve_model, resolve_any
 
     local = _local_whisper()
 
@@ -224,7 +224,7 @@ async def _dispatch_audio(
     # Who served: the single local backend, on the active host.
     served_model = target.id
     try:
-        from .host_profile import resolve as _resolve_host
+        from ..host_profile import resolve as _resolve_host
         served_host = _resolve_host().id
     except Exception:  # noqa: BLE001 — never fail a served request over a label
         served_host = ""
@@ -278,7 +278,7 @@ def audio_health() -> Response:
     """
     import json as _json
 
-    from .backend_process import is_reachable
+    from ..process.backend_process import is_reachable
 
     backends = []
     target = _local_whisper()

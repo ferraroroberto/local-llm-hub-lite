@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import asyncio
 
-from src import backend_process, model_registry, server_lifecycle as sl
+from src import model_registry, server_lifecycle as sl
+from src.process import backend_process
 
 
 def _stub_real_ops(monkeypatch):

@@ -42,7 +42,7 @@ import yaml
 from src.host_profile import CONFIG_PATH, hub_port
 from src.model_registry import Model, enabled_models
 from src.no_window import NO_WINDOW
-from src.server_process import WIN_NEW_GROUP
+from src.process.server_process import WIN_NEW_GROUP
 from src.webapp_config import append_auth_token, ensure_auth_token
 
 from .icon import COLOR_RUNNING, COLOR_STARTING, COLOR_STOPPED, make_icon_image

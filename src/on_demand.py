@@ -156,7 +156,7 @@ def _warn_on_vram_overcommit(model: Model) -> Optional[int]:
     always proceeds. Returns the projected total (MB) when it overcommits,
     ``None`` otherwise (including hosts with no ceiling).
     """
-    from . import backend_process as bp
+    from .process import backend_process as bp
     from .host_profile import resolve as resolve_host
 
     try:
@@ -192,7 +192,7 @@ def ensure_ready(model: Model, deadline_s: float = READY_DEADLINE_S) -> None:
     ``deadline_s`` expires — raising :class:`OnDemandNotReady` so the route
     can surface a distinct 503.
     """
-    from . import backend_process as bp
+    from .process import backend_process as bp
 
     if not is_on_demand(model) or model.virtual or not model.port:
         return
@@ -235,7 +235,7 @@ def idle_unload_pass(now: Optional[float] = None) -> Dict[str, Any]:
     so it still unloads one full window later rather than immediately or
     never. Returns ``{model_id: action}`` for observability/tests.
     """
-    from . import backend_process as bp
+    from .process import backend_process as bp
     from .model_registry import enabled_models
 
     t = time.monotonic() if now is None else now

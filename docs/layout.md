@@ -6,7 +6,7 @@ The structure ratchet (`scripts/structure_ratchet.py`, configured in `.fleet.tom
 
 | Folder | Holds |
 | --- | --- |
-| `src/` | The hub: FastAPI app, model registry, backend process manager, Anthropic↔OpenAI translation, audio proxy, observability ring, system stats, installer. The directory is flat; a new module that fits no existing one goes in a subpackage. |
+| `src/` | The hub: FastAPI app, model registry, backend process manager, Anthropic↔OpenAI translation, audio proxy, observability ring, system stats, installer. The process manager lives in `src/process/`, the Anthropic error envelopes in `src/routes/` and the whisper proxy in `src/audio/`, mirroring local-llm-hub's subpackages; a new module that fits no existing one goes in a subpackage. |
 | `app_web/` | The `/admin` sub-app: `routers/` for the API, `static/` for the vanilla-JS SPA (no bundler). Declared by the shape instead of the scaffold's `app/webapp/`. |
 | `app_web/static/_vendored/` | Admin-SPA components copied from project-scaffolding. Those declared in `.fleet.toml` `[vendored]` are re-vendored, never edited here; `icons/` is a trimmed local sprite. |
 | `tray/` | The pystray tray app that owns the hub process. Declared by the shape instead of the scaffold's `app/tray/`. |

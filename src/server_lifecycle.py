@@ -56,7 +56,7 @@ async def stop_backend_children() -> None:
     restart endpoint sets ``backend_process.restart_pending()`` before
     signalling shutdown; we honour it by skipping teardown.
     """
-    from . import backend_process as bp
+    from .process import backend_process as bp
     from . import http_client
 
     try:
@@ -94,7 +94,7 @@ async def wire_observatory_loop() -> None:
     # previous hub instance. Without this, every hub restart shows the
     # surviving model backends as "adopted" rather than "running".
     try:
-        from . import backend_process as bp
+        from .process import backend_process as bp
         inherited = await asyncio.to_thread(bp.inherit_running_backends)
         if inherited:
             logger.info("📎 Inherited %d running backend(s) from a previous hub", inherited)
@@ -113,7 +113,7 @@ async def wire_observatory_loop() -> None:
 
 async def _autostart_configured_backends() -> None:
     # The registry-derived desired set: eager rows launchable on this host.
-    from . import backend_process as bp
+    from .process import backend_process as bp
     from .model_registry import desired_model_ids
 
     model_ids = desired_model_ids()

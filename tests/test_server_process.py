@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src import server_process
+from src.process import server_process
 
 
 def test_find_port_pids_constrains_posix_lsof_to_requested_listener(monkeypatch):

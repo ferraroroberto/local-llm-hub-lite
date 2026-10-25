@@ -36,7 +36,7 @@ import secrets
 import uuid as _uuid
 from typing import Any, Awaitable, Callable, Optional
 
-from .anthropic_errors import is_anthropic_shape_path
+from .routes.anthropic_errors import is_anthropic_shape_path
 from .anthropic_headers import parity_headers
 
 logger = logging.getLogger(__name__)
