@@ -22,7 +22,7 @@ shape        = "service"
 # [e2e] table at all -- fails safe to the full suite; this table only ever
 # narrows what an *already-covered* diff runs, never what an unmatched one runs.
 [vendored]
-classify_e2e = { src = "scripts/classify_e2e.py", sha = "bede95f00aee0b17d5007246a29fa881a71f24f4", dest = "scripts/classify_e2e.py" }
+classify_e2e = { src = "scripts/classify_e2e.py", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "scripts/classify_e2e.py" }
 build_info = { src = "src/build_info.py", sha = "c9e54e917fd3cbc96011d6c09f9d363af460b205", dest = "src/build_info.py" }
 static_ratchet = { src = "scripts/static_ratchet.py", sha = "0eb0da42298e391fc614b3fe550bd6cf2d07c693", dest = "scripts/static_ratchet.py" }
 docs_ratchet = { src = "scripts/docs_ratchet.py", sha = "fdb750461997c4a13eacea8091f115ff12bba564", dest = "scripts/docs_ratchet.py" }
@@ -31,18 +31,18 @@ instruction_ratchet = { src = "scripts/instruction_ratchet.py", sha = "60fdd0350
 doc_refs_ratchet = { src = "scripts/doc_refs_ratchet.py", sha = "23dbefa46635c952d3c871bda4e80b740e7f2859", dest = "scripts/doc_refs_ratchet.py" }
 dead_code_ratchet = { src = "scripts/dead_code_ratchet.py", sha = "8cc9a5f908c48dabc69971ff958869dffed1ba21", dest = "scripts/dead_code_ratchet.py" }
 conventions_ratchet = { src = "scripts/conventions_ratchet.py", sha = "0eb0da42298e391fc614b3fe550bd6cf2d07c693", dest = "scripts/conventions_ratchet.py" }
-single_instance = { src = "app/tray/single_instance.py", sha = "dadbc3c127e8b7214151defb43d563e0ef82d9f7", dest = "tray/single_instance.py" }
+single_instance = { src = "app/tray/single_instance.py", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "tray/single_instance.py" }
 # Admin-SPA components, byte-identical to project-scaffolding at the recorded sha. icons/ is not
 # listed: its sprite is trimmed to the glyphs this app uses, so it is not a verbatim copy.
-button       = { src = "app/webapp/static/_vendored/button", sha = "a46f8b028dc08885c259290206f3f677b2af786c", dest = "app_web/static/_vendored/button" }
-card         = { src = "app/webapp/static/_vendored/card", sha = "67a4112488110e0a4c943c5290f4165b5a14e836", dest = "app_web/static/_vendored/card" }
-disclosure   = { src = "app/webapp/static/_vendored/disclosure", sha = "1e7edc2fff6d6bf9f1d236da9bb4f4049815a6a0", dest = "app_web/static/_vendored/disclosure" }
-empty-state  = { src = "app/webapp/static/_vendored/empty-state", sha = "69351311c9c4d6500c79f45ddd3c4441b1e90fa4", dest = "app_web/static/_vendored/empty-state" }
-modal        = { src = "app/webapp/static/_vendored/modal", sha = "f94fd8019c07a1c3f8e7759f270badc36cd5e062", dest = "app_web/static/_vendored/modal" }
+button       = { src = "app/webapp/static/_vendored/button", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/button" }
+card         = { src = "app/webapp/static/_vendored/card", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/card" }
+disclosure   = { src = "app/webapp/static/_vendored/disclosure", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/disclosure" }
+empty-state  = { src = "app/webapp/static/_vendored/empty-state", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/empty-state" }
+modal        = { src = "app/webapp/static/_vendored/modal", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/modal" }
 nav          = { src = "app/webapp/static/_vendored/nav", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/nav" }
-segmented    = { src = "app/webapp/static/_vendored/segmented", sha = "f52eb75625cbfd8dcef8a71731390a47b795508d", dest = "app_web/static/_vendored/segmented" }
-switch       = { src = "app/webapp/static/_vendored/switch", sha = "7e1433c70cac1bdcdbd160e874d3f486ba9e2a08", dest = "app_web/static/_vendored/switch" }
-text-size    = { src = "app/webapp/static/_vendored/text-size", sha = "4c699636afecd5cae5e966bc2bcb17fa49744390", dest = "app_web/static/_vendored/text-size" }
+segmented    = { src = "app/webapp/static/_vendored/segmented", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/segmented" }
+switch       = { src = "app/webapp/static/_vendored/switch", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/switch" }
+text-size    = { src = "app/webapp/static/_vendored/text-size", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/text-size" }
 
 # [static_ratchet] -- the scaffold's baseline-and-ratchet static analysis. The gate
 # (scripts/verify-before-ship.ps1) runs scripts/static_ratchet.py, which fails on a
