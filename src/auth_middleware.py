@@ -6,11 +6,15 @@ parent hub's ``/v1/*`` routes, :class:`BearerTokenMiddleware` guards the
 in ``src/`` (the hub's package) rather than ``app_web/`` (the admin
 panel's), which only ever depends on ``src/``, never the reverse.
 
-Loopback callers (PC itself) bypass the bearer token. Non-loopback
-callers must present ``Authorization: Bearer <token>``, ``x-api-key:
+Local programs on this PC bypass the bearer token: a loopback, unproxied
+connection addressed to a loopback name, sent either with no ``Origin`` or
+from a loopback / configured (``cors_allow_origins``) origin. Every other
+caller must present ``Authorization: Bearer <token>``, ``x-api-key:
 <token>`` (the Anthropic SDK's own credential header), or
 ``?token=…`` on the URL (the last is what bookmarked / shared
 URLs use; the SPA strips it from ``window.location`` on first load).
+With no token configured, only local programs and ``extra_allowlist``
+peers are admitted.
 
 WebSocket handshakes are not seen by this middleware:
 ``BaseHTTPMiddleware`` only ever runs for ``http``-scope connections, so
@@ -25,12 +29,16 @@ from __future__ import annotations
 import hmac
 import ipaddress
 import logging
+import re
 from typing import Any, FrozenSet, List, Optional, Tuple
+from urllib.parse import urlsplit
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
+
+from .cors_policy import LOOPBACK_ORIGIN_REGEX, resolve_allowed_origins
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +72,46 @@ def _is_proxied(headers) -> bool:
         if h in headers:
             return True
     return False
+
+
+# ``Host`` names a loopback connection may carry and still count as a local
+# program. ``testserver`` is starlette's TestClient default, the Host-side
+# twin of ``testclient`` in LOOPBACK_HOSTS.
+LOCAL_HOST_NAMES = frozenset({"localhost", "testserver"})
+_LOOPBACK_ORIGIN_RE = re.compile(LOOPBACK_ORIGIN_REGEX)
+
+
+def _host_is_local(headers) -> bool:
+    """True when the request's ``Host`` names this machine's loopback."""
+    host = (headers.get("host", "") or "").strip()
+    if not host:
+        return True
+    try:
+        name = (urlsplit("//" + host).hostname or "").lower()
+    except ValueError:
+        return False
+    if name in LOCAL_HOST_NAMES:
+        return True
+    try:
+        return ipaddress.ip_address(name).is_loopback
+    except ValueError:
+        return False
+
+
+def _origin_is_local(headers, cfg) -> bool:
+    """True when no page origin is attached, or it is loopback or configured.
+
+    A browser attaches ``Origin`` to the requests a page makes, and those
+    requests leave from 127.0.0.1 whatever site the page came from, so the
+    client IP alone does not say a local program sent them.
+    """
+    origin = headers.get("origin")
+    if origin is None:
+        return True
+    origin = origin.strip().rstrip("/").lower()
+    if _LOOPBACK_ORIGIN_RE.fullmatch(origin):
+        return True
+    return origin in resolve_allowed_origins(getattr(cfg, "cors_allow_origins", None))
 
 # Static + login + healthz/version are exempt: the login endpoint is
 # how a phone-side user *gets* the token, and static assets must load
@@ -117,14 +165,21 @@ def _caller_is_trusted(
     concern (login/static must load before a token exists).
     """
     token = (get_token() or "").strip()
-    if not token:
-        return True
-    if client_host in LOOPBACK_HOSTS and not _is_proxied(headers):
-        return True
     cfg = getattr(app_state, "webapp_config", None)
+    if (
+        client_host in LOOPBACK_HOSTS
+        and not _is_proxied(headers)
+        and _host_is_local(headers)
+        and _origin_is_local(headers, cfg)
+    ):
+        return True
     extra = getattr(cfg, "extra_allowlist", []) if cfg else []
     if _client_in_allowlist(client_host, extra):
         return True
+    if not token:
+        # No token means nothing can authenticate, so only the local and
+        # allowlisted callers above get in; the hub binds 0.0.0.0 by default.
+        return False
 
     presented = ""
     auth_header = headers.get("authorization", "")
