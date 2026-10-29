@@ -34,8 +34,9 @@ SAMPLE_CONFIG_PATH = PROJECT_ROOT / "config" / "webapp_config.sample.json"
 class WebappConfig:
     """User-authored, persisted webapp settings."""
 
-    # Bearer token enforced when the request did NOT come from a
-    # loopback IP. Empty string disables enforcement entirely.
+    # Bearer token every non-local caller must present (see
+    # src/auth_middleware.py for what counts as local). Empty string admits
+    # local and ``extra_allowlist`` callers only.
     auth_token: str = ""
     # Optional password gate that hands the bearer token back to the
     # browser when the user types it correctly. Lets a fresh device

@@ -166,10 +166,10 @@ def test_preflight_from_foreign_origin_is_refused():
 
 
 def test_foreign_origin_cannot_read_a_real_response():
-    """The request still runs (CORS never blocked a request, only the read) —
-    the browser is denied the response because no ACAO comes back."""
+    """A page from an unlisted origin gets no ACAO, and its request does not
+    count as a local program, so it meets the token gate."""
     r = _client().get("/v1/models", headers={"Origin": FOREIGN_ORIGIN})
-    assert r.status_code == 200
+    assert r.status_code == 401
     assert "access-control-allow-origin" not in r.headers
 
 

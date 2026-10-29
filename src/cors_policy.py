@@ -21,8 +21,8 @@ Three deliberate choices, each of which is the security-relevant half:
   through without a token, so letting a loopback *origin* read the
   response grants nothing it did not already have. A page served from a
   non-loopback origin still makes its request from 127.0.0.1 — so the
-  origin check, not the client IP, is what keeps it from reading the
-  answer.
+  origin, not the client IP, decides: this policy keeps it from reading
+  the answer, and the bearer gate admits it only with the token.
 - **Credentials are off.** The hub sets no cookies and uses no
   HTTP-auth realm; it authenticates from ``Authorization`` / ``x-api-key``
   / ``?token=``, which a plain (non-credentialed) cross-origin ``fetch``
