@@ -12,7 +12,9 @@
 #   port           loopback port the backend listens on
 #   model_path     weights file, relative to the repo root
 #   hf_repo/hf_pattern  where scripts/download_models.py fetches the weights
-#   est_vram_mb    rough VRAM footprint (display only)
+#   est_vram_mb    rough VRAM footprint; feeds the on-demand overcommit
+#                  warning as the per-model estimate summed against the
+#                  host's `vram_mb` ceiling (see `hosts:` below)
 #   startup        eager (autostarts with the hub, default) | on_demand
 #                  (spawned by the first request; add idle_unload_minutes to
 #                  auto-unload after N idle minutes)
@@ -23,6 +25,14 @@
 #                  payload on every /v1/chat/completions call for this id
 #                  (caller-sent fields win) — the mechanism behind a
 #                  no-think alias
+#
+# Field reference (hosts row):
+#   enabled        registry keys this host serves (autostarted/offered)
+#   vram_mb        discrete-GPU VRAM ceiling in MB; optional — unset disables
+#                  the on-demand overcommit warning (src/on_demand.py checks
+#                  the running models' `est_vram_mb` sum against this before
+#                  spawning another on-demand model; advisory only, never
+#                  blocks the load)
 
 hub:
   port: 8000

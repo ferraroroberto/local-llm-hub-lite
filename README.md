@@ -103,7 +103,11 @@ Single source of truth for models, ports, and roles. Structure:
 hub:    { port: 8000, bind_host: "0.0.0.0" }
 tray:   { autostart_hub: true, hub_ready_timeout_s: 30 }
 hosts:
-  local: { enabled: [qwen35_4b, whisper] }
+  local:
+    enabled: [qwen35_4b, whisper]
+    vram_mb: 8192                    # optional discrete-GPU VRAM ceiling;
+                                      # unset disables the on-demand
+                                      # overcommit warning below
 models:
   qwen35_4b:
     display_name: qwen3.5-4b        # the id clients send
@@ -114,7 +118,9 @@ models:
     model_path: "models/Qwen3.5-4B-Q4_K_M.gguf"
     hf_repo: "unsloth/Qwen3.5-4B-GGUF"   # where --fix downloads from
     hf_pattern: "Qwen3.5-4B-Q4_K_M.gguf"
-    est_vram_mb: 2100                # rough VRAM footprint (display only)
+    est_vram_mb: 2100                # rough VRAM footprint; feeds the
+                                      # on-demand overcommit warning against
+                                      # the host's vram_mb ceiling above
     startup: eager                  # eager | on_demand
     idle_unload_minutes: 30          # on_demand only: unload after N idle minutes
     args: [...]                     # extra backend CLI args
