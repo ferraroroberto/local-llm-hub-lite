@@ -1,11 +1,8 @@
 @echo off
 REM ==========================================================
 REM  local-llm-hub - parameterized per-model launcher.
-REM  Replaces the 22 hand-rolled run_<id>.bat files, each of which
-REM  re-derived the same cd / title / echo-banner / pause around a
-REM  hand-retyped port already declared in config/models.yaml (and
-REM  logged again by run_backend itself) - nothing caught a stale
-REM  or mistyped port when a model's config changed.
+REM  Opens a console for one model's backend: cd / title / echo-banner /
+REM  pause around the port declared in config/models.yaml.
 REM
 REM  Usage: launchers\run_model.bat <model-id>   (id from config/models.yaml)
 REM  Title/port/banner are pulled live from the registry via

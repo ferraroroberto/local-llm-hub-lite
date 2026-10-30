@@ -37,7 +37,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 VENDOR_LLAMA = PROJECT_ROOT / "vendor" / "llama.cpp"
 VENDOR_WHISPER = PROJECT_ROOT / "vendor" / "whisper.cpp"
 LOG_DIR = PROJECT_ROOT / "data" / "logs"
-# Tail size returned by ``log_lines`` — replaces the old 1000-line ring.
+# Tail size returned by ``log_lines``.
 LOG_TAIL_LINES = 400
 # Listen address passed to every backend. The hub is the only intended
 # client and reaches each backend over loopback (``Model.url``); other

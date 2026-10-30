@@ -12,7 +12,7 @@ Endpoints (all under /admin/api/hub):
   * GET  /errors/recent     — non-2xx ring
   * GET  /counters          — per-backend counters since hub start
 
-Plus /admin/api/install/{status,fix-all} which fold in the old install tab.
+Plus /admin/api/install/{status,fix-all} for the install flow.
 """
 
 from __future__ import annotations

@@ -11,13 +11,6 @@ This process is the thing *recovering from* a bad deploy (a broken import
 introduced mid-restart by a ``git pull``, say), so it can't assume the
 rest of the ``src`` package still imports cleanly; only the empty
 ``src/__init__.py`` and this module itself need to load.
-
-Previously this logic was a ~60-line string literal built up line-by-line
-and fed to ``python -c`` — unlintable, untestable, no type-checking, and
-any quoting slip in an interpolated value was invisible until a live
-restart silently failed. Now a real module: covered by this project's
-byte-compile gate, and its pure helpers are unit-tested directly
-(``tests/test_respawn_watchdog.py``).
 """
 
 from __future__ import annotations

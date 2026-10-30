@@ -1,10 +1,9 @@
 """Thread-safe asyncio pub/sub fan-out for SSE-style subscribers.
 
-Extracted from :mod:`src.hub_observability` (``Observatory``) and
-:mod:`src.hub_log` (``RingHandler``) — both carried a line-for-line
-identical subscribe/unsubscribe/fan-out implementation (same lock
-discipline, same ``call_soon_threadsafe``/``QueueFull`` handling),
-differing only in the queue's ``maxsize`` and item type.
+Guarantees one subscriber's slow/full queue never blocks another's
+delivery or the publishing thread: ``push()`` drops into a per-subscriber
+queue with ``QueueFull`` handled, under one lock shared with
+subscribe/unsubscribe.
 
 The write side (``push``) is called from a synchronous context — a log
 handler's ``emit()``, or a plain method on a request-ring class — that

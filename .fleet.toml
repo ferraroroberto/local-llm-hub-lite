@@ -71,10 +71,13 @@ baseline = ".docs-ratchet-baseline.json"
 # [comment_ratchet] -- this repo's own baseline-and-ratchet check (not
 # vendored from project-scaffolding, which has no source-comment equivalent).
 # The gate runs scripts/comment_ratchet.py through scripts/comment_ratchet_gate.py:
-# a new or grown #<digits> issue-number reference in a src/ app_web/ scripts/
-# tray/ launchers/ comment or docstring, beyond .comment-ratchet-baseline.json,
-# fails. Added by issue #53 (audit: claude-md-drift findings) as the structural
-# check that would have caught this class of finding. Excluded: every
+# a new or grown #<digits> issue-number reference, or a curated
+# history-narration phrase ("previously", "used to be", "extracted from",
+# "inlined from", ...), in a src/ app_web/ scripts/ tray/ launchers/ comment
+# or docstring, beyond .comment-ratchet-baseline.json, fails. Added by issue
+# #53 (audit: claude-md-drift findings) as the structural check for the
+# issue-number half of that rule; broadened by a later claude-md-drift audit
+# to the prose-narration half the first pass missed. Excluded: every
 # .fleet.toml [vendored] dest, app_web/static/_vendored/**, and any file
 # carrying the "VENDORED VERBATIM" marker (comment_ratchet.py's own docstring
 # names the convention). Exit 3 (a file could not be read) fails as NOT

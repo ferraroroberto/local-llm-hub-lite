@@ -2,9 +2,8 @@
 
 ``install_llama_cpp.py`` and ``install_whisper_cpp.py`` both download a
 GitHub release archive, extract it into a ``vendor/`` directory, and
-collapse a single-subdir extraction — consolidated here instead of kept as
-near line-for-line duplicates, so a fix to the download/extract/flatten
-logic lands once instead of twice.
+collapse a single-subdir extraction, sharing this module so a fix to the
+download/extract/flatten logic lands once for both scripts.
 
 Not a package ``__init__`` — a plain sibling module. Each install script
 inserts its own directory onto ``sys.path`` before importing this (works
@@ -182,9 +181,6 @@ def flatten_nested_bin(vendor_dir: Path, binary_name: str) -> None:
     ``build/bin/``) instead of at the archive root. Finds the binary via
     ``rglob``, then moves every sibling in its parent directory up into
     ``vendor_dir``, overwriting an existing file/dir of the same name.
-    No-op if the binary is already directly in ``vendor_dir``, or absent.
-    Both install scripts wrote this walk-and-lift by hand — consolidated
-    here for the same reason ``flatten_if_nested`` was.
     """
     for candidate in vendor_dir.rglob(binary_name):
         src_dir = candidate.parent

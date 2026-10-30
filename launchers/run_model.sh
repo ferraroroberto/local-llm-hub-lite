@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # local-llm-hub - parameterized per-model launcher.
-# Replaces the 11 hand-rolled run_<id>.sh files, each of which was an
-# identical shebang / set -euo pipefail / cd / exec around one hardcoded
-# model id.
+# Execs one model's backend via `run_backend`, keyed by model id so the
+# title/port/banner come live from config/models.yaml instead of being
+# hardcoded per model.
 #
 # Usage: launchers/run_model.sh <model-id>   (id from config/models.yaml)
 set -euo pipefail

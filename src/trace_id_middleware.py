@@ -64,8 +64,7 @@ def derive_trace_id_from_uuid(value: str) -> Optional[int]:
 
     Determinism matters: two requests with the same client-side trace
     ID must derive the same value, so we BLAKE2b the input into a stable
-    16-byte digest. (Inlined from the retired ``src.observability`` —
-    behavior preserved exactly.)
+    16-byte digest.
     """
     raw = (value or "").strip().lower()
     if not raw:

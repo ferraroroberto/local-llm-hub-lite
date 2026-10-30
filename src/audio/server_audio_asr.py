@@ -115,13 +115,12 @@ def _whisper_model_for_request(model_name: str) -> Model:
 def _observable_audio_error(exc: HTTPException, ctx, requested: str) -> HTTPException:
     """Make an audio *failure* as observable as an audio success.
 
-    A strict rejection is precisely the event an operator has to be able to
-    see, yet it used to be the least visible thing the hub emitted: the reject
-    fired before anything stamped ``request.state.obs_ctx``, so the ring
-    recorded a blank row and ``ObservatoryMiddleware`` could not recover it —
-    its fallback peeks a *JSON* body and a multipart request never parses.
-    Stamp the detail on the context and echo the same header trio a 200
-    carries, with the served pair empty because nothing served.
+    A multipart rejection fires before anything stamps
+    ``request.state.obs_ctx``, and ``ObservatoryMiddleware``'s fallback only
+    peeks a *JSON* body, so without this the ring would record a blank row
+    for every reject. Stamp the detail on the context and echo the same
+    header trio a 200 carries, with the served pair empty because nothing
+    served.
     """
     detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
     if ctx is not None and not getattr(ctx, "error_detail", ""):
