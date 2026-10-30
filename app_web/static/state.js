@@ -44,8 +44,7 @@ export const els = {
   // Tab buttons + panes are owned by the vendored nav (_vendored/nav) —
   // it discovers them from the markup; no element handles needed here.
 
-  // Hub card — live status indicator lives inside the card header
-  // (replaces the old always-on status strip).
+  // Hub card — live status indicator lives inside the card header.
   hubLiveStatus: document.getElementById('hubLiveStatus'),
   hubLiveStatusText: document.getElementById('hubLiveStatusText'),
   themeToggleBtn: document.getElementById('themeToggleBtn'),

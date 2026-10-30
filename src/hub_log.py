@@ -3,9 +3,8 @@
 A :class:`RingHandler` is attached to the root logger when the hub
 starts. Every log record (also uvicorn's, by attaching to ``uvicorn``
 and ``uvicorn.access``) goes into a thread-safe deque the admin's Hub
-tab can poll or stream. This replaces the old Streamlit ``log_lines()``
-+ ``Popen.stdout`` reader thread — in-process logging is enough now
-that the hub *is* the process.
+tab can poll or stream. In-process logging is enough now that the hub
+*is* the process.
 
 The ring is bounded (default 2000 lines) so an overnight-running hub
 doesn't accumulate unbounded memory.

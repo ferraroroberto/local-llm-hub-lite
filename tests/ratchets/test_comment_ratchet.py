@@ -1,5 +1,6 @@
-"""`scripts/comment_ratchet.py` -- the structural check for audit#53
-(claude-md-drift: issue-number narratives in source comments).
+"""`scripts/comment_ratchet.py` -- the structural check for the
+claude-md-drift audit bucket: issue-number references and decision-history
+narratives in source comments and docstrings.
 
 Exercises the scanner and its baseline modes directly against a throwaway
 git repo in a temp directory: no network, no model, no live backend.
@@ -50,6 +51,42 @@ def test_ref_regex_matches_issue_numbers_not_hex_or_entities(line: str, expect_h
     assert bool(cr._REF.search(line)) is expect_hit
 
 
+@pytest.mark.parametrize(
+    ("text", "expect_hit"),
+    [
+        ("Previously this logic was a hand-rolled string.", True),
+        ("That pairing used to be hand-copied at four sites.", True),
+        ("Extracted from :mod:`src.old_thing` for reuse.", True),
+        ("(Inlined from the retired `src.observability`.)", True),
+        ("Replaces ``tray/app.py`` in one file.", True),
+        ("The resolve-or-404 block each one opened with\nbefore this helper existed.", True),
+        ("Both scripts wrote this by hand -- consolidated\n    here for reuse.", True),
+        ("REM Replaces the 22 hand-rolled run_<id>.bat files", True),
+        ("Resolve the model id or raise 404.", False),
+        ("The hub owns the subprocess from here on.", False),
+        ("This helper replaces nothing; it is the only implementation.", False),
+    ],
+)
+def test_history_regex_matches_narrative_phrases_not_present_tense(text: str, expect_hit: bool) -> None:
+    assert bool(cr._HISTORY.search(text)) is expect_hit
+
+
+def test_count_file_sums_refs_and_history_phrases(tmp_path: Path) -> None:
+    root = _init_repo(tmp_path)
+    _write(
+        root,
+        "src/a.py",
+        '"""Previously this was a string literal (see issue #1)."""\nx = 1\n',
+    )
+    assert cr.count_file(root, "src/a.py") == 2
+
+
+def test_comment_ratchet_py_is_self_exempt_from_its_own_history_phrases() -> None:
+    # The module that defines _HISTORY has to spell every phrase literally,
+    # so it would always flag itself without the self-exemption below.
+    assert cr.count_file(REPO_ROOT, "scripts/comment_ratchet.py") == 0
+
+
 def test_scan_counts_refs_per_file_and_skips_vendored_marker(tmp_path: Path) -> None:
     root = _init_repo(tmp_path)
     _write(root, "src/a.py", "# why this exists (issue #1)\nx = 1\n")
@@ -98,7 +135,7 @@ def test_check_passes_at_baseline_and_fails_above_it(
     code = cr.check(root, baseline)
     out = capsys.readouterr().out
     assert code == cr.EXIT_NEW
-    assert "src/a.py: 2 reference(s), baseline allows 1" in out
+    assert "src/a.py: 2 flag(s), baseline allows 1" in out
 
 
 def test_update_baseline_refuses_growth_without_allow_additions(tmp_path: Path) -> None:

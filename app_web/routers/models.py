@@ -40,10 +40,7 @@ def _add_startup_fields(row: Dict[str, Any], m: Model) -> None:
 
 
 def _require_model(model_id: str) -> Model:
-    """Resolve ``model_id`` via ``bp.resolve_model_by_id`` or raise the same
-    404 every start/stop/force-stop/log handler needs — the identical
-    resolve-or-404 block each one opened with before this helper existed.
-    """
+    """Resolve ``model_id`` via ``bp.resolve_model_by_id`` or raise 404."""
     target = bp.resolve_model_by_id(model_id)
     if target is None:
         raise HTTPException(status_code=404, detail=f"model {model_id!r} not enabled")

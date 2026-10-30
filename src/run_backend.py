@@ -5,9 +5,9 @@
     python -m src.run_backend whisper    # run whisper-server with the whisper entry
 
 ``launchers/run_model.bat`` / ``run_model.sh`` are the sole entry point for
-every per-model launcher — one dispatcher instead of near-identical
-hand-rolled scripts each hardcoding their own title/port/banner, with
-nothing to catch a copy-paste port typo. ``--banner <id>`` below is what the ``.bat`` pulls its
+every per-model launcher, one dispatcher keyed by model id so no launcher
+hardcodes its own title/port/banner and a copy-paste port typo has nothing
+to hide in. ``--banner <id>`` below is what the ``.bat`` pulls its
 window title + console banner from, live off ``config/models.yaml``, so
 there is exactly one place a model's port/name can come from.
 """
@@ -109,7 +109,7 @@ def _banner_lines(model_id: str) -> list[str]:
         url = model.url or f"http://127.0.0.1:{model.port}/v1"
     else:
         # whisper banners show the bare base — the endpoint hint below
-        # spells out the actual POST path (matches the old per-model .bat text).
+        # spells out the actual POST path.
         url = (model.url or f"http://127.0.0.1:{model.port}").removesuffix("/v1").rstrip("/")
     lines = [f"Local LLM Hub - {model.display_name}", f"{kind}: {model.display_name} on {url}"]
     hint = _BANNER_HINT.get(model.backend)

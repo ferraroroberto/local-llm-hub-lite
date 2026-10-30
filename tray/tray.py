@@ -15,9 +15,8 @@ Menu:
     ℹ Status                               — popup with hub state
     Quit
 
-Replaces ``tray/app.py``, ``tray/log_window.py``, and ``tray/config.py``
-in one file. The tk log window is gone — logs live in the admin's Hub
-tab now that the hub IS the process serving its own admin.
+Logs live in the admin's Hub tab, since the hub IS the process serving
+its own admin.
 """
 
 from __future__ import annotations
@@ -403,10 +402,10 @@ class TrayApp:
     def _toggle_model_worker(self, model_id: str) -> None:
         """Toggle a model's lifecycle via the hub's admin API.
 
-        The hub owns the subprocess. Tray is a thin HTTP client — so
-        models started from here show up as "running (managed)" in the
-        admin webapp, not "adopted" (which used to happen when the tray
-        was the subprocess parent).
+        The hub owns the subprocess. Tray is a thin HTTP client, so a model
+        started from here shows up as "running (managed)" in the admin
+        webapp; "adopted" only labels a backend the hub inherited from its
+        own previous process on a restart, not one started via this toggle.
         """
         model = next((m for m in self._models if m.id == model_id), None)
         if model is None or model.port is None:

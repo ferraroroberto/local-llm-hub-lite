@@ -1,20 +1,28 @@
-r"""Ratchet on issue-number narratives inside source-code comments.
+r"""Ratchet on decision-history narratives inside source-code comments.
 
 Catches the claude-md-drift class the docs ratchet (`scripts/docs_ratchet.py`)
-doesn't cover: upstream issue references (`#NNN`, `issue #NNN`,
-`other-repo#NNN`, ...) baked into `src/`, `app_web/`, `scripts/`,
+doesn't cover: decision history baked into `src/`, `app_web/`, `scripts/`,
 `tray/` and `launchers/` comments and docstrings, instead of the issue and
-git log the global CLAUDE.md says decision history belongs in. A reader who
-follows one of these numbers into *this* repo's tracker lands on nothing, or
-on an unrelated issue -- the recurring claude-md-drift audit finding that
-motivated this script.
+git log the global CLAUDE.md says it belongs in. Two shapes, both counted
+against the same per-file total:
 
-Counts the same `#<digits>` reference shape the docs ratchet uses (hex
-colors like `#1f2328` and HTML entities like `&#39;` are excluded by the same
-lookaround), per file, against a committed baseline: it fails only when a
-count *rises*. Existing debt never blocks work, but it cannot grow. (This
-docstring deliberately spells examples as `#NNN` rather than real digits --
-real digits here would trip the scan below against its own source.)
+* Upstream issue references (`#NNN`, `issue #NNN`, `other-repo#NNN`, ...). A
+  reader who follows one of these numbers into *this* repo's tracker lands on
+  nothing, or on an unrelated issue.
+* Prose that narrates what the code *used to be* instead of what it is now --
+  "previously", "used to be", "extracted from", "inlined from", "replaces
+  ... in one file", "before this ... existed", "the old <thing>", "hand-rolled",
+  "by hand ... consolidated", "now a real module". A docstring recounting a
+  retired implementation doesn't help the next reader; the retired code's
+  history already lives in `git log`.
+
+Counts the `#<digits>` reference shape the docs ratchet uses (hex colors like
+`#1f2328` and HTML entities like `&#39;` are excluded by the same lookaround)
+plus hits against the curated history-phrase list above, per file, against a
+committed baseline: it fails only when a count *rises*. Existing debt never
+blocks work, but it cannot grow. (This docstring deliberately spells issue
+examples as `#NNN` rather than real digits -- real digits here would trip the
+scan below against its own source.)
 
 Scope: `git ls-files` restricted to `src/`, `app_web/`, `scripts/`, `tray/`,
 `launchers/`, extensions `.py .js .css .html .bat .sh .ps1`, minus every
@@ -34,8 +42,8 @@ Modes:
                     --allow-additions, which shows in review.
 
 Exit codes (a state is never folded into a pass):
-  0  pass: no in-scope file carries more references than its baseline entry
-  1  a count rose beyond its baseline entry, a new file carries references
+  0  pass: no in-scope file carries more flags than its baseline entry
+  1  a count rose beyond its baseline entry, a new file carries flags
      with no baseline entry, or (check mode) the baseline file is missing
   2  bad baseline JSON, bad CLI usage, or --update-baseline tried to grow an
      entry without --allow-additions -- fail loud
@@ -63,6 +71,12 @@ _NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 EXIT_PASS, EXIT_NEW, EXIT_CONFIG, EXIT_NOT_CONFIRMED = 0, 1, 2, 3
 
+# This module's own source has to spell every history phrase literally to
+# define `_HISTORY` below, so it would always flag itself; exempt it from
+# that half of the scan only (still scanned for `_REF`, same as any other
+# file) rather than obfuscating the phrase list into something unreadable.
+_SELF_EXEMPT_HISTORY = {"scripts/comment_ratchet.py"}
+
 SCOPE_DIRS = ("src/", "app_web/", "scripts/", "tray/", "launchers/")
 SCOPE_EXTENSIONS = {".py", ".js", ".css", ".html", ".bat", ".sh", ".ps1"}
 # Both per-file "this whole file is vendored" header conventions seen in this
@@ -77,6 +91,34 @@ _VENDORED_MARKER = re.compile(r"VENDORED (COPY|VERBATIM)")
 # character or `-` (so `#1f2328` -- a hex color -- never matches: the digit
 # run stops at the first letter and the lookahead then rejects it).
 _REF = re.compile(r"(?<![&#/])#(\d{1,5})(?![\w-])")
+
+# Curated phrases that signal a comment/docstring is narrating what the code
+# *used to be* rather than what it is now -- the prose half of the
+# claude-md-drift "comments state the present-tense why" rule, which plain
+# issue-number matching above never catches (a docstring can narrate history
+# fluently without ever spelling out an issue number). `re.DOTALL` is off on
+# purpose so a wrapped docstring line still needs the phrase on one logical
+# line of prose; `\s+` stands in for a line-wrap's newline + indent where a
+# phrase commonly splits across two physical lines (e.g. "consolidated\n
+# here").
+_HISTORY = re.compile(
+    r"\b(?:"
+    r"previously|"
+    r"used\s+to\s+be|"
+    r"that\s+used\s+to|"
+    r"which\s+used\s+to|"
+    r"extracted\s+from|"
+    r"inlined\s+from|"
+    r"replaces\s+(?:``|the\s+(?:old|\d))|"
+    r"before\s+this\s+\w+\s+existed|"
+    r"hand-rolled|"
+    r"by\s+hand\s*(?:[-—,]|and)?\s*consolidated|"
+    r"consolidated\s+here|"
+    r"the\s+old\s+\w+|"
+    r"now\s+a\s+real\s+module"
+    r")\b",
+    re.IGNORECASE,
+)
 
 
 class NotConfirmed(RuntimeError):
@@ -128,11 +170,15 @@ def count_file(root: Path, path: str) -> int:
         raise NotConfirmed(f"{path}: not valid UTF-8 ({exc})") from exc
     if _VENDORED_MARKER.search(text[:1024]):
         return 0
-    return len(_REF.findall(text))
+    n = len(_REF.findall(text))
+    if path not in _SELF_EXEMPT_HISTORY:
+        n += len(_HISTORY.findall(text))
+    return n
 
 
 def scan(root: Path) -> dict[str, int]:
-    """In-scope reference counts, one entry per file that has at least one."""
+    """In-scope flag counts (issue refs + history phrases), one entry per
+    file that has at least one."""
     vendored = _vendored_dests(root)
     found: dict[str, int] = {}
     for path in tracked_files(root):
@@ -181,10 +227,10 @@ def check(root: Path, baseline_path: Path) -> int:
         if n > baseline.get(path, 0)
     }
     if not grown:
-        print("OK: no in-scope file carries more issue-number references than its baseline entry")
+        print("OK: no in-scope file carries more history flags than its baseline entry")
         return EXIT_PASS
     for path, (now, was) in sorted(grown.items()):
-        print(f"NEW: {path}: {now} reference(s), baseline allows {was}")
+        print(f"NEW: {path}: {now} flag(s), baseline allows {was}")
     return EXIT_NEW
 
 
@@ -216,7 +262,7 @@ def update_baseline(root: Path, baseline_path: Path, allow_additions: bool) -> i
     grown = {p: (n, old.get(p, 0)) for p, n in new.items() if n > old.get(p, 0)}
     if grown and not allow_additions:
         for path, (now, was) in sorted(grown.items()):
-            print(f"CONFIG: {path}: {now} reference(s) would raise the baseline from {was} -- pass --allow-additions")
+            print(f"CONFIG: {path}: {now} flag(s) would raise the baseline from {was} -- pass --allow-additions")
         return EXIT_CONFIG
     _write_baseline(baseline_path, new)
     print(f"OK: wrote {baseline_path} ({len(new)} file(s))")
