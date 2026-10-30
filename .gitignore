@@ -50,3 +50,4 @@ tests/e2e/autoboot-hub.log
 tests/e2e/snapshots/
 playwright-report/
 test-results/
+.proof/
