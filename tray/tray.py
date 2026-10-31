@@ -41,7 +41,7 @@ import yaml
 from src.host_profile import CONFIG_PATH, hub_port
 from src.model_registry import Model, enabled_models
 from src.no_window import NO_WINDOW
-from src.process.server_process import WIN_NEW_GROUP
+from src.process.server_process import WIN_NEW_GROUP, lan_ip
 from src.webapp_config import append_auth_token, ensure_auth_token
 
 from .icon import COLOR_RUNNING, COLOR_STARTING, COLOR_STOPPED, make_icon_image
@@ -334,7 +334,7 @@ class TrayApp:
         elif kind == EVT_COPY_LOCAL:
             self._copy_url(self.hub.base_url() + "/admin/")
         elif kind == EVT_COPY_LAN:
-            lan = _lan_ip()
+            lan = lan_ip()
             if lan:
                 self._copy_url(f"http://{lan}:{hub_port()}/admin/")
             else:
@@ -489,7 +489,7 @@ class TrayApp:
             self._notify("Admin", f"⚠️ webbrowser.open failed: {exc}")
         # Always also push the LAN+token URL to the clipboard so the user
         # can paste it on their phone right after clicking.
-        lan = _lan_ip()
+        lan = lan_ip()
         if lan and token:
             lan_url = append_auth_token(f"http://{lan}:{hub_port()}/admin/", token)
             try:
@@ -550,17 +550,6 @@ class TrayApp:
 
 
 # --------------------------------------------------------------- helpers
-
-
-def _lan_ip() -> str:
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(("8.8.8.8", 80))
-        return s.getsockname()[0]
-    except OSError:
-        return ""
-    finally:
-        s.close()
 
 
 def _tcp_reachable(host: str, port: int, timeout: float = 0.5) -> bool:
