@@ -22,16 +22,22 @@ someone else.
 
 from __future__ import annotations
 
+import logging
 import os
 import signal
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, Optional
+from typing import TYPE_CHECKING, Dict, Optional
 
 from ..http_client import get_sync_client
 from ..model_registry import Model, enabled_models
 from .server_process import WIN_NEW_GROUP, kill_pid, resolve_external_pid
+
+if TYPE_CHECKING:
+    import psutil
+
+logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 VENDOR_LLAMA = PROJECT_ROOT / "vendor" / "llama.cpp"
@@ -99,6 +105,14 @@ class _BackendState:
         # the per-backend log file (the child owns that fd), so ``log_lines``
         # returns its tail across a hub restart — see ``_log_path``.
         self.inherited_pid: Optional[int] = None
+        # (create_time, exe) of ``inherited_pid`` captured at adoption. A PID
+        # alone is not an identity: once the backend dies the OS may hand the
+        # number to an unrelated process, which ``stop`` would then kill.
+        self.inherited_identity: Optional[tuple[float, str]] = None
+
+    def forget_inherited(self) -> None:
+        self.inherited_pid = None
+        self.inherited_identity = None
 
 
 _STATES: Dict[str, _BackendState] = {}
@@ -149,6 +163,11 @@ def pid(model_id: str) -> Optional[int]:
     return None
 
 
+def _process_identity(proc: "psutil.Process") -> tuple[float, str]:
+    """Create-time and lower-cased exe path: what makes a PID this process."""
+    return (proc.create_time(), (proc.exe() or "").lower())
+
+
 def _inherited_alive(state: "_BackendState") -> bool:
     pid_ = state.inherited_pid
     if pid_ is None:
@@ -157,17 +176,23 @@ def _inherited_alive(state: "_BackendState") -> bool:
         import psutil
 
         if not psutil.pid_exists(pid_):
-            state.inherited_pid = None
+            state.forget_inherited()
             return False
-        # Verify it's still the same process — PID reuse on Windows is
-        # aggressive; if the create-time has changed, our PID is stale.
         proc = psutil.Process(pid_)
         if proc.status() in (psutil.STATUS_ZOMBIE, psutil.STATUS_DEAD):
-            state.inherited_pid = None
+            state.forget_inherited()
+            return False
+        # PID reuse on Windows is aggressive: the adopted backend may have
+        # died and its number been given to another process. Anything but the
+        # identity recorded at adoption is stale — fail closed, since a false
+        # "alive" lets ``stop`` kill an unrelated process.
+        if _process_identity(proc) != state.inherited_identity:
+            logger.info("ℹ️ inherited PID %s no longer the adopted backend; dropping it", pid_)
+            state.forget_inherited()
             return False
         return True
     except Exception:  # noqa: BLE001
-        state.inherited_pid = None
+        state.forget_inherited()
         return False
 
 
@@ -318,7 +343,7 @@ def stop(model_id: str) -> tuple[bool, str]:
     if p is None:
         if _inherited_alive(state):
             pid_ = state.inherited_pid
-            state.inherited_pid = None
+            state.forget_inherited()
             ok, msg = kill_pid(int(pid_))
             return ok, msg
         return False, "not running"
@@ -376,15 +401,15 @@ def inherit_running_backends() -> int:
         candidate = pids[0]
         try:
             proc = psutil.Process(candidate)
-            exe = (proc.exe() or "").lower()
+            identity = _process_identity(proc)
         except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
             continue
-        if _looks_like_backend_binary(exe, m):
+        if _looks_like_backend_binary(identity[1], m):
             state = _state_for(m.id)
             state.inherited_pid = candidate
+            state.inherited_identity = identity
             count += 1
-            import logging
-            logging.getLogger(__name__).info(
+            logger.info(
                 "📎 Inherited %s on :%s (PID %s) — log tail at %s",
                 m.id, m.port, candidate, _log_path(m.id),
             )
