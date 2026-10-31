@@ -61,19 +61,18 @@ def already_installed() -> bool:
 
 
 def _linux_cuda_build_hint() -> str:
-    """A reproducible from-source CUDA build recipe for a Linux satellite.
+    """A reproducible from-source CUDA build recipe for Linux.
 
-    Upstream ships **no** prebuilt Linux CUDA binary, and gaming's sm_61
-    build was compiled by hand. Rather than ship an untested automated
-    compile, surface the exact reproducible commands with the arch defaulted to
-    this host's detected GPU (override via ``LOCAL_LLM_HUB_CUDA_ARCH``). The
-    automated build itself remains a deliberate follow-up.
+    Upstream ships **no** prebuilt Linux CUDA binary. Rather than ship an
+    untested automated compile, surface the exact reproducible commands with
+    the arch defaulted to this host's detected GPU (override via
+    ``LOCAL_LLM_HUB_CUDA_ARCH``).
     """
     arch = os.environ.get("LOCAL_LLM_HUB_CUDA_ARCH") or detect_cuda_arch() or "61"
     return (
         "no prebuilt llama.cpp asset for Linux — build from source with CUDA.\n"
         f"target GPU arch: sm_{arch} (override via LOCAL_LLM_HUB_CUDA_ARCH). "
-        "Reproducible build (run on the satellite; not yet automated):\n"
+        "Reproducible build (run on this machine; not yet automated):\n"
         "  git clone --depth 1 https://github.com/ggml-org/llama.cpp /tmp/llama.cpp\n"
         "  cmake -S /tmp/llama.cpp -B /tmp/llama.cpp/build "
         f"-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES={arch}\n"

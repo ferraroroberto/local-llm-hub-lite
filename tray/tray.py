@@ -424,20 +424,19 @@ class TrayApp:
             else:
                 self._notify(model_id, f"⚠️ {msg}")
         else:
-            self._start_model_worker(model_id, autostart=False)
+            self._start_model_worker(model_id)
         self._update_menu()
 
-    def _start_model_worker(self, model_id: str, *, autostart: bool) -> None:
-        prefix = "(autostart) " if autostart else ""
+    def _start_model_worker(self, model_id: str) -> None:
         ok, msg = self._admin_request("POST", f"/admin/api/models/{model_id}/start")
         if not ok:
             # "already running" is a 409 — surface as info, not error.
             if "already running" in (msg or "").lower():
-                self._notify(f"{prefix}{model_id}", f"✅ {msg}")
+                self._notify(model_id, f"✅ {msg}")
             else:
-                self._notify(f"{prefix}{model_id}", f"⚠️ {msg}")
+                self._notify(model_id, f"⚠️ {msg}")
             return
-        self._notify(f"{prefix}{model_id}", "▶ Starting…")
+        self._notify(model_id, "▶ Starting…")
         threading.Thread(
             target=self._wait_model_ready_worker,
             args=(model_id,),
