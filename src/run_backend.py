@@ -123,8 +123,7 @@ def _launchable_targets() -> list[str]:
     """The hub plus every model this host can spawn locally — the exact set
     the bulk launchers (run_all.bat / run_all.sh) enumerate so they mirror
     the active host's ``enabled:`` contract instead of a stale hardcoded
-    roster. Remote-owned rows (proxied, not run here) and disabled rows are
-    absent by construction; each id here is one ``run_backend`` will start.
+    roster. Disabled and virtual rows are absent by construction; each id here is one ``run_backend`` will start.
     """
     return ["hub", *launchable_local_ids()]
 

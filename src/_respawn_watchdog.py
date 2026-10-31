@@ -24,6 +24,25 @@ import sys
 import time
 from typing import List, Optional
 
+# One poll step for all three waits below; short enough that a restart is not
+# held up noticeably, long enough not to spin a detached process.
+POLL_INTERVAL_S = 0.3
+
+# How long to wait for the outgoing hub to exit. A stated guess, not a measurement:
+# the hub sets no uvicorn graceful-shutdown timeout, so a slow close of
+# in-flight streams is what stretches it; past this we relaunch anyway and let
+# the port-free wait below decide.
+PARENT_EXIT_TIMEOUT_S = 30.0
+
+# How long to wait for the outgoing hub's port to free once it is gone (~18 s). A
+# stated guess covering the OS releasing the listening socket; on expiry we
+# still relaunch and the confirmation below reports the bind failure.
+PORT_FREE_TIMEOUT_S = 18.0
+
+# How long to wait for the relaunched hub to accept connections (~30 s). A
+# stated guess for a cold import of the app plus lifespan startup.
+RELAUNCH_CONFIRM_TIMEOUT_S = 30.0
+
 
 def is_alive(pid: int) -> bool:
     try:
@@ -82,15 +101,13 @@ def _stamp() -> str:
 
 
 def run(parent_pid: int, port: int, log_path: str, root: str) -> None:
-    deadline = time.time() + 30
+    deadline = time.time() + PARENT_EXIT_TIMEOUT_S
     while time.time() < deadline and is_alive(parent_pid):
-        time.sleep(0.3)
+        time.sleep(POLL_INTERVAL_S)
 
-    # Wait briefly for the port to free.
-    for _ in range(60):
-        if port_is_free(port):
-            break
-        time.sleep(0.3)
+    deadline = time.time() + PORT_FREE_TIMEOUT_S
+    while time.time() < deadline and not port_is_free(port):
+        time.sleep(POLL_INTERVAL_S)
 
     exe = relaunch_executable()
     env = os.environ.copy()
@@ -113,8 +130,9 @@ def run(parent_pid: int, port: int, log_path: str, root: str) -> None:
             creationflags=flags,
         )
         ok = False
-        for _ in range(100):  # ~30s
-            time.sleep(0.3)
+        deadline = time.time() + RELAUNCH_CONFIRM_TIMEOUT_S
+        while time.time() < deadline:
+            time.sleep(POLL_INTERVAL_S)
             if child.poll() is not None:
                 break
             if port_is_reachable(port):

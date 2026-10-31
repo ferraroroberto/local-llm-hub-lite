@@ -92,19 +92,19 @@ def already_installed() -> bool:
 
 
 def _linux_cuda_build_hint() -> str:
-    """A reproducible from-source CUDA build recipe for a Linux satellite.
+    """A reproducible from-source CUDA build recipe for Linux.
 
-    Upstream ships no prebuilt Linux CUDA whisper-server; gaming's sm_61 build
-    was compiled by hand. Rather than an untested automated compile,
-    surface the exact commands with the arch defaulted to this host's detected
-    GPU (override via ``LOCAL_LLM_HUB_CUDA_ARCH``). Pinned tag matches the
-    Windows/macOS vendored line. The automated build itself is a follow-up.
+    Upstream ships no prebuilt Linux CUDA whisper-server. Rather than an
+    untested automated compile, surface the exact commands with the arch
+    defaulted to this host's detected GPU (override via
+    ``LOCAL_LLM_HUB_CUDA_ARCH``). The pinned tag matches the Windows/macOS
+    vendored line.
     """
     arch = os.environ.get("LOCAL_LLM_HUB_CUDA_ARCH") or detect_cuda_arch() or "61"
     return (
         "no prebuilt whisper.cpp asset for Linux — build from source with CUDA.\n"
         f"target GPU arch: sm_{arch} (override via LOCAL_LLM_HUB_CUDA_ARCH). "
-        "Reproducible build (run on the satellite; not yet automated):\n"
+        "Reproducible build (run on this machine; not yet automated):\n"
         f"  git clone --branch {PINNED_TAG} --depth 1 "
         "https://github.com/ggml-org/whisper.cpp /tmp/whisper.cpp\n"
         "  cmake -S /tmp/whisper.cpp -B /tmp/whisper.cpp/build "
@@ -118,8 +118,8 @@ def _macos_find_cmake() -> Optional[str]:
     """cmake's location on macOS, tolerant of a restricted non-interactive
     PATH (``/usr/bin:/bin:/usr/sbin:/sbin``) that a launchd/SSH-triggered
     "Fix" run gets even when an interactive shell's PATH has it via
-    Homebrew (confirmed on mac-mini-m4: ``cmake`` is on
-    ``/opt/homebrew/bin``, off that restricted PATH)."""
+    Homebrew (``cmake`` is on ``/opt/homebrew/bin``, off that restricted
+    PATH)."""
     found = shutil.which("cmake")
     if found:
         return found
@@ -157,8 +157,7 @@ def _macos_build_prereqs() -> str:
 
 def _macos_build_from_source() -> None:
     """Build whisper-server from source for this pinned tag — no
-    prebuilt macOS asset exists as of ``PINNED_TAG``. Mirrors the recipe
-    hand-verified on mac-mini-m4: cmake configure (Metal + Accelerate BLAS
+    prebuilt macOS asset exists as of ``PINNED_TAG``. Recipe: cmake configure (Metal + Accelerate BLAS
     are auto-detected on Apple platforms), build the ``whisper-server``
     target, flatten the binary plus every produced ``.dylib`` into
     ``VENDOR_DIR``, then ``install_name_tool -add_rpath @loader_path`` each

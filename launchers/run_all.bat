@@ -5,7 +5,7 @@ REM  its own console window. The roster is NOT hardcoded here:
 REM  it is derived live from config/models.yaml by
 REM  `run_backend --list-launchable`, so it always reflects the
 REM  active host's `enabled:` contract (owned, enabled, non-virtual
-REM  rows only). Remote-owned and disabled models are skipped.
+REM  rows only). Disabled models are skipped.
 REM  Close each window individually to stop.
 REM ==========================================================
 cd /d "%~dp0.."
@@ -19,4 +19,4 @@ for /f "usebackq delims=" %%m in (`.venv\Scripts\python.exe -m src.run_backend -
 )
 
 echo Launched the hub + every locally-launchable backend (derived from config/models.yaml) in separate windows.
-echo (Models owned by another host, disabled on this host, or virtual are skipped.)
+echo (Disabled or virtual rows are skipped.)

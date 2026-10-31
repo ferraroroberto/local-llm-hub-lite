@@ -82,13 +82,12 @@ def is_reachable(timeout: float = 1.5) -> bool:
 def snapshot_listening_pids() -> dict[int, list[int]]:
     """One-shot map of every listening TCP port → PID list.
 
-    The legacy :func:`find_port_pids` shells out per-port. The admin
-    webapp's Models tab queries ownership + pid for every backend on
-    every poll — O(N) ``netstat`` invocations at ~1 s each adds up
-    fast. This consolidates the lookup into a single in-process call
-    via :func:`psutil.net_connections` (~2 ms for ~70 sockets), with
-    netstat / lsof kept as the fallback if psutil refuses (Windows
-    sometimes denies access without admin for system-wide queries).
+    The admin webapp's Models tab queries ownership + pid for every
+    backend on every poll, so the lookup is one in-process call via
+    :func:`psutil.net_connections` (~2 ms for ~70 sockets) rather than
+    one ``netstat`` per port (~1 s each). netstat / lsof is the fallback
+    if psutil refuses (Windows sometimes denies access without admin for
+    system-wide queries).
 
     Returns an empty dict if all paths fail — callers must tolerate
     that and treat it as "no information; fall back to ``[]``".
@@ -158,41 +157,11 @@ def snapshot_listening_pids() -> dict[int, list[int]]:
 def find_port_pids(port: int) -> list[int]:
     """Return PIDs of processes listening on `port`, if any.
 
-    Cross-platform: uses `netstat` on Windows, `lsof` on macOS/Linux.
-    Returns [] if nothing is listening or the tool isn't available.
-
-    Note: under ``pythonw`` (e.g. when called from the tray) Windows
-    Terminal will spawn a fresh window for any console child unless we
-    pass ``NO_WINDOW``. Callers that need ports for *many*
-    sockets in one tick should prefer :func:`snapshot_listening_pids`
-    to avoid spawning N netstat / lsof processes.
+    A single-port view over :func:`snapshot_listening_pids`, so one parser
+    owns the netstat / lsof output format. Returns [] if nothing is
+    listening or no lookup path is available.
     """
-    try:
-        if sys.platform == "win32":
-            out = subprocess.run(
-                ["netstat", "-ano", "-p", "TCP"],
-                capture_output=True, text=True, timeout=5,
-                creationflags=NO_WINDOW,
-            ).stdout
-            pids: set[int] = set()
-            for line in out.splitlines():
-                if "LISTENING" not in line:
-                    continue
-                # columns: Proto  LocalAddress  ForeignAddress  State  PID
-                m = re.search(rf":{port}\b.*LISTENING\s+(\d+)", line)
-                if m:
-                    pids.add(int(m.group(1)))
-            return sorted(pids)
-        else:
-            out = subprocess.run(
-                ["lsof", "-nP", "-a", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"],
-                capture_output=True, text=True, timeout=5,
-            ).stdout
-            pids = sorted({int(x) for x in out.split() if x.strip().isdigit()})
-            logger.info("ℹ️ listener lookup for TCP :%s resolved PID(s) %s", port, pids)
-            return pids
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
-        return []
+    return snapshot_listening_pids().get(port, [])
 
 
 def resolve_external_pid(running: bool, port: int) -> Optional[int]:

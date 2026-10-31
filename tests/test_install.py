@@ -236,9 +236,8 @@ def test_macos_build_prereqs_ok_returns_cmake_path(monkeypatch):
 def test_macos_build_from_source_flattens_dylibs_and_fixes_rpath(monkeypatch, tmp_path):
     """Exercises the real flatten + symlink-preservation + rpath-fix control
     flow against a synthetic build tree shaped like the real whisper.cpp
-    cmake output (nested dirs, versioned real .dylib + symlink chain) —
-    verified against an actual macOS build on mac-mini-m4 during development
-    (#413); this test locks in the Python-side file/process orchestration."""
+    cmake output (nested dirs, versioned real .dylib + symlink chain); this
+    test locks in the Python-side file/process orchestration."""
     from scripts import install_whisper_cpp
 
     vendor_dir = tmp_path / "vendor"
