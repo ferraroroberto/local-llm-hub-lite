@@ -45,7 +45,14 @@
 #      .conventions-ratchet-baseline.json. Whole tree, never routed. Any
 #      non-zero exit fails, so exit 3 (git unusable, a file that does not
 #      parse) is NOT CONFIRMED and never a pass.
-#  10. `pytest -q` (unit tests, no GPU / no real CLIs)
+#   9b. runtime write ratchet: no rise in write targets resolving under a code
+#      folder (src, app_web, tray, scripts) per file beyond
+#      .runtime-write-ratchet-baseline.json. Whole tree, never routed. Any
+#      non-zero exit fails, so exit 3 (a new target it cannot resolve) is NOT
+#      CONFIRMED and never a pass.
+#  10. `pytest -q` (unit tests, no GPU / no real CLIs); stages 10-11 run inside
+#      the runtime write probe (--snapshot before, --probe after), which fails on
+#      any untracked or ignored file they leave under a code folder.
 #  11. e2e, routed by scripts/classify_e2e.py against the [e2e] table in
 #      .fleet.toml: nothing for a diff with no browser surface, the smoke
 #      target for inert assets, a surface slice or the full suite otherwise.
@@ -176,6 +183,20 @@ Step "conventions ratchet" {
     & $Python scripts\conventions_ratchet.py
 }
 
+Step "runtime write ratchet" {
+    # Called directly, like the conventions ratchet: Step fails on any non-zero
+    # exit, so exit 3 (a new write target it cannot resolve) stops the gate
+    # like a finding does.
+    & $Python scripts\runtime_write_ratchet.py
+}
+
+# Runtime write probe, first half: what already sits untracked or ignored under
+# the code folders, so the probe after the test runs names only what they wrote.
+$runtimeSnapshot = Join-Path ([IO.Path]::GetTempPath()) "runtime-write-snapshot-$PID.json"
+Step "runtime write probe (snapshot)" {
+    & $Python scripts\runtime_write_ratchet.py --snapshot $runtimeSnapshot
+}
+
 Step "pytest (unit)" {
     & $Python -m pytest -q --ignore=tests/e2e
 }
@@ -199,6 +220,11 @@ if ($e2e.Tier -eq "skip") {
     Step "pytest (e2e · $($e2e.Tier): $($e2e.Target), $label)" {
         & $Python -m pytest @e2eArgs
     }
+}
+
+Step "runtime write probe" {
+    # Second half: any file the unit and e2e runs left under a code folder.
+    & $Python scripts\runtime_write_ratchet.py --probe $runtimeSnapshot
 }
 
 Write-Host ""
