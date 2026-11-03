@@ -5,9 +5,11 @@
 /app_web/static/_vendored/empty-state
 /app_web/static/_vendored/modal
 /app_web/static/_vendored/nav
+/app_web/static/_vendored/page-foot
 /app_web/static/_vendored/segmented
 /app_web/static/_vendored/switch
 /app_web/static/_vendored/text-size
+/app_web/static/_vendored/usage-log
 /scripts/classify_e2e.py
 /scripts/conventions_ratchet.py
 /scripts/dead_code_ratchet.py
@@ -20,6 +22,10 @@
 /scripts/structure_band.py
 /scripts/structure_layout.py
 /scripts/structure_ratchet.py
+/scripts/usage_track_ratchet.py
+/scripts/usage_track_scan.py
 /src/build_info.py
+/src/runtime_data.py
+/src/usage_log.py
 /tray/single_instance.py
 # END vendored-copies
