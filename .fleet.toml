@@ -284,3 +284,11 @@ paths        = ["app_web/static/icon-180.png", "app_web/static/icon-192.png", "a
 check  = "rendered-leg"
 reason = "The rendered geometry leg needs tests/e2e/_geometry.py (project-scaffolding#157), a harness this lite fork does not carry; it stays small, and the static contracts plus the Chromium smoke e2e are the proof here (Roberto, 2026-10-08)."
 record = "https://github.com/ferraroroberto/local-llm-hub-lite/issues/34"
+
+# Reviewed false positives for the cross-repo coupling check (fleet-config architecture/README.md).
+# Both hits are prose in comments; neither file reads, imports or calls the named repo.
+[contracts]
+ignore_refs = [
+  { path = "app_web/static/main.js", repo = "app-launcher", why = "a comment saying the theme toggle uses the same mechanism as app-launcher; no code reads or calls it" },
+  { path = "app_web/static/_vendored/icons/icons-sprite.html", repo = "local-llm-hub", why = "a provenance comment noting the app-only glyphs match the upstream fork parent; the sprite is a static copy with no runtime or build-time read" },
+]
