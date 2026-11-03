@@ -1,8 +1,4 @@
 {
   "version": 1,
-  "entries": [
-    {"key": "app_web/static/hub.js", "counts": {"untracked-control": 1}},
-    {"key": "app_web/static/index.html", "counts": {"untracked-control": 28}},
-    {"key": "app_web/static/models.js", "counts": {"untracked-control": 1}}
-  ]
+  "entries": []
 }
