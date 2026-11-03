@@ -2,5 +2,7 @@
   "auth_token": "",
   "auth_password": "",
   "extra_allowlist": [],
-  "cors_allow_origins": []
+  "cors_allow_origins": [],
+  "telegram_bot_token": "",
+  "telegram_alert_chat_id": ""
 }

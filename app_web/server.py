@@ -27,6 +27,7 @@ from starlette.responses import Response
 from starlette.types import Scope
 
 from src.auth_middleware import BearerTokenMiddleware
+from src.login_lockout import LoginLockout
 from src.runtime_data import runtime_db_path
 from src.static_versioning import (
     compute_asset_hashes,
@@ -36,6 +37,7 @@ from src.static_versioning import (
 from src.usage_log import usage_router
 from src.webapp_config import load_webapp_config
 
+from .login_alert import make_alert_owner
 from .routers import auth, hub, misc, models, playground, roles, version
 from .routers._helpers import STATIC_DIR
 
@@ -124,6 +126,9 @@ def create_app() -> FastAPI:
     )
 
     app.state.webapp_config = webapp_cfg
+    app.state.login_lockout = LoginLockout(
+        on_alert=make_alert_owner(lambda: app.state.webapp_config)
+    )
 
     asset_hashes = compute_asset_hashes(STATIC_DIR)
     app.state.asset_hashes = asset_hashes

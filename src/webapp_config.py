@@ -10,6 +10,7 @@ Holds:
     bearer-token enforcement)
   * CORS allowed origins (extra browser origins beyond loopback that may
     read a hub response from page JavaScript)
+  * Telegram credentials for the wrong-password alert
 """
 
 from __future__ import annotations
@@ -51,6 +52,10 @@ class WebappConfig:
     # dropped with a warning rather than honoured. Read once at startup,
     # so a change here needs a hub restart — unlike ``auth_token``.
     cors_allow_origins: list = field(default_factory=list)
+    # Telegram bot token and chat id for the owner alert sent when a client
+    # keeps guessing wrong passwords. Either empty (the default) sends nothing.
+    telegram_bot_token: str = ""
+    telegram_alert_chat_id: str = ""
 
 
 def load_webapp_config(path: Optional[Path] = None) -> WebappConfig:
@@ -76,6 +81,8 @@ def load_webapp_config(path: Optional[Path] = None) -> WebappConfig:
         auth_password=str(raw.get("auth_password", "")),
         extra_allowlist=list(raw.get("extra_allowlist") or []),
         cors_allow_origins=list(raw.get("cors_allow_origins") or []),
+        telegram_bot_token=str(raw.get("telegram_bot_token", "")),
+        telegram_alert_chat_id=str(raw.get("telegram_alert_chat_id", "")),
     )
     return cfg
 
@@ -90,6 +97,8 @@ def save_webapp_config(cfg: WebappConfig, path: Optional[Path] = None) -> Path:
         "auth_password": cfg.auth_password,
         "extra_allowlist": cfg.extra_allowlist,
         "cors_allow_origins": cfg.cors_allow_origins,
+        "telegram_bot_token": cfg.telegram_bot_token,
+        "telegram_alert_chat_id": cfg.telegram_alert_chat_id,
     }
 
     tmp = target.with_suffix(target.suffix + ".tmp")
