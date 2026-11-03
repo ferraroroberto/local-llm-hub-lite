@@ -1,6 +1,7 @@
-/* HTTP + SSE helpers, bearer-token plumbing, login overlay, toast. */
+/* HTTP + SSE helpers, bearer-token plumbing, sign-in, toast. */
 
-import { els, state, TOKEN_KEY } from './state.js';
+import { els, TOKEN_KEY } from './state.js';
+import { requestSignIn } from './_vendored/sign-in/sign-in.js';
 
 // --------------------------------------------------------------- tokens
 export function tokenFromUrl() {
@@ -86,48 +87,32 @@ export function eventStream(path, handlers) {
   return es;
 }
 
-// --------------------------------------------------------------- login
+// --------------------------------------------------------------- sign-in
+// Called from every 401. The sheet hands every caller the same promise while
+// it is open, so the follow-up runs once per sign-in, not once per 401.
+let onSignedIn = null;
+let signInOpen = false;
+
 export function showLogin() {
-  if (!els.loginOverlay) return;
-  els.loginOverlay.hidden = false;
-  // Non-<dialog> overlay: hide the floating nav bar while it's open
-  // (the vendored nav's body.nav-hidden hook — _vendored/nav/README.md).
-  document.body.classList.add('nav-hidden');
-  if (els.loginPassword) { els.loginPassword.value = ''; els.loginPassword.focus(); }
-}
-
-export function hideLogin() {
-  if (els.loginOverlay) els.loginOverlay.hidden = true;
-  document.body.classList.remove('nav-hidden');
-}
-
-export function wireLoginForm(onLoginSuccess) {
-  if (!els.loginForm) return;
-  els.loginForm.addEventListener('submit', async function (ev) {
-    ev.preventDefault();
-    els.loginError.hidden = true;
-    const password = els.loginPassword.value;
-    try {
-      const res = await fetch('/admin/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-      const body = await res.json().catch(function () { return null; });
-      if (!res.ok || !body || !body.token) {
-        const msg = (body && body.detail) || 'Login failed';
-        els.loginError.textContent = msg;
-        els.loginError.hidden = false;
-        return;
-      }
-      writeToken(body.token);
-      hideLogin();
-      if (onLoginSuccess) onLoginSuccess();
-    } catch (exc) {
-      els.loginError.textContent = String(exc.message || exc);
-      els.loginError.hidden = false;
-    }
+  if (signInOpen) return;
+  signInOpen = true;
+  requestSignIn({
+    endpoint: '/admin/api/login',
+    hint: 'This hub is locked. Enter the configured password.',
+    onToken: writeToken,
+  }).then(function () {
+    signInOpen = false;
+    if (onSignedIn) onSignedIn();
+  }, function (exc) {
+    signInOpen = false;
+    console.warn('sign-in failed to open', exc);
   });
+}
+
+// Boot hook called from main.js — keeps this module independent of the
+// boot sequence.
+export function setSignInHandler(onLoginSuccess) {
+  onSignedIn = onLoginSuccess;
 }
 
 // --------------------------------------------------------------- toast

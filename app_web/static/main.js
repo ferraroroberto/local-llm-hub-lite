@@ -4,7 +4,7 @@
  */
 
 import { state, els, THEME_KEY, STATUS_POLL_MS, COUNTERS_POLL_MS, MODELS_POLL_MS } from './state.js';
-import { jsonApi, tokenFromUrl, writeToken, wireLoginForm, toast } from './api.js';
+import { jsonApi, tokenFromUrl, writeToken, setSignInHandler, toast } from './api.js';
 import { icon } from './_vendored/icons/icons.js';
 import { bindTextSize } from './_vendored/text-size/text-size.js';
 import { buildReadoutText } from './_vendored/page-foot/page-foot.js';
@@ -57,7 +57,7 @@ async function boot() {
   const fromUrl = tokenFromUrl();
   if (fromUrl) writeToken(fromUrl);
 
-  wireLoginForm(function () { return resumeAfterLogin(); });
+  setSignInHandler(function () { return resumeAfterLogin(); });
   wireHub();
   wireModels();
   wireRolesCard();
