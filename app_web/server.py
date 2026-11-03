@@ -27,11 +27,13 @@ from starlette.responses import Response
 from starlette.types import Scope
 
 from src.auth_middleware import BearerTokenMiddleware
+from src.runtime_data import runtime_db_path
 from src.static_versioning import (
     compute_asset_hashes,
     fleet_hash_of,
     rewrite_js_imports,
 )
+from src.usage_log import usage_router
 from src.webapp_config import load_webapp_config
 
 from .routers import auth, hub, misc, models, playground, roles, version
@@ -147,5 +149,10 @@ def create_app() -> FastAPI:
     app.include_router(models.router)
     app.include_router(roles.router)
     app.include_router(playground.router)
+    # Local-only view/tap log. Behind the bearer-token middleware like every /api route;
+    # static/usage.js hands the vendored client the bearer header.
+    app.include_router(usage_router(
+        runtime_db_path("local-llm-hub-lite", "usage.sqlite3", create=True),
+    ))
 
     return app

@@ -12,6 +12,7 @@ import os
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Iterator
@@ -20,6 +21,7 @@ import httpx
 import pytest
 
 from src.process import win_job
+from src.runtime_data import app_dir_env_var
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -53,6 +55,8 @@ def hub_url() -> Iterator[str]:
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
+    # The disposable hub keeps its runtime databases (the usage log) in a per-run temp folder.
+    env[app_dir_env_var("local-llm-hub-lite")] = tempfile.mkdtemp(prefix="llh-lite-e2e-data-")
     # The autostart sampler hits nvidia-smi every 2s. On a CI runner
     # without an NVIDIA GPU that's noisy but harmless.
     creationflags = 0

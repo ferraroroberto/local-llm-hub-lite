@@ -9,6 +9,7 @@ import { icon } from './_vendored/icons/icons.js';
 import { bindTextSize } from './_vendored/text-size/text-size.js';
 import { buildReadoutText } from './_vendored/page-foot/page-foot.js';
 import { wireTabs, onTabChange } from './tabs.js';
+import { wireUsageLog } from './usage.js';
 import { wireHub, fetchHubStatus, fetchCounters, startHubStreams, stopHubStreams, fetchInstallStatus } from './hub.js';
 import { wireModels, fetchModels } from './models.js';
 import { wireRolesCard } from './roles_card.js';
@@ -72,6 +73,7 @@ async function boot() {
       stopHubStreams();
     }
   });
+  onTabChange(wireUsageLog().trackView);
   wireTabs();
 
   await Promise.allSettled([

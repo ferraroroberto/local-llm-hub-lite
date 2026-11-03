@@ -50,6 +50,11 @@
 #      .runtime-write-ratchet-baseline.json. Whole tree, never routed. Any
 #      non-zero exit fails, so exit 3 (a new target it cannot resolve) is NOT
 #      CONFIRMED and never a pass.
+#   9c. usage track ratchet: no rise in untracked controls, untracked sheets or
+#      built ids in app_web/static beyond .usage-track-ratchet-baseline.json, and
+#      the usage log wired. Whole tree, never routed. Any non-zero exit fails, so
+#      exit 3 (a file that cannot be read or closed) is NOT CONFIRMED and never a
+#      pass.
 #  10. `pytest -q` (unit tests, no GPU / no real CLIs); stages 10-11 run inside
 #      the runtime write probe (--snapshot before, --probe after), which fails on
 #      any untracked or ignored file they leave under a code folder.
@@ -188,6 +193,13 @@ Step "runtime write ratchet" {
     # exit, so exit 3 (a new write target it cannot resolve) stops the gate
     # like a finding does.
     & $Python scripts\runtime_write_ratchet.py
+}
+
+Step "usage track ratchet" {
+    # Called directly, like the runtime write ratchet: Step fails on any non-zero
+    # exit, so exit 3 (a file that cannot be read, or JS that never closes) stops
+    # the gate like a finding does.
+    & $Python scripts\usage_track_ratchet.py
 }
 
 # Runtime write probe, first half: what already sits untracked or ignored under
