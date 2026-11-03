@@ -6,6 +6,9 @@
  * and the log would only describe the desktop. The vendored client takes it through its
  * `headers` option, a function so a rotated token is read on every send; nothing here
  * replaces window.fetch or navigator.sendBeacon.
+ *
+ * The usage router is mounted in the /admin sub-app, so the client's endpoint is the
+ * /admin path rather than the vendored default `/api/usage/events`, which would 404.
  */
 
 import { initUsageLog } from './_vendored/usage-log/usage-log.js';
@@ -15,6 +18,7 @@ import { readToken } from './api.js';
 // first view. The caller hands `trackView` to the tab-change hook.
 export function wireUsageLog() {
   return initUsageLog({
+    endpoint: '/admin/api/usage/events',
     headers: function () {
       const token = readToken();
       return token ? { Authorization: 'Bearer ' + token } : {};
