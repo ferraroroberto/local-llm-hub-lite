@@ -35,7 +35,6 @@
   --toggle-knob: #ffffff;       /* vendored switch: thumb */
   --input-bg: var(--card-off);
   --code-bg: var(--card-off);  /* logpane / trace-detail <pre> surfaces */
-  --scrim: rgba(0, 0, 0, 0.5); /* login-overlay dim — theme-invariant by design */
   /* status-alpha composites — derived, so they re-theme for free */
   --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
   --accent-border-soft: color-mix(in srgb, var(--accent) 24%, transparent);
@@ -84,6 +83,7 @@
   --font-heading-xl: 2rem;
   --font-heading-lg: 1.5rem;
   --font-body: 1rem;
+  --font-body-sm: 0.875rem;
   --font-label: 0.875rem;
   --font-caption: 0.75rem;
   /* elevation — cards lean on surface + hairline border; only floating
@@ -880,45 +880,3 @@ h2 { display: flex; align-items: center; gap: 8px; }
   z-index: 130;
 }
 .toast.error { border-color: var(--danger); }
-
-/* ---------- login overlay ---------- */
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--scrim);
-  backdrop-filter: blur(4px);
-  display: grid;
-  place-items: center;
-  z-index: 100;
-  padding: 16px;
-}
-.login-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 20px;
-  width: 100%;
-  max-width: 360px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap);
-}
-.login-card h2 { margin: 0; font-size: var(--font-heading-lg); }
-.login-card input {
-  background: var(--input-bg);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  font-size: var(--font-body);
-  min-height: 44px;
-}
-.login-card .error {
-  background: var(--danger-soft);
-  border: 1px solid var(--danger);
-  color: var(--danger);
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  font-size: var(--font-caption);
-  margin: 0;
-}
