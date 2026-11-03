@@ -143,6 +143,9 @@ To add a model: add a row, list its id in `hosts.local.enabled`, run `python -m 
 | `auth_password` | `""` | Optional login password for the admin SPA (`POST /api/login` swaps it for the token). |
 | `extra_allowlist` | `[]` | IPs allowed without a token (e.g. a trusted LAN peer). |
 | `cors_allow_origins` | `[]` | CORS origins for browser callers. |
+| `telegram_bot_token`, `telegram_alert_chat_id` | `""` | Telegram bot token and chat id for the wrong-password alert (below). Either empty sends nothing. |
+
+`POST /admin/api/login` answers `429` with a `Retry-After` header once a client has typed six wrong passwords: the wait starts at 2 s and doubles to 300 s, and a correct password clears it. The PC itself (the same check that lets it skip the token) is never locked out. Behind a tunnel, a client is told apart by the tunnel's client header, read only when the request arrives over loopback. Three wrong passwords in a row from one client send one Telegram message (app name, client address, count; never a password or token), at most one per five minutes. State is in memory, so a restart clears it.
 
 ## Layout
 

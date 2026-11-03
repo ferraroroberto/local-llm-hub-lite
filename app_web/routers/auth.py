@@ -15,6 +15,8 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Request
 
+from src.auth_middleware import is_pc_itself
+from src.login_lockout import LoginLockout, retry_after_header
 from src.webapp_config import WebappConfig
 
 from ._helpers import PROJECT_ROOT, client_ip, maybe_json
@@ -52,6 +54,19 @@ router = APIRouter()
 async def login(request: Request) -> Dict[str, Any]:
     cfg: WebappConfig = request.app.state.webapp_config
     who = client_ip(request)
+    lockout: LoginLockout = request.app.state.login_lockout
+    # The PC itself is never locked out; the same check lets it skip the token.
+    exempt = is_pc_itself(
+        request.client.host if request.client else "", request.headers, cfg
+    )
+    wait = 0.0 if exempt else lockout.retry_after(who)
+    if wait > 0:
+        auth_logger.warning(f"🔒 Login refused for {who}: too many attempts")
+        raise HTTPException(
+            status_code=429,
+            detail="too many attempts",
+            headers=retry_after_header(wait),
+        )
     if not cfg.auth_password:
         auth_logger.info(
             f"⚠️  Login attempt from {who} but no auth_password configured"
@@ -73,6 +88,9 @@ async def login(request: Request) -> Dict[str, Any]:
             f"🚨 Failed password attempt from {who} "
             f"(presented: {len(presented)} chars)"
         )
+        if not exempt:
+            lockout.record_failure(who)
         raise HTTPException(status_code=401, detail="bad password")
+    lockout.reset(who)
     auth_logger.info(f"🔓 Password login from {who}")
     return {"token": cfg.auth_token}

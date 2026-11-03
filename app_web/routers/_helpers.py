@@ -12,6 +12,8 @@ from typing import Any, AsyncIterator, Callable, Dict, List, Optional, TypeVar
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 
+from src.auth_middleware import resolve_client_address
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -29,7 +31,10 @@ async def maybe_json(request: Request) -> Dict[str, Any]:
 
 
 def client_ip(request: Request) -> str:
-    return request.client.host if request.client else "?"
+    """The caller's address: the tunnel's client header when proxied, else the socket peer."""
+    if not request.client:
+        return "?"
+    return resolve_client_address(request.client.host, request.headers)
 
 
 def sse_pack(data: Any, event: str = "") -> str:

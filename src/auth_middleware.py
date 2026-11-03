@@ -113,6 +113,46 @@ def _origin_is_local(headers, cfg) -> bool:
         return True
     return origin in resolve_allowed_origins(getattr(cfg, "cors_allow_origins", None))
 
+def is_pc_itself(client_host: str, headers, cfg) -> bool:
+    """True for a program on this PC, the one caller that skips the token.
+
+    A loopback socket alone is not enough: a local tunnel delivers every
+    public request over loopback, so the request must also carry no proxy
+    header, name a loopback ``Host`` and come from no foreign page origin.
+    """
+    return (
+        client_host in LOOPBACK_HOSTS
+        and not _is_proxied(headers)
+        and _host_is_local(headers)
+        and _origin_is_local(headers, cfg)
+    )
+
+
+def resolve_client_address(client_host: str, headers) -> str:
+    """The address of the real caller, for logs and per-client limits.
+
+    Behind a local tunnel the socket peer is the proxy's loopback address, so
+    a request that arrives over loopback with a proxy header is keyed on the
+    tunnel's client header instead (``cf-connecting-ip``, else the last
+    ``x-forwarded-for`` hop, which the nearest proxy appended and the caller
+    cannot forge). A header from a non-loopback socket is never believed, and
+    a header value that is not an IP address is ignored.
+    """
+    if client_host not in LOOPBACK_HOSTS or not _is_proxied(headers):
+        return client_host
+    candidates = [headers.get("cf-connecting-ip", "")]
+    forwarded = headers.get("x-forwarded-for", "")
+    if forwarded:
+        candidates.append(forwarded.split(",")[-1])
+    for value in candidates:
+        value = (value or "").strip()
+        try:
+            return str(ipaddress.ip_address(value))
+        except ValueError:
+            continue
+    return client_host
+
+
 # Static + login + healthz/version are exempt: the login endpoint is
 # how a phone-side user *gets* the token, and static assets must load
 # before the login form can render. Paths here are the sub-app's view
@@ -166,12 +206,7 @@ def _caller_is_trusted(
     """
     token = (get_token() or "").strip()
     cfg = getattr(app_state, "webapp_config", None)
-    if (
-        client_host in LOOPBACK_HOSTS
-        and not _is_proxied(headers)
-        and _host_is_local(headers)
-        and _origin_is_local(headers, cfg)
-    ):
+    if is_pc_itself(client_host, headers, cfg):
         return True
     extra = getattr(cfg, "extra_allowlist", []) if cfg else []
     if _client_in_allowlist(client_host, extra):
