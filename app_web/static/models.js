@@ -113,6 +113,10 @@ function fillItem(li, m) {
     btn.type = 'button';
     btn.className = 'icon-btn' + (b.danger ? ' danger' : '');
     btn.dataset.act = b.act;
+    if (b.act === 'start') btn.setAttribute('data-track', 'model-start');
+    else if (b.act === 'stop') btn.setAttribute('data-track', 'model-stop');
+    else if (b.act === 'ping') btn.setAttribute('data-track', 'model-ping');
+    else btn.setAttribute('data-track', 'model-force-stop');
     btn.disabled = !!b.disabled;
     btn.title = b.label;
     btn.setAttribute('aria-label', b.label);

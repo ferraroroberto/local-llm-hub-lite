@@ -75,7 +75,7 @@
             </span>
           </div>
           <div class="card-header-actions">
-            <button id="themeToggleBtn" type="button" class="icon-header-btn" aria-label="Toggle dark mode" title="Toggle theme"><svg class="icon" aria-hidden="true"><use href="#i-moon"></use></svg></button>
+            <button data-track="theme-toggle" id="themeToggleBtn" type="button" class="icon-header-btn" aria-label="Toggle dark mode" title="Toggle theme"><svg class="icon" aria-hidden="true"><use href="#i-moon"></use></svg></button>
           </div>
         </div>
         <div class="hub-meta-row">
@@ -87,7 +87,7 @@
 
       <!-- Health & install — vendored disclosure card (_vendored/disclosure) -->
       <details class="card card--collapsible" id="installCard">
-        <summary class="collapse-summary">
+        <summary data-track="hub-health-install" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-stethoscope"></use></svg>
             <h3 class="collapse-title">Health &amp; install</h3>
@@ -100,14 +100,14 @@
           <div class="setting-row">
             <span class="setting-label">Text size</span>
             <div class="segmented" id="textSizeControl" role="group" aria-label="Text size">
-              <button type="button" class="segmented-item" aria-pressed="false" data-textsize="small">Small</button>
-              <button type="button" class="segmented-item" aria-pressed="true" data-textsize="default">Default</button>
-              <button type="button" class="segmented-item" aria-pressed="false" data-textsize="large">Large</button>
+              <button data-track="text-size-small" type="button" class="segmented-item" aria-pressed="false" data-textsize="small">Small</button>
+              <button data-track="text-size-default" type="button" class="segmented-item" aria-pressed="true" data-textsize="default">Default</button>
+              <button data-track="text-size-large" type="button" class="segmented-item" aria-pressed="false" data-textsize="large">Large</button>
             </div>
           </div>
           <div class="card-actions">
-            <button id="installFixAllBtn" type="button" class="button-primary launch-btn"><svg class="icon" aria-hidden="true"><use href="#i-wrench"></use></svg>Fix all</button>
-            <button id="installRefreshBtn" type="button" class="ghost-btn"><svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"></use></svg>Re-check</button>
+            <button data-track="install-fix-all" id="installFixAllBtn" type="button" class="button-primary launch-btn"><svg class="icon" aria-hidden="true"><use href="#i-wrench"></use></svg>Fix all</button>
+            <button data-track="install-recheck" id="installRefreshBtn" type="button" class="ghost-btn"><svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"></use></svg>Re-check</button>
           </div>
         </div>
       </details>
@@ -116,7 +116,7 @@
            (_vendored/disclosure), folded by default — same pattern as
            Health & install. The density toggle + compact tabbed pane are gone. -->
       <details class="card card--collapsible">
-        <summary class="collapse-summary">
+        <summary data-track="hub-live-requests" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-radio"></use></svg>
             <h3 class="collapse-title">Live requests</h3>
@@ -132,7 +132,7 @@
       </details>
 
       <details class="card card--collapsible">
-        <summary class="collapse-summary">
+        <summary data-track="hub-counters" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-chart-column"></use></svg>
             <h3 class="collapse-title">Counters</h3>
@@ -152,7 +152,7 @@
       </details>
 
       <details class="card card--collapsible">
-        <summary class="collapse-summary">
+        <summary data-track="hub-errors" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-triangle-alert"></use></svg>
             <h3 class="collapse-title">Errors</h3>
@@ -167,7 +167,7 @@
       </details>
 
       <details class="card card--collapsible">
-        <summary class="collapse-summary">
+        <summary data-track="hub-log" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-scroll-text"></use></svg>
             <h3 class="collapse-title">Log</h3>
@@ -176,7 +176,7 @@
         </summary>
         <div class="collapse-body">
           <div class="logpane-actions">
-            <button id="hubLogPauseBtn" type="button" class="ghost-btn"><svg class="icon" aria-hidden="true"><use href="#i-pause"></use></svg>Pause</button>
+            <button data-track="hub-log-pause" id="hubLogPauseBtn" type="button" class="ghost-btn"><svg class="icon" aria-hidden="true"><use href="#i-pause"></use></svg>Pause</button>
           </div>
           <pre id="hubLog" class="logpane" aria-label="Hub server log"></pre>
         </div>
@@ -187,13 +187,13 @@
       <!-- Vendored disclosure card (_vendored/disclosure), open by default —
            the inventory is what you came to this tab to see. -->
       <details class="card card--collapsible" id="modelsCard" open>
-        <summary class="collapse-summary">
+        <summary data-track="models-list" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-boxes"></use></svg>
             <h3 class="collapse-title">Models</h3>
           </span>
           <span class="collapse-actions">
-            <button id="modelsActiveToggle" type="button" class="icon-header-btn active" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="#i-activity"></use></svg></button>
+            <button data-track="models-active-toggle" id="modelsActiveToggle" type="button" class="icon-header-btn active" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="#i-activity"></use></svg></button>
             <span class="collapse-chevron" aria-hidden="true">›</span>
           </span>
         </summary>
@@ -210,7 +210,7 @@
            System Map lazy-load discipline (a folded, low-noise card),
            adapted for small live JSON instead of a static image. -->
       <details class="card card--collapsible" id="rolesCard">
-        <summary class="collapse-summary">
+        <summary data-track="models-decisions" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-boxes"></use></svg>
             <h3 class="collapse-title">Model decisions</h3>
@@ -230,7 +230,7 @@
       <!-- The testers are vendored disclosure cards, folded by default,
            so one opens at a time by choice. -->
       <details class="card card--collapsible">
-        <summary class="collapse-summary">
+        <summary data-track="playground-section" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-flask-conical"></use></svg>
             <h3 class="collapse-title">Playground</h3>
@@ -241,7 +241,7 @@
 
         <div class="opt-stack">
           <label for="playgroundModel">Model</label>
-          <select id="playgroundModel" aria-label="Model"></select>
+          <select data-track="playground-model" id="playgroundModel" aria-label="Model"></select>
         </div>
 
         <div class="opt-stack">
@@ -255,16 +255,16 @@
         </div>
 
         <details class="opt-stack" id="playgroundMore">
-          <summary class="opt-group-title" style="cursor: pointer; list-style: revert;">More options</summary>
+          <summary data-track="playground-more-options" class="opt-group-title" style="cursor: pointer; list-style: revert;">More options</summary>
 
           <div class="opt-stack">
             <label>Max tokens</label>
             <div class="maxtokens-row">
               <div id="playgroundMaxTokensSeg" class="preset-tabs stretch" role="tablist" aria-label="Max tokens preset">
-                <button type="button" data-value="256">256</button>
-                <button type="button" data-value="512" class="active">512</button>
-                <button type="button" data-value="2048">2048</button>
-                <button type="button" data-value="8192">8192</button>
+                <button data-track="playground-max-256" type="button" data-value="256">256</button>
+                <button data-track="playground-max-512" type="button" data-value="512" class="active">512</button>
+                <button data-track="playground-max-2048" type="button" data-value="2048">2048</button>
+                <button data-track="playground-max-8192" type="button" data-value="8192">8192</button>
               </div>
               <input id="playgroundMaxTokens" type="number" min="1" max="32000" value="512" aria-label="Max tokens override">
             </div>
@@ -272,8 +272,8 @@
         </details>
 
         <div class="playground-send-row">
-          <button id="playgroundSendBtn" type="button" class="ghost-btn primary"><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg>Send</button>
-          <button id="playgroundClearBtn" type="button" class="ghost-btn">Clear</button>
+          <button data-track="playground-send" id="playgroundSendBtn" type="button" class="ghost-btn primary"><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg>Send</button>
+          <button data-track="playground-clear" id="playgroundClearBtn" type="button" class="ghost-btn">Clear</button>
         </div>
         <p id="playgroundLatency" class="muted small" style="margin: 8px 0 0;"></p>
 
@@ -285,7 +285,7 @@
       </details>
 
       <details class="card card--collapsible" id="transcribeCard">
-        <summary class="collapse-summary">
+        <summary data-track="transcribe-section" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-radio"></use></svg>
             <h3 class="collapse-title">Transcribe</h3>
@@ -297,14 +297,14 @@
         <div class="opt-stack">
           <label for="transcribeFile">Audio file</label>
           <div class="file-row">
-            <button id="transcribeFileBtn" type="button" class="ghost-btn"><svg class="icon" aria-hidden="true"><use href="#i-paperclip"></use></svg>Choose file</button>
+            <button data-track="transcribe-choose-file" id="transcribeFileBtn" type="button" class="ghost-btn"><svg class="icon" aria-hidden="true"><use href="#i-paperclip"></use></svg>Choose file</button>
             <span id="transcribeFileName" class="file-name muted small">No file selected</span>
             <input id="transcribeFile" type="file" accept="audio/*" hidden aria-label="Audio file to transcribe">
           </div>
         </div>
 
         <div class="playground-send-row">
-          <button id="transcribeBtn" type="button" class="ghost-btn primary" disabled><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg>Transcribe</button>
+          <button data-track="transcribe-run" id="transcribeBtn" type="button" class="ghost-btn primary" disabled><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg>Transcribe</button>
         </div>
         <p id="transcribeLatency" class="muted small" style="margin: 8px 0 0;"></p>
 
@@ -332,7 +332,7 @@
       <h2><svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg>Sign in</h2>
       <p class="muted small">This hub is locked. Enter the configured password to receive a bearer token.</p>
       <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" required>
-      <button type="submit" class="button-primary launch-btn">Sign in</button>
+      <button data-track="login-sign-in" type="submit" class="button-primary launch-btn">Sign in</button>
       <p id="loginError" class="error" hidden></p>
     </form>
   </div>
