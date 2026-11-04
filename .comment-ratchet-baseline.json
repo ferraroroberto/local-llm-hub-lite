@@ -1,1 +1,7 @@
-{}
+{
+  "version": 1,
+  "entries": [
+    {"key": "app_web/static/_vendored/icons/icons.js", "count": 1},
+    {"key": "scripts/tray_lifecycle.ps1", "count": 9}
+  ]
+}
