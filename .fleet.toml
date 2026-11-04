@@ -37,6 +37,7 @@ structure_band = { src = "scripts/structure_band.py", sha = "3b708fd3c54ab7b93b0
 instruction_ratchet = { src = "scripts/instruction_ratchet.py", sha = "5505185c5f4b10eea5ab268e7b6676c6c54340c4", dest = "scripts/instruction_ratchet.py" }
 doc_refs_ratchet = { src = "scripts/doc_refs_ratchet.py", sha = "5505185c5f4b10eea5ab268e7b6676c6c54340c4", dest = "scripts/doc_refs_ratchet.py" }
 dead_code_ratchet = { src = "scripts/dead_code_ratchet.py", sha = "5505185c5f4b10eea5ab268e7b6676c6c54340c4", dest = "scripts/dead_code_ratchet.py" }
+comment_ratchet = { src = "scripts/comment_ratchet.py", sha = "41ca8abd5a2755a06bd8a620a72967211161d58e", dest = "scripts/comment_ratchet.py" }
 conventions_ratchet = { src = "scripts/conventions_ratchet.py", sha = "93208ab08bdc8591c678a08f55a0f46b3fc8a525", dest = "scripts/conventions_ratchet.py" }
 runtime_write_ratchet = { src = "scripts/runtime_write_ratchet.py", sha = "5505185c5f4b10eea5ab268e7b6676c6c54340c4", dest = "scripts/runtime_write_ratchet.py" }
 runtime_write_resolve = { src = "scripts/runtime_write_resolve.py", sha = "5505185c5f4b10eea5ab268e7b6676c6c54340c4", dest = "scripts/runtime_write_resolve.py" }
@@ -82,20 +83,12 @@ exclude  = ["**/_vendored/**", "vendor/**", "models/**"]
 enabled  = true
 baseline = ".docs-ratchet-baseline.json"
 
-# [comment_ratchet] -- this repo's own baseline-and-ratchet check (not
-# vendored from project-scaffolding, which has no source-comment equivalent).
+# [comment_ratchet] -- the scaffold's baseline-and-ratchet check on issue
+# references (`#NNN`) inside comments, vendored from project-scaffolding.
 # The gate runs scripts/comment_ratchet.py through scripts/comment_ratchet_gate.py:
-# a new or grown #<digits> issue-number reference, or a curated
-# history-narration phrase ("previously", "used to be", "extracted from",
-# "inlined from", ...), in a src/ app_web/ scripts/ tray/ launchers/ comment
-# or docstring, beyond .comment-ratchet-baseline.json, fails. Added by issue
-# #53 (audit: claude-md-drift findings) as the structural check for the
-# issue-number half of that rule; broadened by a later claude-md-drift audit
-# to the prose-narration half the first pass missed. Excluded: every
-# .fleet.toml [vendored] dest, app_web/static/_vendored/**, and any file
-# carrying the "VENDORED VERBATIM" marker (comment_ratchet.py's own docstring
-# names the convention). Exit 3 (a file could not be read) fails as NOT
-# CONFIRMED.
+# a file whose count of references rises above .comment-ratchet-baseline.json,
+# or a new file carrying any, fails. Every .fleet.toml [vendored] dest is
+# excluded. Exit 3 (a file could not be read) fails as NOT CONFIRMED.
 [comment_ratchet]
 enabled  = true
 baseline = ".comment-ratchet-baseline.json"

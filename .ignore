@@ -7,10 +7,13 @@
 /app_web/static/_vendored/nav
 /app_web/static/_vendored/page-foot
 /app_web/static/_vendored/segmented
+/app_web/static/_vendored/select-native
+/app_web/static/_vendored/sign-in
 /app_web/static/_vendored/switch
 /app_web/static/_vendored/text-size
 /app_web/static/_vendored/usage-log
 /scripts/classify_e2e.py
+/scripts/comment_ratchet.py
 /scripts/conventions_ratchet.py
 /scripts/dead_code_ratchet.py
 /scripts/doc_refs_ratchet.py
@@ -25,6 +28,8 @@
 /scripts/usage_track_ratchet.py
 /scripts/usage_track_scan.py
 /src/build_info.py
+/src/login_lockout.py
+/src/notify
 /src/runtime_data.py
 /src/usage_log.py
 /tray/single_instance.py

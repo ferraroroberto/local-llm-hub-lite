@@ -59,10 +59,12 @@ def test_the_pre_ship_gate_calls_the_wrapper_not_the_script() -> None:
     assert docs_at < stage[0] < pytest_at
 
 
-def test_the_ratchet_script_is_repo_local_not_vendored() -> None:
-    """Unlike static/docs ratchet, this check has no project-scaffolding
-    equivalent -- it must not be declared in .fleet.toml's [vendored] table."""
+def test_the_ratchet_script_is_declared_vendored() -> None:
+    """The script is project-scaffolding's, vendored verbatim, so its source and
+    pinned sha are declared in .fleet.toml's [vendored] table."""
     import tomllib
 
     fleet = tomllib.loads((REPO_ROOT / ".fleet.toml").read_text(encoding="utf-8"))
-    assert "comment_ratchet" not in fleet.get("vendored", {})
+    entry = fleet["vendored"]["comment_ratchet"]
+    assert entry["src"] == "scripts/comment_ratchet.py"
+    assert entry["dest"] == "scripts/comment_ratchet.py"

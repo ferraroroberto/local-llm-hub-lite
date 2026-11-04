@@ -1,144 +1,708 @@
-r"""Ratchet on decision-history narratives inside source-code comments.
+"""Ratchet on issue references inside product-code comments (project-scaffolding#411).
 
-Catches the claude-md-drift class the docs ratchet (`scripts/docs_ratchet.py`)
-doesn't cover: decision history baked into `src/`, `app_web/`, `scripts/`,
-`tray/` and `launchers/` comments and docstrings, instead of the issue and
-git log the global CLAUDE.md says it belongs in. Two shapes, both counted
-against the same per-file total:
+A comment that cites `#1003` to carry the story of how the code got here teaches
+the next change to add another one. The story belongs in the issue, the PR and
+`git log`; a comment states why the code is the way it is *now*. The rule text
+is owned by fleet-config#1517; this stage enforces it structurally: it counts
+`#NNN` references inside comments, per file, compares them with a committed
+baseline, and fails only when a file's count *rises*. Existing debt never
+blocks work, but it cannot grow.
 
-* Upstream issue references (`#NNN`, `issue #NNN`, `other-repo#NNN`, ...). A
-  reader who follows one of these numbers into *this* repo's tracker lands on
-  nothing, or on an unrelated issue.
-* Prose that narrates what the code *used to be* instead of what it is now --
-  "previously", "used to be", "extracted from", "inlined from", "replaces
-  ... in one file", "before this ... existed", "the old <thing>", "hand-rolled",
-  "by hand ... consolidated", "now a real module". A docstring recounting a
-  retired implementation doesn't help the next reader; the retired code's
-  history already lives in `git log`.
+What is counted -- comment text only, extracted by a real scanner, never by
+grepping source lines:
 
-Counts the `#<digits>` reference shape the docs ratchet uses (hex colors like
-`#1f2328` and HTML entities like `&#39;` are excluded by the same lookaround)
-plus hits against the curated history-phrase list above, per file, against a
-committed baseline: it fails only when a count *rises*. Existing debt never
-blocks work, but it cannot grow. (This docstring deliberately spells issue
-examples as `#NNN` rather than real digits -- real digits here would trip the
-scan below against its own source.)
+  * `.py`                 stdlib `tokenize`, COMMENT tokens (a string, f-string or
+                          docstring is not a comment)
+  * `.js` `.mjs` `.cjs`   `//` and `/* */`; strings, template literals (with
+                          `${}`) and regex literals are skipped
+  * `.css`                `/* */`; strings and unquoted `url(...)` are skipped
+  * `.ps1` `.psm1`        `#` line comments and `<# #>` blocks; single- and
+                          double-quoted strings (with `$( )`) and here-strings
+                          are skipped
+  * `.yml` `.yaml`        `#` line comments (must start the line or follow
+                          whitespace, per the YAML spec); single- and
+                          double-quoted scalars are skipped. A block scalar
+                          (`|`/`>`, e.g. a GitHub Actions `run:` step) is not
+                          special-cased -- a `#` inside one is scanned like any
+                          other, which is correct for an embedded shell/script
+                          comment and conservative for anything else.
 
-Scope: `git ls-files` restricted to `src/`, `app_web/`, `scripts/`, `tray/`,
-`launchers/`, extensions `.py .js .css .html .bat .sh .ps1`, minus every
-`dest` in this repo's `.fleet.toml` `[vendored]` table,
-`app_web/static/_vendored/**`, and any file whose first 1 KiB carries a
-per-file "whole file is vendored" header (`VENDORED COPY` or `VENDORED
-VERBATIM` -- `scripts/tray_lifecycle.ps1` and `tray/single_instance.py`):
-fixed upstream in project-scaffolding and re-propagated, never edited
-per-app -- editing either here would fork it from the rest of the fleet
-silently.
+A reference is `#` plus one to five digits, not preceded by `&` or `#` and ending
+on a word boundary; `https://...` URLs inside a comment are blanked first so an
+anchor never counts. `repo#123` counts (same smell). Known false positive: a
+digit-only CSS hex colour written inside a comment (`/* #333 */`) -- write the
+token name instead. Docstrings and inline `<script>` / `<!-- -->` in HTML are out
+of scope. A file the scanner cannot finish (unterminated string, comment,
+template or here-string; a Python file `tokenize` rejects; undecodable bytes) is
+NOT CONFIRMED, never skipped.
 
-Modes:
-  check             (default) compare the current scan to the baseline.
-  --init            write the first baseline; refuses to overwrite one.
-  --update-baseline rewrite the baseline from the current scan. Shrinking or
-                    dropping an entry always succeeds; raising one needs
-                    --allow-additions, which shows in review.
+Opt-in, per adopter, in its own `.fleet.toml` -- re-vendoring never breaks a
+repo that has not opted in:
+
+    [comment_ratchet]
+    enabled  = true
+    baseline = ".comment-ratchet-baseline.json"   # default
+    include  = ["app/", "src/"]                    # path prefixes; default: whole tree
+    exclude  = ["**/generated/**"]                 # globs, added to the built-in set
+
+Product code only: `git ls-files --cached --others --exclude-standard` (ignored and generated folders never appear)
+minus tests (`tests/`, `test_*.py`, `*_test.py`, `conftest.py`, `*.test.js`),
+`*.min.*`, `node_modules`, venvs, files whose first lines say `DO NOT EDIT` or
+`@generated`, and every `dest` in the adopter's own `[vendored]` table.
 
 Exit codes (a state is never folded into a pass):
-  0  pass: no in-scope file carries more flags than its baseline entry
-  1  a count rose beyond its baseline entry, a new file carries flags
-     with no baseline entry, or (check mode) the baseline file is missing
-  2  bad baseline JSON, bad CLI usage, or --update-baseline tried to grow an
-     entry without --allow-additions -- fail loud
-  3  NOT CONFIRMED: `git ls-files` failed, or an in-scope file is not valid
-     UTF-8 -- the gate fails on it, never a pass or a skip
+
+  0  pass, or the stage is not enabled (declared, not inferred)
+  1  a file's count rose, a new file carries references, or the baseline is
+     missing / a mode was refused
+  2  bad configuration, baseline or arguments -- fail loud
+  3  NOT CONFIRMED: `git` unusable or a file could not be scanned. The gate
+     fails on it.
+
+Modes: `check` (default; what the gate runs), `--init` (write the first
+baseline, refuses to overwrite), `--update-baseline` (lower or drop entries;
+exits 1 and writes nothing while any count rose), `--update-baseline
+--allow-additions` (the explicit flag that raises or adds -- shows in review).
+
+Vendor-verbatim: copied byte-for-byte into adopters (manifest key
+`comment_ratchet`), stdlib-only. Full procedure and limits: docs/comment-ratchet.md.
 """
 
 from __future__ import annotations
 
+import argparse
+import io
 import json
 import os
 import re
 import subprocess
 import sys
+import tokenize
 import tomllib
-from pathlib import Path
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_BASELINE = REPO_ROOT / ".comment-ratchet-baseline.json"
+
+BASELINE_VERSION = 1
+DEFAULT_BASELINE = ".comment-ratchet-baseline.json"
+#: Always excluded, whatever the adopter's own `exclude` adds.
+BUILTIN_EXCLUDES = (
+    "**/tests/**",
+    "**/test_*.py",
+    "**/*_test.py",
+    "**/conftest.py",
+    "**/*.test.js",
+    "**/*.min.*",
+    "**/node_modules/**",
+    "**/.venv/**",
+    "**/venv/**",
+    "**/__pycache__/**",
+)
+GENERATED_MARKERS = ("DO NOT EDIT", "@generated")  # case-sensitive: "Do NOT edit this file per-app" is prose
+GENERATED_HEAD_LINES = 5
 GIT_TIMEOUT_S = 120
-# run_stage() (scripts/static_ratchet_gate.py) invokes this as a bare script,
-# not `python -m`, so REPO_ROOT is not reliably importable here; mirror the
-# vendored ratchets' own inline flag instead of importing src.no_window.
+
+LANGUAGES = {
+    ".py": "py",
+    ".js": "js", ".mjs": "js", ".cjs": "js",
+    ".css": "css",
+    ".ps1": "ps", ".psm1": "ps",
+    ".yml": "yaml", ".yaml": "yaml",
+}
+#: A `.yml.template`/`.yaml.template` copy-to-adapt source (this repo's own
+#: convention for keeping a GitHub Actions workflow inert until an adopter
+#: copies it -- see `.github/workflows/*.yml.template`) is still YAML text
+#: that comments live in; the trailing `.template` just hides it from
+#: `LANGUAGES`' plain single-suffix lookup.
+_TEMPLATE_LANGUAGE_SUFFIXES = {".yml.template": "yaml", ".yaml.template": "yaml"}
+
+
+def language_for(path: str) -> str | None:
+    """The scanner key for `path`, or None if it is out of scope."""
+    lower = path.lower()
+    for suffix, language in _TEMPLATE_LANGUAGE_SUFFIXES.items():
+        if lower.endswith(suffix):
+            return language
+    return LANGUAGES.get(PurePosixPath(path).suffix.lower())
+
+EXIT_PASS, EXIT_RISE, EXIT_CONFIG, EXIT_NOT_CONFIRMED = 0, 1, 2, 3
+
+# Vendor-verbatim module: derives the flag locally (the shared `src/no_window.py`
+# would not resolve in a consumer tree), the documented exception.
 _NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
-EXIT_PASS, EXIT_NEW, EXIT_CONFIG, EXIT_NOT_CONFIRMED = 0, 1, 2, 3
+_CONFIG_KEYS = {"enabled", "baseline", "include", "exclude"}
+_REF = re.compile(r"(?<![&#])#(\d{1,5})\b")
+_URL = re.compile(r"https?://\S+")
 
-# This module's own source has to spell every history phrase literally to
-# define `_HISTORY` below, so it would always flag itself; exempt it from
-# that half of the scan only (still scanned for `_REF`, same as any other
-# file) rather than obfuscating the phrase list into something unreadable.
-_SELF_EXEMPT_HISTORY = {"scripts/comment_ratchet.py"}
 
-SCOPE_DIRS = ("src/", "app_web/", "scripts/", "tray/", "launchers/")
-SCOPE_EXTENSIONS = {".py", ".js", ".css", ".html", ".bat", ".sh", ".ps1"}
-# Both per-file "this whole file is vendored" header conventions seen in this
-# repo: tray/single_instance.py's "CANONICAL, VENDORED VERBATIM" and
-# scripts/tray_lifecycle.ps1's "VENDORED COPY". Checked near the top only, so
-# an ordinary mention of the app_web/static/_vendored/ *directory* elsewhere
-# in a file (lowercase, a different word) never matches.
-_VENDORED_MARKER = re.compile(r"VENDORED (COPY|VERBATIM)")
-
-# Same shape + lookaround as docs_ratchet.py's `_REF`: `#NNN`, not preceded by
-# `&`/`#`/`/` (entity, doubled hash, URL path) and not followed by a word
-# character or `-` (so `#1f2328` -- a hex color -- never matches: the digit
-# run stops at the first letter and the lookahead then rejects it).
-_REF = re.compile(r"(?<![&#/])#(\d{1,5})(?![\w-])")
-
-# Curated phrases that signal a comment/docstring is narrating what the code
-# *used to be* rather than what it is now -- the prose half of the
-# claude-md-drift "comments state the present-tense why" rule, which plain
-# issue-number matching above never catches (a docstring can narrate history
-# fluently without ever spelling out an issue number). `re.DOTALL` is off on
-# purpose so a wrapped docstring line still needs the phrase on one logical
-# line of prose; `\s+` stands in for a line-wrap's newline + indent where a
-# phrase commonly splits across two physical lines (e.g. "consolidated\n
-# here").
-_HISTORY = re.compile(
-    r"\b(?:"
-    r"previously|"
-    r"used\s+to\s+be|"
-    r"that\s+used\s+to|"
-    r"which\s+used\s+to|"
-    r"extracted\s+from|"
-    r"inlined\s+from|"
-    r"replaces\s+(?:``|the\s+(?:old|\d))|"
-    r"before\s+this\s+\w+\s+existed|"
-    r"hand-rolled|"
-    r"by\s+hand\s*(?:[-—,]|and)?\s*consolidated|"
-    r"consolidated\s+here|"
-    r"the\s+old\s+\w+|"
-    r"now\s+a\s+real\s+module"
-    r")\b",
-    re.IGNORECASE,
-)
+class ConfigError(RuntimeError):
+    """The `[comment_ratchet]` table or the baseline file is unusable."""
 
 
 class NotConfirmed(RuntimeError):
-    pass
+    """A file could not be scanned, so its count is unknown."""
 
 
-def _vendored_dests(root: Path) -> set[str]:
-    fleet_path = root / ".fleet.toml"
-    if not fleet_path.is_file():
-        return set()
-    data = tomllib.loads(fleet_path.read_text(encoding="utf-8"))
-    return {entry["dest"] for entry in data.get("vendored", {}).values()}
+@dataclass(frozen=True)
+class Config:
+    baseline: str
+    include: tuple[str, ...]
+    exclude: tuple[str, ...]
 
+
+@dataclass(frozen=True)
+class Ref:
+    line: int
+    text: str  # the matched `#NNN`, plus the comment line it sits on, for messages
+
+
+# ----------------------------------------------------------------- config
+
+def _str_list(table: dict[str, object], name: str) -> tuple[str, ...]:
+    value = table.get(name, [])
+    if not isinstance(value, list) or not all(isinstance(v, str) and v for v in value):
+        raise ConfigError(f"[comment_ratchet] {name} must be a list of non-empty strings")
+    return tuple(value)
+
+
+def parse_config(toml_text: str) -> Config | None:
+    """`[comment_ratchet]` -> `Config`, or None when the stage is not enabled.
+
+    An absent table, or `enabled = false`, is the one correct skip: the adopter
+    declared it. Anything malformed raises `ConfigError` -- a typo'd key must not
+    quietly run with defaults.
+    """
+    table = tomllib.loads(toml_text).get("comment_ratchet")
+    if table is None:
+        return None
+    if not isinstance(table, dict):
+        raise ConfigError("[comment_ratchet] must be a table")
+    unknown = sorted(set(table) - _CONFIG_KEYS)
+    if unknown:
+        raise ConfigError(f"[comment_ratchet]: unknown key(s) {', '.join(unknown)}")
+    enabled = table.get("enabled", False)
+    if not isinstance(enabled, bool):
+        raise ConfigError("[comment_ratchet] enabled must be true or false")
+    if not enabled:
+        return None
+    baseline = table.get("baseline", DEFAULT_BASELINE)
+    if not isinstance(baseline, str) or not baseline:
+        raise ConfigError("[comment_ratchet] baseline must be a non-empty string")
+    return Config(baseline, _str_list(table, "include"), _str_list(table, "exclude"))
+
+
+def vendored_dests(toml_text: str) -> tuple[str, ...]:
+    """Every `dest` in the adopter's own `[vendored]` table (files or folders)."""
+    table = tomllib.loads(toml_text).get("vendored")
+    if not isinstance(table, dict):
+        return ()
+    dests = []
+    for entry in table.values():
+        dest = entry.get("dest") if isinstance(entry, dict) else None
+        if isinstance(dest, str) and dest.strip("/"):
+            dests.append(dest.replace("\\", "/").strip("/"))
+    return tuple(sorted(dests))
+
+
+def load_config(root: Path) -> tuple[Config | None, tuple[str, ...]]:
+    """(config or None when not enabled, vendored dests)."""
+    path = root / ".fleet.toml"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ConfigError(f"cannot read {path}: {exc}") from exc
+    try:
+        return parse_config(text), vendored_dests(text)
+    except tomllib.TOMLDecodeError as exc:
+        raise ConfigError(f"{path} is not valid TOML: {exc}") from exc
+
+
+# ------------------------------------------------------------------- globs
+
+def _glob_regex(glob: str) -> re.Pattern[str]:
+    """Repo-root-anchored glob -> regex; `**/` is zero or more directories."""
+    out: list[str] = []
+    i = 0
+    while i < len(glob):
+        if glob.startswith("**/", i):
+            out.append("(?:.*/)?")
+            i += 3
+        elif glob.startswith("**", i):
+            out.append(".*")
+            i += 2
+        elif glob[i] == "*":
+            out.append("[^/]*")
+            i += 1
+        elif glob[i] == "?":
+            out.append("[^/]")
+            i += 1
+        else:
+            out.append(re.escape(glob[i]))
+            i += 1
+    return re.compile("".join(out) + r"\Z")
+
+
+def is_excluded(path: str, globs: tuple[str, ...]) -> bool:
+    return any(_glob_regex(g).match(path) for g in globs)
+
+
+def _under(path: str, prefix: str) -> bool:
+    prefix = prefix.replace("\\", "/").strip("/")
+    return path == prefix or path.startswith(prefix + "/")
+
+
+def in_scope(path: str, cfg: Config, vendored: tuple[str, ...]) -> bool:
+    """Is `path` a product-code file this stage counts?"""
+    if language_for(path) is None:
+        return False
+    if cfg.include and not any(_under(path, p) for p in cfg.include):
+        return False
+    if any(_under(path, d) for d in vendored):
+        return False
+    return not is_excluded(path, BUILTIN_EXCLUDES + cfg.exclude)
+
+
+def is_generated(text: str) -> bool:
+    head = "\n".join(text.split("\n", GENERATED_HEAD_LINES)[:GENERATED_HEAD_LINES])
+    return any(marker in head for marker in GENERATED_MARKERS)
+
+
+# ---------------------------------------------------------------- counting
+
+def find_refs(comment: str, first_line: int) -> list[Ref]:
+    """`#NNN` references in one comment's text; `first_line` is the comment's start line."""
+    blanked = _URL.sub(lambda m: " " * len(m.group()), comment)
+    lines = comment.split("\n")
+    refs = []
+    for match in _REF.finditer(blanked):
+        offset = blanked.count("\n", 0, match.start())
+        refs.append(Ref(first_line + offset, f"#{match.group(1)}  | {lines[offset].strip()}"))
+    return refs
+
+
+def comments_py(text: str) -> list[tuple[int, str]]:
+    out = []
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+            if tok.type == tokenize.COMMENT:
+                out.append((tok.start[0], tok.string))
+    except (tokenize.TokenError, SyntaxError) as exc:  # IndentationError is a SyntaxError
+        raise NotConfirmed(f"python tokenizer rejected the file: {exc}") from exc
+    return out
+
+
+_IDENT = re.compile(r"[A-Za-z0-9_$\u0080-￿]+")
+#: A `/` after one of these starts a regex literal; after anything else it divides.
+_REGEX_AFTER_PUNCT = frozenset("(,=:[!&|?{};+-*%<>~^}")
+_REGEX_AFTER_WORD = frozenset({
+    "return", "typeof", "case", "do", "else", "in", "of", "new", "delete",
+    "void", "throw", "instanceof", "yield", "await",
+})
+
+
+def _skip_quoted(text: str, i: int, quote: str, what: str) -> int:
+    """`i` is just past the opening quote of a single-line string; return the index past its close."""
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if c == "\\":
+            i += 2
+        elif c == quote:
+            return i + 1
+        elif c == "\n":
+            break
+        else:
+            i += 1
+    raise NotConfirmed(f"unterminated {what}")
+
+
+def _skip_template(text: str, i: int) -> tuple[int, bool]:
+    """Inside a template literal from `i`; return (index, True if a `${` opened)."""
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if c == "\\":
+            i += 2
+        elif c == "`":
+            return i + 1, False
+        elif c == "$" and text.startswith("${", i):
+            return i + 2, True
+        else:
+            i += 1
+    raise NotConfirmed("unterminated template literal")
+
+
+def _skip_regex(text: str, i: int) -> int:
+    """`i` is just past the opening `/` of a regex literal; return the index past its close."""
+    n = len(text)
+    in_class = False
+    while i < n:
+        c = text[i]
+        if c == "\\":
+            i += 2
+        elif c == "\n":
+            break
+        elif c == "[":
+            in_class = True
+            i += 1
+        elif c == "]":
+            in_class = False
+            i += 1
+        elif c == "/" and not in_class:
+            return i + 1
+        else:
+            i += 1
+    raise NotConfirmed("unterminated regex literal")
+
+
+def comments_js(text: str) -> list[tuple[int, str]]:
+    out: list[tuple[int, str]] = []
+    n = len(text)
+    i = 0
+    line = 1
+    braces: list[str] = []  # "{" plain block/object, "$" a template `${` substitution
+    prev: str | None = None  # last significant token: a punctuation char, a word, or "" (a value)
+    while i < n:
+        c = text[i]
+        if c == "\n":
+            line += 1
+            i += 1
+        elif c in " \t\r\f\v":
+            i += 1
+        elif text.startswith("//", i):
+            end = text.find("\n", i)
+            end = n if end == -1 else end
+            out.append((line, text[i:end]))
+            i = end
+        elif text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            if end == -1:
+                raise NotConfirmed("unterminated block comment")
+            out.append((line, text[i:end + 2]))
+            line += text.count("\n", i, end + 2)
+            i = end + 2
+        elif c in "'\"":
+            start = i
+            i = _skip_quoted(text, i + 1, c, "string literal")
+            line += text.count("\n", start, i)  # only a `\`-newline continuation can span lines
+            prev = ""
+        elif c == "`":
+            start = i
+            i, opened = _skip_template(text, i + 1)
+            if opened:
+                braces.append("$")
+                prev = "{"
+            else:
+                prev = ""
+            line += text.count("\n", start, i)
+        elif c == "/":
+            if prev is None or prev in _REGEX_AFTER_WORD or (len(prev) == 1 and prev in _REGEX_AFTER_PUNCT):
+                i = _skip_regex(text, i + 1)
+                prev = ""
+            else:
+                i += 1
+                prev = "/"
+        elif c == "{":
+            braces.append("{")
+            prev = "{"
+            i += 1
+        elif c == "}":
+            if braces and braces.pop() == "$":
+                start = i
+                i, opened = _skip_template(text, i + 1)
+                if opened:
+                    braces.append("$")
+                    prev = "{"
+                else:
+                    prev = ""
+                line += text.count("\n", start, i)
+            else:
+                prev = "}"
+                i += 1
+        elif c in "+-" and text.startswith(c * 2, i):
+            prev = ""  # `x++ / 2`: a postfix operator ends a value
+            i += 2
+        else:
+            m = _IDENT.match(text, i)
+            if m:
+                word = m.group()
+                prev = word if word in _REGEX_AFTER_WORD else ""
+                i = m.end()
+            else:
+                prev = c
+                i += 1
+    return out
+
+
+def comments_css(text: str) -> list[tuple[int, str]]:
+    out: list[tuple[int, str]] = []
+    n = len(text)
+    i = 0
+    line = 1
+    while i < n:
+        c = text[i]
+        if c == "\n":
+            line += 1
+            i += 1
+        elif text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            if end == -1:
+                raise NotConfirmed("unterminated comment")
+            out.append((line, text[i:end + 2]))
+            line += text.count("\n", i, end + 2)
+            i = end + 2
+        elif c in "'\"":
+            i = _skip_quoted(text, i + 1, c, "string")
+        elif text[i:i + 4].lower() == "url(":
+            j = i + 4
+            while j < n and text[j] in " \t\r\n":
+                j += 1
+            if j < n and text[j] in "'\"":
+                i = j  # a quoted url(): the string branch handles it
+            else:
+                end = text.find(")", j)
+                if end == -1:
+                    raise NotConfirmed("unterminated url(")
+                line += text.count("\n", i, end)
+                i = end + 1
+        else:
+            i += 1
+    return out
+
+
+_PS_TOKEN_START = frozenset(" \t\r\n;(){}|,")
+
+
+def _ps_here_string(text: str, i: int, quote: str) -> int | None:
+    """`i` is at `@`; if a here-string opens there, return the index past its close."""
+    if not text.startswith("@" + quote, i):
+        return None
+    j = i + 2
+    while j < len(text) and text[j] in " \t\r":
+        j += 1
+    if j >= len(text) or text[j] != "\n":
+        return None
+    end = text.find("\n" + quote + "@", j)
+    if end == -1:
+        raise NotConfirmed("unterminated here-string")
+    return end + 3
+
+
+def comments_ps(text: str) -> list[tuple[int, str]]:
+    out: list[tuple[int, str]] = []
+    n = len(text)
+    i = 0
+    line = 1
+    # Frames: "code" (top level, or the inside of a `$( )`) and "dq" (a double-quoted
+    # string). A `$( )` frame counts its own parentheses so it knows which `)` closes it.
+    stack: list[list[object]] = [["code", 0]]
+    while i < n:
+        kind, depth = stack[-1]
+        c = text[i]
+        if kind == "dq":
+            if c == "`":
+                line += text.count("\n", i, i + 2)
+                i += 2
+            elif c == '"':
+                if text.startswith('""', i):
+                    i += 2
+                else:
+                    stack.pop()
+                    i += 1
+            elif c == "$" and text.startswith("$(", i):
+                stack.append(["code", 0])
+                i += 2
+            else:
+                line += c == "\n"
+                i += 1
+            continue
+        assert isinstance(depth, int)
+        if c == "\n":
+            line += 1
+            i += 1
+        elif text.startswith("<#", i):
+            end = text.find("#>", i + 2)
+            if end == -1:
+                raise NotConfirmed("unterminated block comment")
+            out.append((line, text[i:end + 2]))
+            line += text.count("\n", i, end + 2)
+            i = end + 2
+        elif c == "#" and (i == 0 or text[i - 1] in _PS_TOKEN_START):
+            end = text.find("\n", i)
+            end = n if end == -1 else end
+            out.append((line, text[i:end]))
+            i = end
+        elif c == "@" and (close := _ps_here_string(text, i, "'")) is not None:
+            line += text.count("\n", i, close)
+            i = close
+        elif c == "@" and (close := _ps_here_string(text, i, '"')) is not None:
+            line += text.count("\n", i, close)
+            i = close
+        elif c == "'":
+            j = i + 1
+            while True:
+                j = text.find("'", j)
+                if j == -1:
+                    raise NotConfirmed("unterminated string")
+                if text.startswith("''", j):
+                    j += 2
+                    continue
+                break
+            line += text.count("\n", i, j)
+            i = j + 1
+        elif c == '"':
+            stack.append(["dq", 0])
+            i += 1
+        elif c == "$" and text.startswith("${", i):
+            end = text.find("}", i)
+            if end == -1:
+                raise NotConfirmed("unterminated ${...} variable name")
+            i = end + 1
+        elif c == "`":
+            line += text.count("\n", i, i + 2)
+            i += 2
+        elif c == "(":
+            stack[-1][1] = depth + 1
+            i += 1
+        elif c == ")":
+            if depth > 0:
+                stack[-1][1] = depth - 1
+            elif len(stack) > 1:
+                stack.pop()
+            i += 1
+        else:
+            i += 1
+    if len(stack) > 1:
+        raise NotConfirmed("unterminated string")
+    return out
+
+
+def _yaml_scalar_close(text: str, i: int, quote: str) -> int:
+    """`text[i]` opens a quoted scalar; return the index of its closing quote.
+
+    A single-quoted scalar escapes a quote by doubling it, a double-quoted one with a backslash.
+    """
+    j = i + 1
+    if quote == "'":
+        while True:
+            j = text.find("'", j)
+            if j == -1:
+                raise NotConfirmed("unterminated single-quoted scalar")
+            if not text.startswith("''", j):
+                return j
+            j += 2
+    while j < len(text) and text[j] != '"':
+        j += 2 if text[j] == "\\" else 1
+    if j >= len(text):
+        raise NotConfirmed("unterminated double-quoted scalar")
+    return j
+
+
+def comments_yaml(text: str) -> list[tuple[int, str]]:
+    """`#` line comments in YAML -- must start the line or follow whitespace
+    (YAML comment grammar; `a#b` is a plain scalar, `a #b` is a comment).
+    Single- and double-quoted scalars are skipped so a `#` inside one never
+    counts; a `''` inside a single-quoted scalar is YAML's own escape for a
+    literal quote, so it does not end the scalar. A quote opens a scalar only
+    where a value can start (line start, after `- `, `? `, `: `, or `[`, `{`, `,`
+    in a flow collection, optionally after an anchor or tag); anywhere else it
+    is a plain-scalar character such as an apostrophe in `the customer's store`.
+    """
+    out: list[tuple[int, str]] = []
+    n = len(text)
+    i = 0
+    line = 1
+    prev_char = "\n"  # start-of-text counts as start-of-line
+    comment_start: int | None = None
+    value_start = True  # a quote here opens a quoted scalar
+    flow_depth = 0
+    while i < n:
+        c = text[i]
+        if comment_start is not None:
+            if c == "\n":
+                out.append((line, text[comment_start:i]))
+                comment_start = None
+            else:
+                i += 1
+                continue
+        nxt = text[i + 1] if i + 1 < n else "\n"
+        if c == "\n":
+            line += 1
+            prev_char = c
+            value_start = True
+            i += 1
+        elif c in " \t":
+            prev_char = c
+            i += 1
+        elif c == "#" and prev_char in (" ", "\t", "\n"):
+            comment_start = i
+            i += 1
+        elif c in "'\"" and not value_start:
+            prev_char = c
+            i += 1
+        elif c in "-?" and value_start:
+            value_start = nxt in " \t\n"
+            prev_char = c
+            i += 1
+        elif c == ":" and (nxt in " \t\n" or (flow_depth > 0 and nxt in ",]}")):
+            value_start = True
+            prev_char = c
+            i += 1
+        elif c in "[{" and (value_start or flow_depth > 0):
+            flow_depth += 1
+            value_start = True
+            prev_char = c
+            i += 1
+        elif c in "]}" and flow_depth > 0:
+            flow_depth -= 1
+            value_start = False
+            prev_char = c
+            i += 1
+        elif c == "," and flow_depth > 0:
+            value_start = True
+            prev_char = c
+            i += 1
+        elif c in "&!" and value_start:
+            while i < n and text[i] not in " \t\n":
+                i += 1
+            prev_char = text[i - 1]
+        elif c in "'\"":
+            j = _yaml_scalar_close(text, i, c)
+            line += text.count("\n", i, j)
+            prev_char = c
+            value_start = False
+            i = j + 1
+        else:
+            prev_char = c
+            value_start = False
+            i += 1
+    if comment_start is not None:
+        out.append((line, text[comment_start:]))
+    return out
+
+
+_SCANNERS = {"py": comments_py, "js": comments_js, "css": comments_css, "ps": comments_ps, "yaml": comments_yaml}
+
+
+def scan_text(text: str, language: str) -> list[Ref]:
+    """Every `#NNN` reference in the comments of one file's text."""
+    text = text.replace("\r\n", "\n")
+    refs: list[Ref] = []
+    for first_line, comment in _SCANNERS[language](text):
+        refs.extend(find_refs(comment, first_line))
+    return refs
+
+
+# ------------------------------------------------------------------- files
 
 def tracked_files(root: Path) -> list[str]:
-    """Repo-relative, forward-slash paths of every tracked file."""
+    """Repo-relative, forward-slash paths of every tracked or untracked-but-not-ignored file."""
     env = dict(os.environ, GIT_OPTIONAL_LOCKS="0")  # a read-only sweep must not leave index locks
     try:
         proc = subprocess.run(
-            ["git", "ls-files", "-z"], cwd=root, capture_output=True, env=env,
+            ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd=root, capture_output=True, env=env,
             stdin=subprocess.DEVNULL, creationflags=_NO_WINDOW, timeout=GIT_TIMEOUT_S, check=False,
         )
     except subprocess.TimeoutExpired as exc:
@@ -151,157 +715,175 @@ def tracked_files(root: Path) -> list[str]:
     return sorted(p for p in proc.stdout.decode("utf-8", "replace").split("\0") if p)
 
 
-def in_scope(path: str, vendored: set[str]) -> bool:
-    if not path.startswith(SCOPE_DIRS):
-        return False
-    if Path(path).suffix not in SCOPE_EXTENSIONS:
-        return False
-    if path in vendored:
-        return False
-    if path.startswith("app_web/static/_vendored/"):
-        return False
-    return True
-
-
-def count_file(root: Path, path: str) -> int:
-    try:
-        text = (root / path).read_text(encoding="utf-8")
-    except UnicodeDecodeError as exc:
-        raise NotConfirmed(f"{path}: not valid UTF-8 ({exc})") from exc
-    if _VENDORED_MARKER.search(text[:1024]):
-        return 0
-    n = len(_REF.findall(text))
-    if path not in _SELF_EXEMPT_HISTORY:
-        n += len(_HISTORY.findall(text))
-    return n
-
-
-def scan(root: Path) -> dict[str, int]:
-    """In-scope flag counts (issue refs + history phrases), one entry per
-    file that has at least one."""
-    vendored = _vendored_dests(root)
-    found: dict[str, int] = {}
+def count_tree(root: Path, cfg: Config, vendored: tuple[str, ...]) -> dict[str, list[Ref]]:
+    """``{path: refs}`` for every in-scope file that has at least one reference."""
+    found: dict[str, list[Ref]] = {}
     for path in tracked_files(root):
-        if not in_scope(path, vendored):
+        if not in_scope(path, cfg, vendored):
             continue
-        n = count_file(root, path)
-        if n:
-            found[path] = n
+        try:
+            raw = (root / path).read_bytes()
+        except FileNotFoundError:
+            continue  # tracked but deleted in the working tree: nothing to count
+        except OSError as exc:
+            raise NotConfirmed(f"{path}: cannot be read: {exc}") from exc
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise NotConfirmed(f"{path}: is not valid UTF-8: {exc}") from exc
+        if is_generated(text):
+            continue
+        language = language_for(path)
+        assert language is not None  # in_scope() above already confirmed it
+        try:
+            refs = scan_text(text, language)
+        except NotConfirmed as exc:
+            raise NotConfirmed(f"{path}: {exc}") from exc
+        if refs:
+            found[path] = refs
     return found
 
 
-def _load_baseline(path: Path) -> dict[str, int]:
+# ---------------------------------------------------------------- baseline
+
+def read_baseline(path: Path) -> dict[str, int]:
+    """Baseline file -> ``{path: count}``. Raises `ConfigError` on anything off."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"could not read baseline {path}: {exc}") from exc
-    if not isinstance(data, dict) or not all(isinstance(v, int) for v in data.values()):
-        raise ValueError(f"baseline {path} is not a flat {{path: count}} map")
-    return data
-
-
-def _write_baseline(path: Path, counts: dict[str, int]) -> None:
-    path.write_text(
-        json.dumps(dict(sorted(counts.items())), indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-
-
-def check(root: Path, baseline_path: Path) -> int:
-    if not baseline_path.is_file():
-        print(f"FAIL: no baseline at {baseline_path} -- run --init")
-        return EXIT_NEW
-    try:
-        baseline = _load_baseline(baseline_path)
+    except OSError as exc:
+        raise ConfigError(f"cannot read baseline {path}: {exc}") from exc
     except ValueError as exc:
-        print(f"CONFIG: {exc}")
-        return EXIT_CONFIG
+        raise ConfigError(f"baseline {path} is not valid JSON: {exc}") from exc
+    if not isinstance(data, dict) or data.get("version") != BASELINE_VERSION:
+        raise ConfigError(f"baseline {path}: expected an object with version {BASELINE_VERSION}")
+    entries = data.get("entries")
+    if not isinstance(entries, list):
+        raise ConfigError(f"baseline {path}: `entries` must be a list")
+    out: dict[str, int] = {}
+    for entry in entries:
+        if (
+            not isinstance(entry, dict)
+            or not isinstance(entry.get("key"), str)
+            or isinstance(entry.get("count"), bool)
+            or not isinstance(entry.get("count"), int)
+            or entry["count"] < 1
+        ):
+            raise ConfigError(f"baseline {path}: malformed entry {entry!r}")
+        out[entry["key"]] = entry["count"]
+    return out
+
+
+def render_baseline(counts: dict[str, int]) -> str:
+    """Sorted, one entry per line, no line numbers, so a baseline diff reviews cleanly."""
+    entries = [
+        "    " + json.dumps({"key": key, "count": counts[key]}, ensure_ascii=False)
+        for key in sorted(counts)
+    ]
+    body = "[\n" + ",\n".join(entries) + "\n  ]" if entries else "[]"
+    return f'{{\n  "version": {BASELINE_VERSION},\n  "entries": {body}\n}}\n'
+
+
+def diff(current: dict[str, int], baseline: dict[str, int]) -> tuple[list[str], list[str]]:
+    """(files whose count rose or that are new, files whose count fell or that are gone), sorted."""
+    rose = sorted(p for p, c in current.items() if c > baseline.get(p, 0))
+    shrank = sorted(p for p, b in baseline.items() if current.get(p, 0) < b)
+    return rose, shrank
+
+
+# -------------------------------------------------------------------- CLI
+
+def _report_rose(rose: list[str], current: dict[str, list[Ref]], baseline: dict[str, int]) -> None:
+    print(f"comment ratchet: {len(rose)} file(s) with MORE #NNN comment references than the baseline:")
+    for path in rose:
+        was = baseline.get(path)
+        print(f"  {path}: {len(current[path])} (baseline {was if was is not None else 'none -- not baselined'})")
+        for ref in current[path]:
+            print(f"      line {ref.line}: {ref.text}")
+
+
+def run(root: Path, *, init: bool, update: bool, allow_additions: bool) -> int:
     try:
-        current = scan(root)
-    except NotConfirmed as exc:
-        print(f"NOT CONFIRMED: {exc}")
-        return EXIT_NOT_CONFIRMED
-    grown = {
-        path: (n, baseline.get(path, 0))
-        for path, n in current.items()
-        if n > baseline.get(path, 0)
-    }
-    if not grown:
-        print("OK: no in-scope file carries more history flags than its baseline entry")
-        return EXIT_PASS
-    for path, (now, was) in sorted(grown.items()):
-        print(f"NEW: {path}: {now} flag(s), baseline allows {was}")
-    return EXIT_NEW
-
-
-def init(root: Path, baseline_path: Path) -> int:
-    if baseline_path.is_file():
-        print(f"CONFIG: {baseline_path} already exists -- use --update-baseline")
+        cfg, vendored = load_config(root)
+    except ConfigError as exc:
+        print(f"comment ratchet: CONFIG ERROR: {exc}")
         return EXIT_CONFIG
-    try:
-        counts = scan(root)
-    except NotConfirmed as exc:
-        print(f"NOT CONFIRMED: {exc}")
-        return EXIT_NOT_CONFIRMED
-    _write_baseline(baseline_path, counts)
-    print(f"OK: wrote {baseline_path} ({len(counts)} file(s))")
-    return EXIT_PASS
-
-
-def update_baseline(root: Path, baseline_path: Path, allow_additions: bool) -> int:
-    try:
-        old = _load_baseline(baseline_path) if baseline_path.is_file() else {}
-    except ValueError as exc:
-        print(f"CONFIG: {exc}")
-        return EXIT_CONFIG
-    try:
-        new = scan(root)
-    except NotConfirmed as exc:
-        print(f"NOT CONFIRMED: {exc}")
-        return EXIT_NOT_CONFIRMED
-    grown = {p: (n, old.get(p, 0)) for p, n in new.items() if n > old.get(p, 0)}
-    if grown and not allow_additions:
-        for path, (now, was) in sorted(grown.items()):
-            print(f"CONFIG: {path}: {now} flag(s) would raise the baseline from {was} -- pass --allow-additions")
-        return EXIT_CONFIG
-    _write_baseline(baseline_path, new)
-    print(f"OK: wrote {baseline_path} ({len(new)} file(s))")
-    return EXIT_PASS
-
-
-def main(argv: list[str]) -> int:
-    mode = "check"
-    baseline_path = DEFAULT_BASELINE
-    allow_additions = False
-    rest = list(argv)
-    if rest and not rest[0].startswith("--"):
-        mode, rest = rest[0], rest[1:]
-    while rest:
-        arg = rest.pop(0)
-        if arg == "--init":
-            mode = "init"
-        elif arg == "--update-baseline":
-            mode = "update-baseline"
-        elif arg == "--allow-additions":
-            allow_additions = True
-        elif arg == "--baseline":
-            if not rest:
-                print("CONFIG: --baseline needs a path")
-                return EXIT_CONFIG
-            baseline_path = Path(rest.pop(0))
-        else:
-            print(f"CONFIG: unknown argument {arg!r}")
+    if cfg is None:
+        if init or update:
+            print("comment ratchet: not enabled -- set [comment_ratchet] enabled = true in .fleet.toml first")
             return EXIT_CONFIG
+        print("comment ratchet: not enabled (no [comment_ratchet] enabled = true in .fleet.toml)")
+        return EXIT_PASS
+    baseline_path = root / cfg.baseline
 
-    if mode == "check":
-        return check(REPO_ROOT, baseline_path)
-    if mode == "init":
-        return init(REPO_ROOT, baseline_path)
-    if mode == "update-baseline":
-        return update_baseline(REPO_ROOT, baseline_path, allow_additions)
-    print(f"CONFIG: unknown mode {mode!r}")
-    return EXIT_CONFIG
+    baseline: dict[str, int] = {}
+    if init:
+        if baseline_path.exists():
+            print(f"comment ratchet: {cfg.baseline} already exists; --init never overwrites it")
+            return EXIT_CONFIG
+    elif baseline_path.is_file():
+        try:
+            baseline = read_baseline(baseline_path)
+        except ConfigError as exc:
+            print(f"comment ratchet: BASELINE ERROR: {exc}")
+            return EXIT_CONFIG
+    else:
+        print(f"comment ratchet: FAIL: baseline {cfg.baseline} is missing -- run `python scripts/comment_ratchet.py --init`")
+        return EXIT_RISE
+
+    try:
+        refs = count_tree(root, cfg, vendored)
+    except NotConfirmed as exc:
+        print(f"comment ratchet: NOT CONFIRMED: {exc}")
+        print("  (the count could not be established, so it is neither a pass nor a clean tree)")
+        return EXIT_NOT_CONFIRMED
+    current = {path: len(found) for path, found in refs.items()}
+
+    if init:
+        baseline_path.write_text(render_baseline(current), encoding="utf-8", newline="\n")
+        print(f"comment ratchet: wrote {cfg.baseline} with {len(current)} file(s), {sum(current.values())} reference(s)")
+        return EXIT_PASS
+
+    rose, shrank = diff(current, baseline)
+    if update:
+        if rose and not allow_additions:
+            _report_rose(rose, refs, baseline)
+            print("comment ratchet: nothing written -- remove the references, or raise the baseline with --allow-additions")
+            return EXIT_RISE
+        baseline_path.write_text(render_baseline(current), encoding="utf-8", newline="\n")
+        print(f"comment ratchet: {cfg.baseline} now has {len(current)} file(s), {sum(current.values())} reference(s) "
+              f"({len(shrank)} lowered or dropped, {len(rose)} raised or added)")
+        return EXIT_PASS
+
+    if rose:
+        _report_rose(rose, refs, baseline)
+        print("  A comment states why the code is the way it is now; how it got here belongs in the issue, PR and "
+              "git log (rule text: fleet-config#1517). Reword the comment, or (reviewed) raise the baseline with "
+              "`--update-baseline --allow-additions`.")
+        return EXIT_RISE
+    print(f"comment ratchet: PASS ({sum(current.values())} reference(s) in {len(current)} file(s), none above the baseline)")
+    if shrank:
+        print(f"  {len(shrank)} file(s) are below the baseline -- run "
+              f"`python scripts/comment_ratchet.py --update-baseline` to lower it")
+    return EXIT_PASS
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0] if __doc__ else None)
+    parser.add_argument("--root", type=Path, default=REPO_ROOT, help="repo root (default: this repo)")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--init", action="store_true", help="write the first baseline; never overwrites")
+    mode.add_argument("--update-baseline", action="store_true", help="lower or drop entries (shrink only)")
+    parser.add_argument("--allow-additions", action="store_true",
+                        help="with --update-baseline: also raise or add entries (shows in review)")
+    args = parser.parse_args(argv)
+    if args.allow_additions and not args.update_baseline:
+        parser.error("--allow-additions only applies with --update-baseline")
+    return run(args.root.resolve(), init=args.init, update=args.update_baseline,
+               allow_additions=args.allow_additions)
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    # Reports contain non-ASCII (e.g. "→"); a cp1252 console would otherwise crash after the verdict.
+    for _stream in (sys.stdout, sys.stderr):
+        _stream.reconfigure(encoding="utf-8")  # type: ignore[union-attr]  # real console streams are TextIOWrapper
+    sys.exit(main())
