@@ -314,12 +314,21 @@ def run_all_checks(*, use_cache: bool = False) -> Report:
 FixFn = Callable[[], None]
 
 
+# A cold `pip install -r requirements.txt` downloads wheels over the network; 15 min
+# is several times a slow run and still frees the fix worker if pip wedges.
+PIP_INSTALL_TIMEOUT_S = 900
+
+
 def _fix_deps() -> None:
-    subprocess.run(
-        [sys.executable, "-m", "pip", "install", "-r", str(PROJECT_ROOT / "requirements.txt")],
-        check=True,
-        creationflags=NO_WINDOW,
-    )
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-r", str(PROJECT_ROOT / "requirements.txt")],
+            check=True,
+            creationflags=NO_WINDOW,
+            timeout=PIP_INSTALL_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"pip install timed out after {PIP_INSTALL_TIMEOUT_S}s") from None
 
 
 def _fix_llama_cpp() -> None:

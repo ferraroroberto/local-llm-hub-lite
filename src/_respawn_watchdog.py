@@ -34,6 +34,10 @@ POLL_INTERVAL_S = 0.3
 # the port-free wait below decide.
 PARENT_EXIT_TIMEOUT_S = 30.0
 
+# `tasklist` answers in well under a second; a hang is a wedged process table, and
+# the liveness poll must not outlast the exit wait it serves.
+TASKLIST_TIMEOUT_S = 15.0
+
 # How long to wait for the outgoing hub's port to free once it is gone (~18 s). A
 # stated guess covering the OS releasing the listening socket; on expiry we
 # still relaunch and the confirmation below reports the bind failure.
@@ -47,13 +51,19 @@ RELAUNCH_CONFIRM_TIMEOUT_S = 30.0
 def is_alive(pid: int) -> bool:
     try:
         if sys.platform == "win32":
-            r = subprocess.run(
-                ["tasklist", "/FI", f"PID eq {pid}"], capture_output=True, text=True,
-                # Inline ternary, not src.no_window.NO_WINDOW — this module is
-                # deliberately stdlib-only (see module docstring), it can't
-                # assume any other src.* module still imports cleanly.
-                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
-            )
+            try:
+                r = subprocess.run(
+                    ["tasklist", "/FI", f"PID eq {pid}"], capture_output=True, text=True,
+                    # Inline ternary, not src.no_window.NO_WINDOW — this module is
+                    # deliberately stdlib-only (see module docstring), it can't
+                    # assume any other src.* module still imports cleanly.
+                    creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+                    timeout=TASKLIST_TIMEOUT_S,
+                )
+            except subprocess.TimeoutExpired:
+                # Liveness is unknown, not "gone": reporting dead would relaunch over a
+                # hub that may still hold the port. The caller's own wait bounds this.
+                return True
             return str(pid) in r.stdout
         os.kill(pid, 0)
         return True
