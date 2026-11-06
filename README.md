@@ -21,7 +21,7 @@ Models can be `startup: eager` (autostart with the hub) or `startup: on_demand` 
 ```bat
 git clone https://github.com/ferraroroberto/local-llm-hub-lite
 cd local-llm-hub-lite
-setup.bat                                      REM .venv + requirements + install report
+scripts\setup.bat                              REM .venv + requirements + install report
 .venv\Scripts\python.exe -m src.install --fix  REM download llama.cpp + whisper.cpp + weights
 tray.bat                                       REM tray icon -> hub on :8000
 ```
