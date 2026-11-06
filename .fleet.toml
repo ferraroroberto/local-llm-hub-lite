@@ -22,7 +22,7 @@ shape        = "service"
 # [e2e] table at all -- fails safe to the full suite; this table only ever
 # narrows what an *already-covered* diff runs, never what an unmatched one runs.
 [vendored]
-usage-log = { src = "app/webapp/static/_vendored/usage-log", sha = "ea11037a42f9f99ea8e728f574c6bb89480f3aa2", dest = "app_web/static/_vendored/usage-log" }
+usage-log = { src = "app/webapp/static/_vendored/usage-log", sha = "6c8ae06472edc4c7448a767656060cd2b79cefe9", dest = "app_web/static/_vendored/usage-log" }
 usage_log = { src = "src/usage_log.py", sha = "ea11037a42f9f99ea8e728f574c6bb89480f3aa2", dest = "src/usage_log.py" }
 runtime_data = { src = "src/runtime_data.py", sha = "ea11037a42f9f99ea8e728f574c6bb89480f3aa2", dest = "src/runtime_data.py" }
 usage_track_ratchet = { src = "scripts/usage_track_ratchet.py", sha = "ea11037a42f9f99ea8e728f574c6bb89480f3aa2", dest = "scripts/usage_track_ratchet.py" }
@@ -47,7 +47,7 @@ notify = { src = "src/notify", sha = "93208ab08bdc8591c678a08f55a0f46b3fc8a525",
 single_instance = { src = "app/tray/single_instance.py", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "tray/single_instance.py" }
 # Admin-SPA components, byte-identical to project-scaffolding at the recorded sha. icons/ is not
 # listed: its sprite is trimmed to the glyphs this app uses, so it is not a verbatim copy.
-button       = { src = "app/webapp/static/_vendored/button", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/button" }
+button       = { src = "app/webapp/static/_vendored/button", sha = "6c8ae06472edc4c7448a767656060cd2b79cefe9", dest = "app_web/static/_vendored/button" }
 card         = { src = "app/webapp/static/_vendored/card", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/card" }
 disclosure   = { src = "app/webapp/static/_vendored/disclosure", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/disclosure" }
 empty-state  = { src = "app/webapp/static/_vendored/empty-state", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/empty-state" }
@@ -58,7 +58,7 @@ switch       = { src = "app/webapp/static/_vendored/switch", sha = "5d460bd1d9d4
 text-size    = { src = "app/webapp/static/_vendored/text-size", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/text-size" }
 page-foot    = { src = "app/webapp/static/_vendored/page-foot", sha = "35c1f11348e100fa6b5da487411424c6d6ced43c", dest = "app_web/static/_vendored/page-foot" }
 select-native = { src = "app/webapp/static/_vendored/select-native", sha = "8c64876f0a69eb3158eaa889cb6769807af5412b", dest = "app_web/static/_vendored/select-native" }
-sign-in     = { src = "app/webapp/static/_vendored/sign-in", sha = "f05859a2bada56296d7f134e471953867c253571", dest = "app_web/static/_vendored/sign-in" }
+sign-in     = { src = "app/webapp/static/_vendored/sign-in", sha = "6c8ae06472edc4c7448a767656060cd2b79cefe9", dest = "app_web/static/_vendored/sign-in" }
 
 # [static_ratchet] -- the scaffold's baseline-and-ratchet static analysis. The gate
 # (scripts/verify-before-ship.ps1) runs scripts/static_ratchet.py, which fails on a
