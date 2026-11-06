@@ -6,7 +6,7 @@ REM    2. install Python requirements
 REM    3. run the installer checks (vendored binaries + weights
 REM       are downloaded by `python -m src.install --fix`)
 REM ==========================================================
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 if not exist ".venv\Scripts\python.exe" (
     echo Creating .venv ...

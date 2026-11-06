@@ -11,7 +11,7 @@ The structure ratchet (`scripts/structure_ratchet.py`, configured in `.fleet.tom
 | `app_web/static/_vendored/` | Admin-SPA components copied from project-scaffolding. Those declared in `.fleet.toml` `[vendored]` are re-vendored, never edited here; `icons/` is a trimmed local sprite. |
 | `tray/` | The pystray tray app that owns the hub process. Declared by the shape instead of the scaffold's `app/tray/`. |
 | `tests/` | Unit tests, with `tests/e2e/` for the Playwright suite. The flat directory is close to the 40-module limit, so a new test goes in a subfolder (`tests/ratchets/` holds the gate and ratchet tests). |
-| `scripts/` | The gate, the ratchets, installers for llama.cpp / whisper.cpp / weights, the smoke test and the vendored `tray_lifecycle.ps1`. |
+| `scripts/` | The gate, the ratchets, the one-shot `setup.bat` (venv, requirements, install report), installers for llama.cpp / whisper.cpp / weights, the smoke test and the vendored `tray_lifecycle.ps1`. |
 | `config/` | The committed model registry (`models.yaml`) and the web-config sample. |
 | `launchers/` | Registry-driven per-model consoles (`.bat` and `.sh`). |
 | `docs/` | Durable reference. |
