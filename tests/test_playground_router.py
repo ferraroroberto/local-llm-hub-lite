@@ -9,7 +9,6 @@ send is text-only, and the new /api/playground/transcribe proxies audio.
 
 from __future__ import annotations
 
-
 from fastapi.testclient import TestClient
 
 from app_web.routers import playground as playground_router

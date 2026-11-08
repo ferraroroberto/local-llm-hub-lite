@@ -7,7 +7,6 @@ mocked `call_openai_chat`) plus the unknown-model 400 branch and the
 
 from __future__ import annotations
 
-
 from fastapi.testclient import TestClient
 
 from src import chat_translation as chat_translation_mod

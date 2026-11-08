@@ -12,7 +12,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from .host_profile import HostProfile, _load_config, resolve as resolve_host
+from .host_profile import HostProfile, _load_config
+from .host_profile import resolve as resolve_host
 
 # ``startup:`` policy values — see the field docstring on ``Model``.
 STARTUP_EAGER = "eager"

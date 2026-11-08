@@ -7,7 +7,6 @@ fleet block, and the payload carries each row's declared startup policy
 
 from __future__ import annotations
 
-
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app_web.routers import models as models_router  # noqa: E402

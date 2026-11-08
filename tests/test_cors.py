@@ -16,7 +16,6 @@ rather than assumed.
 
 from __future__ import annotations
 
-
 from fastapi.testclient import TestClient
 
 from src import cors_policy

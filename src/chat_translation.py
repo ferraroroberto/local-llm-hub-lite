@@ -26,7 +26,6 @@ from .openai_upstream import (
     openai_to_anthropic_envelope,
 )
 
-
 # ---- shared content-block helpers (unchanged shape) ----
 
 class ContentBlock(BaseModel):

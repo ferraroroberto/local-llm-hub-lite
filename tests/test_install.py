@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-
 from src import install as install_mod
 
 
@@ -164,8 +163,9 @@ def test_find_macos_asset_matches_when_present():
 
 
 def test_pick_assets_no_longer_handles_darwin(monkeypatch):
-    from scripts import install_whisper_cpp
     import pytest
+
+    from scripts import install_whisper_cpp
 
     monkeypatch.setattr(install_whisper_cpp.sys, "platform", "darwin")
     with pytest.raises(install_whisper_cpp.InstallError, match="unsupported platform"):
@@ -199,8 +199,9 @@ def test_macos_find_cmake_none_when_absent_everywhere(monkeypatch):
 
 
 def test_macos_build_prereqs_raises_actionable_message_when_cmake_missing(monkeypatch):
-    from scripts import install_whisper_cpp
     import pytest
+
+    from scripts import install_whisper_cpp
 
     monkeypatch.setattr(install_whisper_cpp, "_macos_find_cmake", lambda: None)
     with pytest.raises(install_whisper_cpp.InstallError, match="brew install cmake"):
@@ -208,8 +209,9 @@ def test_macos_build_prereqs_raises_actionable_message_when_cmake_missing(monkey
 
 
 def test_macos_build_prereqs_raises_actionable_message_when_clt_missing(monkeypatch):
-    from scripts import install_whisper_cpp
     import pytest
+
+    from scripts import install_whisper_cpp
 
     monkeypatch.setattr(install_whisper_cpp, "_macos_find_cmake", lambda: "/opt/homebrew/bin/cmake")
 
@@ -356,6 +358,7 @@ class _FakeResponse:
 
 def test_download_writes_bytes_and_returns_matching_sha256(monkeypatch, tmp_path):
     import hashlib
+
     from scripts import _lib
 
     payload = b"hello world"
@@ -369,6 +372,7 @@ def test_download_writes_bytes_and_returns_matching_sha256(monkeypatch, tmp_path
 
 def test_download_rejects_and_removes_file_on_sha_mismatch(monkeypatch, tmp_path):
     import pytest
+
     from scripts import _lib
 
     monkeypatch.setattr(_lib.urllib.request, "urlopen", lambda url, timeout=120: _FakeResponse(b"hello world"))
@@ -390,8 +394,10 @@ def test_download_skips_verification_when_no_expected_digest(monkeypatch, tmp_pa
 
 
 def test_extract_zip_rejects_path_traversal_member(tmp_path):
-    import pytest
     import zipfile
+
+    import pytest
+
     from scripts import _lib
 
     archive = tmp_path / "evil.zip"
@@ -405,8 +411,10 @@ def test_extract_zip_rejects_path_traversal_member(tmp_path):
 
 def test_extract_tar_rejects_path_traversal_member(tmp_path):
     import io
-    import pytest
     import tarfile
+
+    import pytest
+
     from scripts import _lib
 
     archive = tmp_path / "evil.tar.gz"
@@ -423,6 +431,7 @@ def test_extract_tar_rejects_path_traversal_member(tmp_path):
 
 def test_extract_zip_normal_member_still_works(tmp_path):
     import zipfile
+
     from scripts import _lib
 
     archive = tmp_path / "good.zip"
@@ -437,6 +446,7 @@ def test_extract_zip_normal_member_still_works(tmp_path):
 def test_install_assets_extracts_flattens_and_removes_archive(monkeypatch, tmp_path):
     import io
     import zipfile
+
     from scripts import _lib
 
     buf = io.BytesIO()

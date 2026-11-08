@@ -19,7 +19,6 @@ from __future__ import annotations
 import json
 from typing import Iterator, List
 
-
 from fastapi.testclient import TestClient
 
 from src import openai_upstream as upstream_mod
@@ -30,7 +29,6 @@ from src.openai_upstream import (
     iter_cleaned_sse,
     strip_think_blocks,
 )
-
 
 # ---- ThinkStripper unit tests ----
 

@@ -9,11 +9,9 @@ never has to know the YAML's nesting shape.
 
 from __future__ import annotations
 
-
 from fastapi.testclient import TestClient  # noqa: E402
 
 from src import server as server_mod  # noqa: E402
-
 
 _BASE_CONFIG = {
     "hub": {"port": 8000},

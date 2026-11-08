@@ -22,10 +22,16 @@ import uuid
 from typing import Any, Dict, List, Optional, Union
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import (
+    JSONResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
 from pydantic import BaseModel
 
-from .routes.anthropic_errors import install_anthropic_error_handlers
+from . import on_demand as _on_demand
+from .audio.server_audio_asr import router as _audio_router
 from .auth_middleware import ParentBearerTokenMiddleware
 from .chat_translation import MessagesRequest, _run_openai_backend
 from .cors_policy import install_cors
@@ -33,9 +39,6 @@ from .host_profile import hub_bind_host, hub_port
 from .hub_log import install_root_handler
 from .hub_observability import ObservatoryMiddleware
 from .model_registry import Model, enabled_models
-from .server_common import ensure_backend_ready_or_503 as _ensure_backend_ready, resolve_model_or_400 as _resolve
-from . import on_demand as _on_demand
-from .audio.server_audio_asr import router as _audio_router
 from .openai_upstream import (
     UpstreamError,
     call_openai_chat,
@@ -43,6 +46,9 @@ from .openai_upstream import (
     clean_openai_response,
     iter_cleaned_sse,
 )
+from .routes.anthropic_errors import install_anthropic_error_handlers
+from .server_common import ensure_backend_ready_or_503 as _ensure_backend_ready
+from .server_common import resolve_model_or_400 as _resolve
 from .trace_id_middleware import TraceIdHeaderMiddleware
 
 logging.basicConfig(
@@ -447,6 +453,7 @@ app.include_router(_audio_router)
 
 def main() -> None:
     import uvicorn
+
     from src.event_loop import LOOP_FACTORY
     uvicorn.run(
         "src.server:app",

@@ -21,6 +21,7 @@ from fastapi.responses import Response
 
 from ..http_client import get_async_client
 from ..model_registry import Model
+from ..server_common import ensure_backend_ready_or_503
 from .server_audio_common import (
     HEADER_REQUESTED_MODEL,
     HEADER_SERVED_HOST,
@@ -28,7 +29,6 @@ from .server_audio_common import (
     _audio_upstream_error,
     _header_safe,
 )
-from ..server_common import ensure_backend_ready_or_503
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,8 @@ def _whisper_model_for_request(model_name: str) -> Model:
     400 when the named model is not a transcription backend, 503 when it is
     a configured transcription model this host does not serve.
     """
-    from ..model_registry import resolve as _resolve_model, resolve_any
+    from ..model_registry import resolve as _resolve_model
+    from ..model_registry import resolve_any
 
     local = _local_whisper()
 

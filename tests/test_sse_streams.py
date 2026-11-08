@@ -15,7 +15,6 @@ from __future__ import annotations
 import asyncio
 import threading
 
-
 from app_web.routers._helpers import sse_pack, sse_stream
 from src.async_fanout import AsyncFanout
 
