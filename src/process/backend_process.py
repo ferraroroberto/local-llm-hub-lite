@@ -313,6 +313,7 @@ def start(model_id: str) -> tuple[bool, str]:
     # an inherited backend never writes into a closed pipe (the class of
     # [Errno 22] this avoids). The file is also readable on disk and
     # via ``log_lines`` / the admin log endpoint. Roll first for a fresh log.
+    # runtime-write-exempt: per-backend log under data/logs, rolled by _roll_log
     log_file = _roll_log(model_id).open("ab")
     try:
         proc = subprocess.Popen(

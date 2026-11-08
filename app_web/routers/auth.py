@@ -35,7 +35,9 @@ def ensure_log_handler() -> None:
     ):
         return
     try:
+        # runtime-write-exempt: auth.log sits in webapp/ at the repo root; PROJECT_ROOT is imported from ._helpers
         _AUTH_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        # runtime-write-exempt: same auth.log path as above
         fh = logging.FileHandler(_AUTH_LOG_PATH, encoding="utf-8")
         fh.setLevel(logging.INFO)
         fh.setFormatter(
