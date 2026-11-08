@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from src.auth_middleware import is_pc_itself
 from src.login_lockout import LoginLockout, retry_after_header
+from src.runtime_files import checked_write_path
 from src.webapp_config import WebappConfig
 
 from ._helpers import PROJECT_ROOT, client_ip, maybe_json
@@ -35,10 +36,9 @@ def ensure_log_handler() -> None:
     ):
         return
     try:
-        # runtime-write-exempt: auth.log sits in webapp/ at the repo root; PROJECT_ROOT is imported from ._helpers
-        _AUTH_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        # runtime-write-exempt: same auth.log path as above
-        fh = logging.FileHandler(_AUTH_LOG_PATH, encoding="utf-8")
+        log_path = checked_write_path(_AUTH_LOG_PATH)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        fh = logging.FileHandler(log_path, encoding="utf-8")
         fh.setLevel(logging.INFO)
         fh.setFormatter(
             logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")

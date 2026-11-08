@@ -26,6 +26,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.model_registry import Model, enabled_models  # noqa: E402
+from src.runtime_files import checked_write_path  # noqa: E402
 
 
 def _pattern_match(name: str, pattern: str) -> bool:
@@ -64,8 +65,7 @@ def download_one(model_id: str) -> List[Path]:
         )
 
     target_path = (PROJECT_ROOT / (model.model_path or "")).resolve()
-    target_dir = target_path.parent
-    # runtime-write-exempt: models/ target comes from the registry's model_path, a config value
+    target_dir = checked_write_path(target_path.parent)
     target_dir.mkdir(parents=True, exist_ok=True)
 
     results: List[Path] = []

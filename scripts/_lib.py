@@ -26,6 +26,12 @@ import zipfile
 from pathlib import Path
 from typing import List, Optional
 
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+from src.runtime_files import checked_write_path  # noqa: E402
+
 log = logging.getLogger(__name__)
 
 
@@ -86,16 +92,15 @@ def download(url: str, dest: Path, *, expected_sha256: Optional[str] = None) -> 
     downloaded file is verified against it and removed + rejected on a
     mismatch — a corrupted or tampered download must never reach ``extract()``.
     """
-    # runtime-write-exempt: download target is chosen by the caller (vendor/ or models/)
-    dest.parent.mkdir(parents=True, exist_ok=True)
+    out = checked_write_path(dest)
+    out.parent.mkdir(parents=True, exist_ok=True)
     log.info("downloading %s", url)
-    log.info("       -> %s", dest)
+    log.info("       -> %s", out)
     with urllib.request.urlopen(url, timeout=120) as r:
         total = int(r.headers.get("Content-Length", 0))
         seen = 0
         next_report = 0
-        # runtime-write-exempt: same caller-chosen download target as above
-        with dest.open("wb") as f:
+        with out.open("wb") as f:
             while True:
                 chunk = r.read(1024 * 1024)
                 if not chunk:
@@ -108,12 +113,12 @@ def download(url: str, dest: Path, *, expected_sha256: Optional[str] = None) -> 
                     next_report = seen + total // 20
     log.info("  done: %.1f MB", seen/1_048_576)
 
-    digest = _sha256_of(dest)
+    digest = _sha256_of(out)
     log.info("  sha256: %s", digest)
     if expected_sha256 is not None and not hmac.compare_digest(digest, expected_sha256):
-        dest.unlink(missing_ok=True)
+        out.unlink(missing_ok=True)
         raise InstallError(
-            f"sha256 mismatch for {dest.name}: expected {expected_sha256}, got {digest}"
+            f"sha256 mismatch for {out.name}: expected {expected_sha256}, got {digest}"
         )
     return digest
 
@@ -134,48 +139,48 @@ def _reject_unsafe_members(names: List[str], dest_dir: Path) -> None:
 
 
 def extract(archive: Path, dest_dir: Path) -> None:
-    # runtime-write-exempt: extraction folder is chosen by the caller (vendor/)
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    log.info("extracting %s -> %s", archive.name, dest_dir)
+    out_dir = checked_write_path(dest_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    log.info("extracting %s -> %s", archive.name, out_dir)
     if archive.suffix == ".zip":
         with zipfile.ZipFile(archive) as zf:
-            _reject_unsafe_members(zf.namelist(), dest_dir)
-            zf.extractall(dest_dir)
+            _reject_unsafe_members(zf.namelist(), out_dir)
+            zf.extractall(out_dir)
     elif archive.name.endswith(".tar.gz"):
         with tarfile.open(archive, "r:gz") as tf:
-            _reject_unsafe_members(tf.getnames(), dest_dir)
+            _reject_unsafe_members(tf.getnames(), out_dir)
             # filter="data": rejects absolute paths, `..` traversal, device
             # files, and symlinks/hardlinks that escape dest_dir. Required
             # explicitly on 3.12/3.13 (unfiltered extraction warns); becomes
             # the stdlib default in 3.14.
-            tf.extractall(dest_dir, filter="data")
+            tf.extractall(out_dir, filter="data")
     else:
         raise InstallError(f"unknown archive type: {archive}")
 
 
 def flatten_if_nested(target: Path) -> None:
     """Some releases extract into a single subdir; collapse it into target."""
-    entries = [p for p in target.iterdir() if not p.name.startswith(".")]
+    out_dir = checked_write_path(target)
+    entries = [p for p in out_dir.iterdir() if not p.name.startswith(".")]
     if len(entries) == 1 and entries[0].is_dir():
         inner = entries[0]
         for child in inner.iterdir():
-            # runtime-write-exempt: moves within the caller-chosen vendor folder
-            shutil.move(str(child), str(target / child.name))
+            shutil.move(str(child), str(out_dir / child.name))
         inner.rmdir()
 
 
 def install_assets(assets: List[dict], vendor_dir: Path) -> None:
     """Download each release asset into ``vendor_dir``, extract it, delete the
     archive, then collapse a single-subdir extraction."""
-    # runtime-write-exempt: vendor folder is chosen by the caller
-    vendor_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = checked_write_path(vendor_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
     for a in assets:
-        archive = vendor_dir / a["name"]
+        archive = out_dir / a["name"]
         if not archive.exists():
             download(a["browser_download_url"], archive, expected_sha256=asset_sha256(a))
-        extract(archive, vendor_dir)
+        extract(archive, out_dir)
         archive.unlink(missing_ok=True)
-    flatten_if_nested(vendor_dir)
+    flatten_if_nested(out_dir)
 
 
 def flatten_nested_bin(vendor_dir: Path, binary_name: str) -> None:
@@ -187,18 +192,18 @@ def flatten_nested_bin(vendor_dir: Path, binary_name: str) -> None:
     ``rglob``, then moves every sibling in its parent directory up into
     ``vendor_dir``, overwriting an existing file/dir of the same name.
     """
-    for candidate in vendor_dir.rglob(binary_name):
+    out_dir = checked_write_path(vendor_dir)
+    for candidate in out_dir.rglob(binary_name):
         src_dir = candidate.parent
-        if src_dir == vendor_dir:
+        if src_dir == out_dir:
             return
-        log.info("flattening %s -> %s", src_dir, vendor_dir)
+        log.info("flattening %s -> %s", src_dir, out_dir)
         for child in list(src_dir.iterdir()):
-            target = vendor_dir / child.name
+            target = out_dir / child.name
             if target.exists():
                 if target.is_dir():
                     shutil.rmtree(target)
                 else:
                     target.unlink()
-            # runtime-write-exempt: moves within the caller-chosen vendor folder
             shutil.move(str(child), str(target))
         return
