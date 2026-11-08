@@ -24,6 +24,8 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import urlencode, urlparse, urlunparse
 
+from .runtime_files import checked_write_path
+
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -89,8 +91,7 @@ def load_webapp_config(path: Optional[Path] = None) -> WebappConfig:
 
 def save_webapp_config(cfg: WebappConfig, path: Optional[Path] = None) -> Path:
     """Atomically write the config back to disk."""
-    target = Path(path) if path is not None else DEFAULT_CONFIG_PATH
-    # runtime-write-exempt: config path is a parameter; the default is config/webapp_config.json
+    target = checked_write_path(path if path is not None else DEFAULT_CONFIG_PATH)
     target.parent.mkdir(parents=True, exist_ok=True)
 
     payload = {
@@ -103,7 +104,6 @@ def save_webapp_config(cfg: WebappConfig, path: Optional[Path] = None) -> Path:
     }
 
     tmp = target.with_suffix(target.suffix + ".tmp")
-    # runtime-write-exempt: same config path as above (atomic temp file beside it)
     tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     os.replace(tmp, target)
     logger.info(f"💾 Saved webapp_config to {target}")

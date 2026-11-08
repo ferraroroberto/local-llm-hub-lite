@@ -285,6 +285,9 @@ enabled  = true
 baseline = ".runtime-write-ratchet-baseline.json"
 # The service shape keeps code in app_web/ and tray/ too, beside src/ and scripts/.
 code_folders = ["src", "app_web", "tray", "scripts"]
+# checked_write_path returns a caller-named path unchanged and raises when it resolves under a
+# code folder, so a write through it is guarded at run time (src/runtime_files.py).
+safe_calls = ["checked_write_path"]
 
 # [usage_track_ratchet] -- scripts/usage_track_ratchet.py (with its reader
 # scripts/usage_track_scan.py) fails when the web app's HTML or JS gains a control with no

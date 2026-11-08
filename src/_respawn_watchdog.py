@@ -127,7 +127,7 @@ def run(parent_pid: int, port: int, log_path: str, root: str) -> None:
     if sys.platform == "win32":
         flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
 
-    # runtime-write-exempt: log_path is an argv value; the hub passes data/logs/restart.log
+    # runtime-write-exempt: log_path is an argv value the hub has already passed through checked_write_path; this module stays stdlib-only so it can recover a broken deploy, so it cannot import the guard
     with open(log_path, "a", encoding="utf-8", errors="replace") as logf:
         logf.write(f"{_stamp()} [respawn] relaunching {exe} -m src.server\n")
         logf.flush()
