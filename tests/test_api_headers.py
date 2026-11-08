@@ -16,7 +16,6 @@ under test here — which is exactly the path that would otherwise have left
 
 from __future__ import annotations
 
-
 from fastapi.testclient import TestClient
 
 from src import anthropic_headers

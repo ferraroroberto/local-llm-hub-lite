@@ -9,7 +9,8 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from src.host_profile import hub_port
 from src.http_client import get_async_client
-from src.model_registry import enabled_models, resolve as resolve_model
+from src.model_registry import enabled_models
+from src.model_registry import resolve as resolve_model
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

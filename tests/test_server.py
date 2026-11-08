@@ -6,7 +6,6 @@ are fast and deterministic.
 
 from __future__ import annotations
 
-
 from fastapi.testclient import TestClient
 
 from src import chat_translation as chat_translation_mod

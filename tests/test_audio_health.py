@@ -14,7 +14,6 @@ Two behaviours are pinned:
 
 from __future__ import annotations
 
-
 import httpx  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 

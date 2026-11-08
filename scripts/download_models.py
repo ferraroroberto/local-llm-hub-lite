@@ -65,6 +65,7 @@ def download_one(model_id: str) -> List[Path]:
 
     target_path = (PROJECT_ROOT / (model.model_path or "")).resolve()
     target_dir = target_path.parent
+    # runtime-write-exempt: models/ target comes from the registry's model_path, a config value
     target_dir.mkdir(parents=True, exist_ok=True)
 
     results: List[Path] = []

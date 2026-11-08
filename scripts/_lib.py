@@ -86,6 +86,7 @@ def download(url: str, dest: Path, *, expected_sha256: Optional[str] = None) -> 
     downloaded file is verified against it and removed + rejected on a
     mismatch — a corrupted or tampered download must never reach ``extract()``.
     """
+    # runtime-write-exempt: download target is chosen by the caller (vendor/ or models/)
     dest.parent.mkdir(parents=True, exist_ok=True)
     log.info("downloading %s", url)
     log.info("       -> %s", dest)
@@ -93,6 +94,7 @@ def download(url: str, dest: Path, *, expected_sha256: Optional[str] = None) -> 
         total = int(r.headers.get("Content-Length", 0))
         seen = 0
         next_report = 0
+        # runtime-write-exempt: same caller-chosen download target as above
         with dest.open("wb") as f:
             while True:
                 chunk = r.read(1024 * 1024)
@@ -132,6 +134,7 @@ def _reject_unsafe_members(names: List[str], dest_dir: Path) -> None:
 
 
 def extract(archive: Path, dest_dir: Path) -> None:
+    # runtime-write-exempt: extraction folder is chosen by the caller (vendor/)
     dest_dir.mkdir(parents=True, exist_ok=True)
     log.info("extracting %s -> %s", archive.name, dest_dir)
     if archive.suffix == ".zip":
@@ -156,6 +159,7 @@ def flatten_if_nested(target: Path) -> None:
     if len(entries) == 1 and entries[0].is_dir():
         inner = entries[0]
         for child in inner.iterdir():
+            # runtime-write-exempt: moves within the caller-chosen vendor folder
             shutil.move(str(child), str(target / child.name))
         inner.rmdir()
 
@@ -163,6 +167,7 @@ def flatten_if_nested(target: Path) -> None:
 def install_assets(assets: List[dict], vendor_dir: Path) -> None:
     """Download each release asset into ``vendor_dir``, extract it, delete the
     archive, then collapse a single-subdir extraction."""
+    # runtime-write-exempt: vendor folder is chosen by the caller
     vendor_dir.mkdir(parents=True, exist_ok=True)
     for a in assets:
         archive = vendor_dir / a["name"]
@@ -194,5 +199,6 @@ def flatten_nested_bin(vendor_dir: Path, binary_name: str) -> None:
                     shutil.rmtree(target)
                 else:
                     target.unlink()
+            # runtime-write-exempt: moves within the caller-chosen vendor folder
             shutil.move(str(child), str(target))
         return

@@ -13,7 +13,8 @@ import logging
 
 from fastapi import HTTPException
 
-from .model_registry import Model, enabled_models, resolve as resolve_model
+from .model_registry import Model, enabled_models
+from .model_registry import resolve as resolve_model
 
 logger = logging.getLogger(__name__)
 

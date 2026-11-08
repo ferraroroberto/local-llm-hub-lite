@@ -6,7 +6,6 @@ battery run just to locate one check by fix_id.
 
 from __future__ import annotations
 
-
 from fastapi.testclient import TestClient
 
 from src import install as install_mod

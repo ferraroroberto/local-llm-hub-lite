@@ -12,13 +12,15 @@ from typing import Any, Dict, List, Optional
 import httpx
 from fastapi import APIRouter, HTTPException
 
-from src.process import backend_process as bp
 from src.http_client import get_async_client
 from src.model_registry import (
     Model,
     enabled_models,
+)
+from src.model_registry import (
     resolve as resolve_model,
 )
+from src.process import backend_process as bp
 from src.process.server_process import (
     OWNERSHIP_EXTERNAL,
     OWNERSHIP_NONE,

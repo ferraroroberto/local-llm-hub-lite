@@ -56,8 +56,8 @@ async def stop_backend_children() -> None:
     restart endpoint sets ``backend_process.restart_pending()`` before
     signalling shutdown; we honour it by skipping teardown.
     """
-    from .process import backend_process as bp
     from . import http_client
+    from .process import backend_process as bp
 
     try:
         await http_client.aclose()
@@ -113,8 +113,8 @@ async def wire_observatory_loop() -> None:
 
 async def _autostart_configured_backends() -> None:
     # The registry-derived desired set: eager rows launchable on this host.
-    from .process import backend_process as bp
     from .model_registry import desired_model_ids
+    from .process import backend_process as bp
 
     model_ids = desired_model_ids()
     if not model_ids:

@@ -13,16 +13,14 @@ Two coupled fixes (issue #46, also resolving the #39 reachability finding):
 
 from __future__ import annotations
 
-
 import wave  # noqa: E402
 from io import BytesIO  # noqa: E402
 
 import httpx  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from src.process import backend_process as bp  # noqa: E402
 from src.model_registry import Model  # noqa: E402
-
+from src.process import backend_process as bp  # noqa: E402
 
 # --------------------------------------------------------------------------
 # is_reachable: the port-mangling regression

@@ -12,11 +12,10 @@ from __future__ import annotations
 
 import asyncio
 
-
 import pytest
 
-from src.process import backend_process as bp
 from src import server_lifecycle
+from src.process import backend_process as bp
 
 
 def _run(coro):

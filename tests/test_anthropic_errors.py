@@ -15,14 +15,13 @@ Three things are under test, and the third is the one that matters most:
 
 from __future__ import annotations
 
-
 import anthropic
 import pytest
 from fastapi.testclient import TestClient
 
-from src.routes import anthropic_errors
 from src import chat_translation as chat_translation_mod
 from src import server as server_mod
+from src.routes import anthropic_errors
 
 
 def _client() -> TestClient:
