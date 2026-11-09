@@ -179,3 +179,20 @@ def test_messages_upstream_error_returns_502(monkeypatch):
     assert body["type"] == "error"
     assert body["error"]["type"] == "api_error"
     assert "boom" in body["error"]["message"]
+
+
+def test_unknown_model_request_lands_in_the_live_ring():
+    """A /v1/messages call naming no registered model answers 400 and the
+    request still shows up in the ring behind /admin/api/hub/requests/recent."""
+    client = TestClient(server_mod.app)
+    marker = "unit-live-ring-marker"
+    r = client.post(
+        "/v1/messages",
+        json={"model": marker, "messages": [{"role": "user", "content": "hi"}]},
+    )
+    assert r.status_code == 400, r.text
+    rows = client.get("/admin/api/hub/requests/recent").json()["requests"]
+    row = next((q for q in rows if q["model"] == marker), None)
+    assert row is not None, rows
+    assert row["status"] == 400
+    assert row["latency_ms"] >= 0

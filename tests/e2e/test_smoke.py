@@ -2,14 +2,16 @@
 
 What the gate proves:
 
-  * Each tab pane (Hub / Models / Playground) loads without throwing a
-    JavaScript console error.
-  * The hub-control round-trip works: a /v1/messages request to a known-
-    bad model lands as a row in the live-request ring (SSE arrives).
-  * Static assets carry the ?v=<hash> stamp (cache-busting wired up).
-  * GET /admin/api/version returns a non-empty git_sha + asset_hash.
-  * Phone-viewport (390 x 844) screenshot of each tab is captured for
-    visual review — files land in ``tests/e2e/snapshots/`` (gitignored).
+  * Each tab pane (Hub / Models / Playground) opens from the nav on a
+    phone viewport without a JavaScript console error, and is screenshotted
+    into ``tests/e2e/snapshots/`` (gitignored) for visual review.
+  * The Small/Default/Large text-size control scales and persists.
+  * A request to a known-bad model lands once in the live-request pane over
+    SSE, and is not duplicated when the stream reconnects.
+
+The API-only checks (version endpoint, ?v=<hash> stamps, the request ring,
+toast stacking) are unit tests: ``tests/test_build_info.py``,
+``tests/test_static_versioning.py`` and ``tests/test_server.py``.
 
 Runs under Chromium only. WebKit was dropped from the matrix in issue
 #24 — the SPA has no Safari-specific code and WebKit on windows-latest
@@ -18,9 +20,6 @@ CI was chronically flaky.
 
 from __future__ import annotations
 
-import re
-import time
-import uuid
 from pathlib import Path
 
 import httpx
@@ -58,102 +57,6 @@ def _no_console_errors(page):
         raise AssertionError("console errors: " + " | ".join(errs))
 
 
-def test_admin_loads(page, admin_url):
-    page.goto(admin_url, wait_until="domcontentloaded")
-    page.wait_for_selector("#tabHub", state="visible", timeout=5000)
-    # Hub tab is the default — wait for state, don't race.
-    page.wait_for_selector("#paneHub", state="visible", timeout=3000)
-    page.wait_for_selector("#paneModels", state="hidden", timeout=3000)
-    page.wait_for_selector("#panePlayground", state="hidden", timeout=3000)
-
-
-def test_models_tab(page, admin_url):
-    # wait_until="load" — not "domcontentloaded" — so the module-script
-    # boot() has finished and wireTabs() has attached its #tabModels
-    # listener before we click. Otherwise the click lands on a button
-    # with no handler, setTab('models') never runs, and the pane stays
-    # hidden (issue #19).
-    page.goto(admin_url, wait_until="load")
-    page.click("#tabModels")
-    page.wait_for_selector("#paneModels", state="visible", timeout=3000)
-
-
-def test_toast_stacks_above_mobile_navigation(page, admin_url):
-    page.set_viewport_size(PHONE_VIEWPORT)
-    page.goto(admin_url, wait_until="load")
-    page.locator("#toast").evaluate(
-        "(toast) => { toast.textContent = 'Model stopped'; toast.hidden = false; }"
-    )
-
-    toast_z = int(page.locator("#toast").evaluate("e => getComputedStyle(e).zIndex"))
-    assert toast_z > 120, "toast must clear the floating nav's z-index: 120"
-
-
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_text_size_control_persists(page, admin_url, theme):
-    """The Hub-tab Small/Default/Large control scales the root font-size,
-    survives a reload via the pre-paint stamp, and works in both themes (#34)."""
-    page.goto(admin_url, wait_until="load")
-    page.evaluate(
-        "(t) => { localStorage.setItem('llmhub.theme', t); localStorage.removeItem('llmhub.textsize'); }",
-        theme,
-    )
-    page.reload(wait_until="load")
-    assert page.evaluate("document.documentElement.dataset.theme") == theme
-    assert page.evaluate("document.documentElement.dataset.textsize") == "default"
-
-    page.click("#installCard > summary")
-    for step, px in (("large", "18px"), ("small", "15px"), ("default", "16px")):
-        page.click(f"#textSizeControl [data-textsize='{step}']")
-        assert page.evaluate("document.documentElement.dataset.textsize") == step
-        assert page.evaluate("getComputedStyle(document.documentElement).fontSize") == px
-        active = page.locator("#textSizeControl .segmented-item[aria-pressed='true']")
-        assert active.count() == 1 and active.get_attribute("data-textsize") == step
-
-    page.click("#textSizeControl [data-textsize='large']")
-    page.reload(wait_until="load")
-    # Pre-paint stamp: set from storage before any control is bound or clicked.
-    assert page.evaluate("document.documentElement.dataset.textsize") == "large"
-    assert page.evaluate("getComputedStyle(document.documentElement).fontSize") == "18px"
-
-
-def test_playground_tab(page, admin_url):
-    page.goto(admin_url, wait_until="load")
-    page.click("#tabPlayground")
-    page.wait_for_selector("#panePlayground", state="visible", timeout=3000)
-    # Model dropdown populated from /admin/api/playground/models. Boot
-    # fans out several fetches at once, including install_status which
-    # is the slow one — 10s window covers the cold-cache case.
-    page.wait_for_function(
-        "document.getElementById('playgroundModel').options.length > 0",
-        timeout=10000,
-    )
-
-
-def test_static_assets_versioned(admin_url: str):
-    """The index.html that comes off the wire stamps ``?v=<hash>`` onto
-    every /admin/static/<file>.(css|js) URL."""
-    r = httpx.get(admin_url, timeout=5.0)
-    assert r.status_code == 200, r.text
-    body = r.text
-    # styles.css must carry a version stamp
-    assert re.search(r"/admin/static/styles\.css\?v=[0-9a-f]{4,}", body), body[:1000]
-    # main.js module
-    assert re.search(r"/admin/static/main\.js\?v=[0-9a-f]{4,}", body), body[:1000]
-    # subdir (vendored) assets must be stamped too — anything outside the
-    # ?v= scheme rides iOS Safari's heuristic cache across deploys (#211).
-    assert re.search(r"/admin/static/_vendored/nav/nav-tabs\.css\?v=[0-9a-f]{4,}", body), body[:1200]
-
-
-def test_version_endpoint(admin_url: str):
-    r = httpx.get(admin_url.rstrip("/") + "/api/version", timeout=5.0)
-    assert r.status_code == 200
-    body = r.json()
-    assert body["git_sha"]
-    assert body["built_at"]
-    assert body["asset_hash"]
-
-
 def _snapshot(page, name: str, browser_name: str) -> None:
     """Save a phone-viewport screenshot of the current page to a
     deterministic path under ``tests/e2e/snapshots/``. The sparklines
@@ -169,10 +72,19 @@ def _snapshot(page, name: str, browser_name: str) -> None:
     assert out.exists() and out.stat().st_size > 0, f"empty screenshot at {out}"
 
 
-def test_hub_tab_phone_screenshot(page, admin_url, browser_name):
+def test_each_tab_opens_on_a_phone(page, admin_url, browser_name):
+    """Hub is the default pane; Models and Playground open from the nav and
+    the Playground model dropdown fills. Each tab is screenshotted."""
     page.set_viewport_size(PHONE_VIEWPORT)
-    page.goto(admin_url, wait_until="domcontentloaded")
-    page.wait_for_selector("#paneHub", state="visible", timeout=5000)
+    # wait_until="load" — not "domcontentloaded" — so the module-script
+    # boot() has finished and wireTabs() has attached its listeners before
+    # we click. Otherwise the click lands on a button with no handler and
+    # the pane stays hidden (issue #19).
+    page.goto(admin_url, wait_until="load")
+    page.wait_for_selector("#tabHub", state="visible", timeout=5000)
+    page.wait_for_selector("#paneHub", state="visible", timeout=3000)
+    page.wait_for_selector("#paneModels", state="hidden", timeout=3000)
+    page.wait_for_selector("#panePlayground", state="hidden", timeout=3000)
     # Let the first poll settle so the snapshot reflects the populated
     # UI rather than the "checking…" placeholder in the Hub card header.
     page.wait_for_function(
@@ -182,21 +94,15 @@ def test_hub_tab_phone_screenshot(page, admin_url, browser_name):
     )
     _snapshot(page, "hub-390x844", browser_name)
 
-
-def test_models_tab_phone_screenshot(page, admin_url, browser_name):
-    page.set_viewport_size(PHONE_VIEWPORT)
-    # See test_models_tab — wait_until="load" defeats the issue #19 race.
-    page.goto(admin_url, wait_until="load")
     page.click("#tabModels")
     page.wait_for_selector("#paneModels", state="visible", timeout=3000)
     _snapshot(page, "models-390x844", browser_name)
 
-
-def test_playground_tab_phone_screenshot(page, admin_url, browser_name):
-    page.set_viewport_size(PHONE_VIEWPORT)
-    page.goto(admin_url, wait_until="load")
     page.click("#tabPlayground")
     page.wait_for_selector("#panePlayground", state="visible", timeout=3000)
+    # Model dropdown populated from /admin/api/playground/models. Boot
+    # fans out several fetches at once, including install_status which
+    # is the slow one — 10s window covers the cold-cache case.
     page.wait_for_function(
         "document.getElementById('playgroundModel').options.length > 0",
         timeout=10000,
@@ -204,48 +110,32 @@ def test_playground_tab_phone_screenshot(page, admin_url, browser_name):
     _snapshot(page, "playground-390x844", browser_name)
 
 
-def test_live_request_ring(admin_url: str):
-    """A bad /v1/messages call must land in the live ring.
+def test_text_size_control_persists(page, admin_url):
+    """The Hub-tab Small/Default/Large control scales the root font-size,
+    survives a reload via the pre-paint stamp, and works in both themes (#34)."""
+    page.goto(admin_url, wait_until="load")
+    for theme in ("light", "dark"):
+        page.evaluate(
+            "(t) => { localStorage.setItem('llmhub.theme', t); localStorage.removeItem('llmhub.textsize'); }",
+            theme,
+        )
+        page.reload(wait_until="load")
+        assert page.evaluate("document.documentElement.dataset.theme") == theme
+        assert page.evaluate("document.documentElement.dataset.textsize") == "default"
 
-    Hardened for #392 (same flake class as #361): the old shape was a
-    fixed ``time.sleep(0.2)`` followed by asserting ``requests[0]`` was
-    our row — a fixed wait racing ring ingestion, plus an ordering
-    assumption. Under host contention (parallel e2e suites + live hub)
-    the autobooted hub's event loop can also be starved past the 5s
-    fast-path timeout this file uses elsewhere, so the POST and the
-    poll both get the 10s-class headroom already established for
-    slower-CI operations (#192).
-    """
-    base = admin_url.rsplit("/admin/", 1)[0]
-    # Unique marker model so we match *our* row in the ring — never an
-    # ordering assumption on requests[0], never a stale row from an
-    # earlier run against the same session hub.
-    marker = f"e2e-live-ring-{uuid.uuid4().hex[:8]}"
-    r = httpx.post(
-        f"{base}/v1/messages",
-        json={"model": marker, "messages": [{"role": "user", "content": "hi"}]},
-        timeout=10.0,
-    )
-    assert r.status_code == 400, r.text
-    # Condition-wait, not a fixed sleep: poll the ring until the marker
-    # row lands. A transient GET timeout under load retries within the
-    # same deadline instead of failing the test outright.
-    deadline = time.monotonic() + 10.0
-    row = None
-    last_body = None
-    while time.monotonic() < deadline:
-        try:
-            r2 = httpx.get(admin_url.rstrip("/") + "/api/hub/requests/recent", timeout=5.0)
-        except httpx.TimeoutException:
-            continue
-        last_body = r2.json()
-        row = next((q for q in last_body["requests"] if q["model"] == marker), None)
-        if row is not None:
-            break
-        time.sleep(0.2)
-    assert row is not None, f"marker {marker} never landed in the ring; last snapshot: {last_body}"
-    assert row["status"] == 400
-    assert row["latency_ms"] >= 0  # monotonic-clock duration is non-negative but can read 0.0 below clock resolution (coarse QPC ticks on CI Windows runners)
+        page.click("#installCard > summary")
+        for step, px in (("large", "18px"), ("small", "15px"), ("default", "16px")):
+            page.click(f"#textSizeControl [data-textsize='{step}']")
+            assert page.evaluate("document.documentElement.dataset.textsize") == step
+            assert page.evaluate("getComputedStyle(document.documentElement).fontSize") == px
+            active = page.locator("#textSizeControl .segmented-item[aria-pressed='true']")
+            assert active.count() == 1 and active.get_attribute("data-textsize") == step
+
+        page.click("#textSizeControl [data-textsize='large']")
+        page.reload(wait_until="load")
+        # Pre-paint stamp: set from storage before any control is bound or clicked.
+        assert page.evaluate("document.documentElement.dataset.textsize") == "large"
+        assert page.evaluate("getComputedStyle(document.documentElement).fontSize") == "18px"
 
 
 def test_live_requests_stream_rolls_forward(page, admin_url):

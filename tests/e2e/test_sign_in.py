@@ -3,11 +3,11 @@
 The e2e hub is loopback, so it never asks for a password. These tests put a
 stand-in auth layer in front of the SPA with Playwright routes (every
 ``/admin/api/*`` call answers 401 until it carries the good bearer token;
-``/admin/api/login`` checks the password) and prove the three paths:
+``/admin/api/login`` checks the password) and prove the two flows:
 
-  * a wrong password keeps the sheet open and says so;
-  * a correct password closes the sheet and stores the token under the
-    app's existing ``llmhub.token`` key;
+  * a wrong password keeps the sheet open and says so, then a correct
+    password closes the sheet and stores the token under the app's
+    existing ``llmhub.token`` key;
   * a device that already holds a token never sees the sheet.
 """
 
@@ -45,7 +45,7 @@ def _install_auth_layer(page: Page) -> None:
     page.route("**/admin/api/**", _api)
 
 
-def test_wrong_password_keeps_the_sheet_open(page: Page, admin_url: str) -> None:
+def test_wrong_password_then_correct_password_signs_in(page: Page, admin_url: str) -> None:
     _install_auth_layer(page)
     page.goto(admin_url)
     sheet = page.locator("dialog.sign-in")
@@ -56,13 +56,9 @@ def test_wrong_password_keeps_the_sheet_open(page: Page, admin_url: str) -> None
     expect(sheet).to_be_visible()
     assert page.evaluate(f"localStorage.getItem('{TOKEN_KEY}')") is None
 
-
-def test_correct_password_stores_the_existing_token_key(page: Page, admin_url: str) -> None:
-    _install_auth_layer(page)
-    page.goto(admin_url)
     page.locator("dialog.sign-in input[type=password]").fill(GOOD_PASSWORD)
     page.locator("dialog.sign-in [data-track=sign-in-submit]").click()
-    expect(page.locator("dialog.sign-in")).not_to_be_visible()
+    expect(sheet).not_to_be_visible()
     assert page.evaluate(f"localStorage.getItem('{TOKEN_KEY}')") == GOOD_TOKEN
 
 

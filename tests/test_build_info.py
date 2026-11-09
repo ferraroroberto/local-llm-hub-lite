@@ -21,3 +21,8 @@ def test_version_endpoint_serves_the_process_capture() -> None:
     body = TestClient(server_mod.app).get("/admin/api/version").json()
     assert body["git_sha"] == version_mod.IDENTITY["git_sha"]
     assert body["built_at"] == version_mod.IDENTITY["built_at"]
+
+
+def test_version_endpoint_carries_the_stylesheet_asset_hash() -> None:
+    body = TestClient(server_mod.app).get("/admin/api/version").json()
+    assert body["asset_hash"]
