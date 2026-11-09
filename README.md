@@ -178,6 +178,8 @@ powershell -File scripts\verify-before-ship.ps1   # byte-compile + static ratche
 
 The e2e stage asks `scripts/classify_e2e.py` what the diff needs (rules in the `[e2e]` table of `.fleet.toml`): a docs/backend-only diff skips the browser suite, inert assets run the smoke test, anything touching `app_web/` or `tray/` runs the full suite. An unclassified path, an empty diff or a router failure runs the full suite and prints why. `-RouteOnly` prints the decision without running any stage.
 
+The last stdout line of a gate run is `GATE-RESULT: PASS` or `GATE-RESULT: FAIL`, so a caller that must pipe the gate (a pipe reports its last command's exit code) asserts on that line; a run without it is not a pass.
+
 CI (`.github/workflows/e2e.yml`) runs the same three steps on every PR/push to `main` — advisory, the local gate is the contract.
 
 ## Scope & usage policy
