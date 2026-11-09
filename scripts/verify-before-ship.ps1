@@ -64,7 +64,9 @@
 #      An unclassified path, an empty diff or a router failure runs the
 #      full suite and prints why.
 #
-# Stops on the first failure.
+# Stops on the first failure. The last stdout line is `GATE-RESULT: PASS` or
+# `GATE-RESULT: FAIL`; never pipe the gate when its exit code matters, and a
+# caller that must pipe asserts on that line (a run without it is not a pass).
 #
 # -Classifier   router script to ask (default scripts\classify_e2e.py); a
 #               seam so the fail-safe paths can be exercised with a stub.
@@ -76,13 +78,28 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$ProjectRoot = Split-Path -Parent $PSScriptRoot
-Set-Location $ProjectRoot
 
-$Python = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
-if (-not (Test-Path $Python)) {
-    Write-Host "❌ .venv\Scripts\python.exe not found at $Python" -ForegroundColor Red
-    exit 1
+# gate-verdict:begin
+# The last stdout line of every gate run is GATE-RESULT: PASS or FAIL. A pipe
+# (`... | tail`) reports its last command's exit code, so a red gate can read
+# green; the verdict line is what a piped caller asserts on. The trap reports a
+# terminating error on stdout first (under "Stop" it would otherwise reach
+# stderr only). Exit codes are unchanged: 0 on a pass, the failing stage's code
+# on a failed stage, 1 on a missing .venv or an unhandled error.
+function Write-GateResult($verdict) {
+    Write-Host "GATE-RESULT: $verdict"
+}
+
+function Complete-Gate([int]$Code) {
+    Write-GateResult $(if ($Code -eq 0) { "PASS" } else { "FAIL" })
+    exit $Code
+}
+
+trap {
+    Write-Host ""
+    Write-Host "[FAIL] the gate aborted on an unhandled error:" -ForegroundColor Red
+    Write-Host ("       {0}" -f $_.Exception.Message) -ForegroundColor Red
+    Complete-Gate 1
 }
 
 function Step($label, $block) {
@@ -91,9 +108,19 @@ function Step($label, $block) {
     & $block
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ $label failed (exit $LASTEXITCODE)" -ForegroundColor Red
-        exit $LASTEXITCODE
+        Complete-Gate $LASTEXITCODE
     }
     Write-Host "✅ $label" -ForegroundColor Green
+}
+# gate-verdict:end
+
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
+Set-Location $ProjectRoot
+
+$Python = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
+if (-not (Test-Path $Python)) {
+    Write-Host "❌ .venv\Scripts\python.exe not found at $Python" -ForegroundColor Red
+    Complete-Gate 1
 }
 
 # Ask the router what the diff needs. Every way of not getting a usable answer
@@ -241,3 +268,4 @@ Step "runtime write probe" {
 
 Write-Host ""
 Write-Host "🚀 all green" -ForegroundColor Green
+Complete-Gate 0
