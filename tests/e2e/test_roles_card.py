@@ -28,13 +28,6 @@ FAKE_ROLES = {
 }
 
 
-def _install_routes(page):
-    def roles_handler(route):
-        route.fulfill(status=200, content_type="application/json", body=json.dumps(FAKE_ROLES))
-
-    page.route("**/admin/api/roles", roles_handler)
-
-
 def _open_models_tab(page, admin_url):
     # wait_until="load" so wireTabs() has attached before the click (issue #19).
     page.goto(admin_url, wait_until="load")
@@ -42,8 +35,9 @@ def _open_models_tab(page, admin_url):
     page.wait_for_selector("#paneModels", state="visible", timeout=5000)
 
 
-def test_roles_card_folded_by_default_no_fetch(page, admin_url):
-    """Collapsed on load; the backing endpoint is not called until expanded."""
+def test_roles_card_is_lazy_then_renders_on_expand(page, admin_url):
+    """Collapsed on load with the backing endpoint untouched; expanding it
+    fetches once and renders one row per role."""
     calls = []
 
     def roles_handler(route):
@@ -58,12 +52,7 @@ def test_roles_card_folded_by_default_no_fetch(page, admin_url):
     page.wait_for_timeout(300)  # give any accidental eager fetch a chance to fire
     assert calls == [], "the roles card must not fetch while collapsed"
 
-
-def test_roles_card_renders_on_expand(page, admin_url):
-    _install_routes(page)
-    _open_models_tab(page, admin_url)
     page.eval_on_selector("#rolesCard", "el => { el.open = true; }")
-
     page.wait_for_selector("#rolesList .startup-row", state="visible", timeout=10000)
     roles_rows = page.locator("#rolesList .startup-row")
     assert roles_rows.count() == 2

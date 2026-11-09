@@ -9,6 +9,7 @@ vendored component.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from src.static_versioning import (
@@ -109,3 +110,28 @@ def test_vendor_dir_still_unstamped(tmp_path: Path) -> None:
     hashes = compute_asset_hashes(static_dir)
     body = '<script src="/admin/static/vendor/chart.js"></script>'
     assert rewrite_index_html(body, hashes) == body
+
+
+def test_served_admin_index_stamps_every_static_asset() -> None:
+    """The index served at /admin/ carries ``?v=<hash>`` on the stylesheet, the
+    module entry and a vendored subdirectory asset (an unstamped one rides
+    iOS Safari's heuristic cache across deploys)."""
+    from fastapi.testclient import TestClient
+
+    from src import server as server_mod
+
+    r = TestClient(server_mod.app).get("/admin/")
+    assert r.status_code == 200
+    for asset in ("styles.css", "main.js", "_vendored/nav/nav-tabs.css"):
+        assert re.search(rf"/admin/static/{re.escape(asset)}\?v=[0-9a-f]{{4,}}", r.text), asset
+
+
+def test_toast_stacks_above_the_floating_mobile_nav() -> None:
+    """The toast's z-index clears the vendored floating nav's, so command
+    progress stays readable on a phone."""
+    static_dir = Path(__file__).resolve().parents[1] / "app_web" / "static"
+    styles = re.sub(r"/\*.*?\*/", "", (static_dir / "styles.css").read_text("utf-8"), flags=re.S)
+    toast = re.search(r"\.toast\s*\{[^}]*?z-index:\s*(\d+)", styles, re.S)
+    nav_levels = re.findall(r"z-index:\s*(\d+)", (static_dir / "_vendored/nav/nav-tabs.css").read_text("utf-8"))
+    assert toast and nav_levels
+    assert int(toast.group(1)) > max(int(z) for z in nav_levels)
