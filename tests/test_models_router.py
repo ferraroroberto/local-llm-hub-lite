@@ -108,3 +108,94 @@ def test_start_unknown_model_404():
 def test_log_unknown_model_404():
     resp = _admin_client().get("/api/models/does-not-exist/log")
     assert resp.status_code == 404
+
+
+# --- serving state (one derivation behind every field of a tile) -------------
+
+class _DeadPopen:
+    pid = 4242
+
+    def __init__(self, returncode: int) -> None:
+        self.returncode = returncode
+
+    def poll(self) -> int:
+        return self.returncode
+
+
+class _LivePopen(_DeadPopen):
+    def __init__(self) -> None:
+        super().__init__(0)
+
+    def poll(self):
+        return None
+
+
+def _backend_state(monkeypatch, proc) -> None:
+    """Give ``qwen35_4b`` a spawn whose process is ``proc``."""
+    import time
+
+    from src.process.serving_state import LaunchRecord
+
+    st = bp._BackendState()
+    st.proc = proc
+    st.launch = LaunchRecord(spawned_at=time.monotonic())
+    monkeypatch.setitem(bp._STATES, "qwen35_4b", st)
+
+
+def test_a_loading_backend_is_loading_not_running_or_idle(monkeypatch):
+    """Disagreement 1: spawned, reading weights, port not bound yet."""
+    _backend_state(monkeypatch, _LivePopen())
+    monkeypatch.setattr(models_router, "snapshot_listening_pids", lambda: {})
+
+    qwen = _row(_admin_client().get("/api/models").json(), "qwen35_4b")
+    assert qwen["state"] == "loading"
+    assert qwen["reason"] is None
+    # The older fields stay, read off the same observation.
+    assert qwen["ownership"] == "ours"
+    assert qwen["reachable"] is False
+
+
+def test_a_crash_during_load_is_failed_with_its_exit_code(monkeypatch):
+    """Disagreement 2: the child exited in the first second; the tile said stopped."""
+    _backend_state(monkeypatch, _DeadPopen(returncode=3))
+    monkeypatch.setattr(models_router, "snapshot_listening_pids", lambda: {})
+
+    qwen = _row(_admin_client().get("/api/models").json(), "qwen35_4b")
+    assert qwen["state"] == "failed"
+    assert "exit code 3" in qwen["reason"]
+    assert qwen["ownership"] == "none"
+
+
+def test_a_failed_port_lookup_is_unknown_not_stopped(monkeypatch):
+    """Disagreement 3: every lookup path failed; the tile said stopped, Start enabled."""
+    import psutil
+
+    from src.process import server_process
+
+    def _denied(*a, **kw):
+        raise psutil.AccessDenied()
+
+    def _missing(*a, **kw):
+        raise FileNotFoundError("netstat")
+
+    monkeypatch.setattr(psutil, "net_connections", _denied)
+    monkeypatch.setattr(server_process.subprocess, "run", _missing)
+    monkeypatch.setattr(bp, "is_reachable", lambda m, timeout=1.5: False)
+
+    body = _admin_client().get("/api/models").json()
+    qwen = _row(body, "qwen35_4b")
+    assert qwen["state"] == "unknown"
+    assert "snapshot" in qwen["reason"]
+    assert qwen["ownership"] == "none"
+
+
+def test_ready_and_adopted_rows_carry_state(monkeypatch):
+    monkeypatch.setattr(models_router, "snapshot_listening_pids", lambda: {8081: [111], 8090: [222]})
+    monkeypatch.setattr(bp, "is_reachable", lambda m, timeout=1.5: True)
+    monkeypatch.setattr(bp, "is_running", lambda mid: mid == "qwen35_4b")
+    monkeypatch.setattr(bp, "pid", lambda mid: 4242)
+
+    body = _admin_client().get("/api/models").json()
+    assert _row(body, "qwen35_4b")["state"] == "ready"
+    assert _row(body, "whisper")["state"] == "adopted"
+    assert _row(body, "whisper")["reason"] is None

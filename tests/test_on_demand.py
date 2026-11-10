@@ -223,3 +223,35 @@ def test_finish_is_idempotent():
     track.finish()
     track.finish()
     assert _in_flight("gemma") == 0
+
+
+def test_ensure_ready_fails_fast_when_the_child_exits_during_load(monkeypatch):
+    """Disagreement 2: a crash in the first second must not wait out the deadline."""
+    import time
+
+    from src.process.serving_state import LaunchRecord
+
+    class _Dead:
+        pid = 4242
+
+        def poll(self):
+            return 3
+
+    st = bp._BackendState()
+    monkeypatch.setitem(bp._STATES, "gemma", st)
+
+    def _start(mid):
+        st.proc = _Dead()
+        st.launch = LaunchRecord(spawned_at=time.monotonic())
+        return True, "started"
+
+    monkeypatch.setattr(on_demand, "READY_POLL_S", 0.01)
+    monkeypatch.setattr(host_profile, "resolve", lambda: _Profile(None))
+    monkeypatch.setattr(bp, "is_reachable", lambda m, timeout=1.5: False)
+    monkeypatch.setattr(bp, "running_backends", dict)
+    monkeypatch.setattr(bp, "start", _start)
+
+    began = time.monotonic()
+    with pytest.raises(on_demand.OnDemandNotReady, match="exit code 3"):
+        on_demand.ensure_ready(_model(), deadline_s=30.0)
+    assert time.monotonic() - began < 5.0

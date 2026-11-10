@@ -22,9 +22,8 @@ from src.model_registry import (
 )
 from src.process import backend_process as bp
 from src.process.server_process import (
-    OWNERSHIP_EXTERNAL,
     OWNERSHIP_NONE,
-    OWNERSHIP_OURS,
+    snapshot_is_known,
     snapshot_listening_pids,
 )
 
@@ -49,22 +48,6 @@ def _require_model(model_id: str) -> Model:
     return target
 
 
-def _ownership_from_snapshot(m: Model, listening: Dict[int, list]) -> tuple[str, Any]:
-    """Compute (ownership, pid) for a controllable model from a port→pids map.
-
-    Avoids the per-model netstat invocation that ``bp.ownership`` does
-    when checking each model in isolation.
-    """
-    if bp.is_running(m.id):
-        return OWNERSHIP_OURS, bp.pid(m.id)
-    if not m.port:
-        return OWNERSHIP_NONE, None
-    pids = listening.get(m.port) or []
-    if pids:
-        return OWNERSHIP_EXTERNAL, pids[0]
-    return OWNERSHIP_NONE, None
-
-
 @router.get("/api/models")
 async def list_models_for_admin() -> Dict[str, Any]:
     """Per-tile state for every enabled model — all rows are local; every
@@ -76,6 +59,10 @@ async def list_models_for_admin() -> Dict[str, Any]:
     do a single netstat snapshot up front instead of one per backend —
     O(N) → O(1) subprocesses, O(N) → O(0.5 s) wall time when all
     backends are alive.
+
+    A controllable row's ``state`` / ``reason`` come from
+    ``backend_process.serving``; ``ownership``, ``pid`` and ``reachable``
+    are kept for older clients and read off the same observation.
     """
     local_models = list(enabled_models())
 
@@ -83,13 +70,21 @@ async def list_models_for_admin() -> Dict[str, Any]:
     # ownership *and* as a cheap reachability gate so we never fire an
     # HTTP probe at a port that isn't bound.
     listening = await asyncio.to_thread(snapshot_listening_pids)
+    listening_known = snapshot_is_known(listening)
 
-    async def _probe_reach(m: Model) -> bool:
-        if not m.port or m.port not in listening:
-            # Port isn't bound → definitely not reachable; skip the
-            # 1-second-per-dead-backend HTTP probe.
+    async def _probe_reach(m: Model) -> Optional[bool]:
+        if not m.port:
             return False
-        return await asyncio.to_thread(bp.is_reachable, m, 0.4)
+        if listening_known and m.port not in listening:
+            # Port isn't bound → definitely not reachable; skip the
+            # 1-second-per-dead-backend HTTP probe. With an unknown
+            # snapshot nothing is known to be unbound, so probe anyway.
+            return False
+        try:
+            return await asyncio.to_thread(bp.is_reachable, m, 0.4)
+        except Exception as exc:  # noqa: BLE001 — an unrun probe is unknown, not "down"
+            logger.warning("⚠️ readiness probe for %s could not be run: %s", m.id, exc)
+            return None
 
     reach_results = await asyncio.gather(*(_probe_reach(m) for m in local_models))
 
@@ -100,8 +95,10 @@ async def list_models_for_admin() -> Dict[str, Any]:
         controllable = m.backend in ("openai", "whisper") and not m.virtual
         own = OWNERSHIP_NONE
         pid: Any = None
+        verdict = None
         if controllable:
-            own, pid = _ownership_from_snapshot(m, listening)
+            verdict = bp.serving(m, reachable, listening if listening_known else None)
+            own, pid = verdict.ownership, verdict.pid
         row: Dict[str, Any] = {
             "id": m.id,
             "display_name": m.display_name,
@@ -116,6 +113,9 @@ async def list_models_for_admin() -> Dict[str, Any]:
             "reachable": bool(reachable),
             "model_path": m.model_path,
         }
+        if verdict is not None:
+            row["state"] = verdict.state.value
+            row["reason"] = verdict.reason
         _add_startup_fields(row, m)
         rows.append(row)
 

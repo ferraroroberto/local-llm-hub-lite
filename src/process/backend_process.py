@@ -27,13 +27,20 @@ import os
 import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Dict, Mapping, Optional
 
 from ..http_client import get_sync_client
 from ..model_registry import Model, enabled_models
 from ..runtime_files import checked_write_path
-from .server_process import WIN_NEW_GROUP, kill_pid, resolve_external_pid
+from .server_process import (
+    WIN_NEW_GROUP,
+    kill_pid,
+    resolve_external_pid,
+    snapshot_is_known,
+)
+from .serving_state import LaunchRecord, Observation, Serving, ServingState, derive
 
 if TYPE_CHECKING:
     import psutil
@@ -110,6 +117,11 @@ class _BackendState:
         # alone is not an identity: once the backend dies the OS may hand the
         # number to an unrelated process, which ``stop`` would then kill.
         self.inherited_identity: Optional[tuple[float, str]] = None
+        # The current spawn (or inheritance), set by ``start`` /
+        # ``inherit_running_backends`` and dropped only by a deliberate
+        # ``stop``. A record whose process is gone is how "died on its own"
+        # reads differently from "stopped" (see ``serving``).
+        self.launch: Optional[LaunchRecord] = None
 
     def forget_inherited(self) -> None:
         self.inherited_pid = None
@@ -225,6 +237,52 @@ def is_reachable(model: Model, timeout: float = 1.5) -> bool:
         return False
 
 
+def serving(
+    model: Model,
+    reachable: Optional[bool],
+    listening: Optional[Mapping[int, list]],
+    now: Optional[float] = None,
+) -> Serving:
+    """The model's serving state: the one derivation every reader uses.
+
+    ``reachable`` is the caller's probe of the backend (:func:`is_reachable`),
+    ``None`` when it could not be run. ``listening`` is the port → PIDs
+    snapshot, ``None`` when it was not gathered or its lookup failed (a
+    ``ListeningSnapshot`` with ``known = False`` counts as failed). A reader
+    that only wants the process verdict (the on-demand loader) passes
+    ``None`` and ignores the port facts. Latches the launch record's
+    ``ready`` flag the first time a live process answers.
+    """
+    state = _state_for(model.id)
+    if listening is not None and not snapshot_is_known(listening):
+        listening = None
+    t = time.monotonic() if now is None else now
+    alive = is_running(model.id)
+    holders = listening.get(model.port) if listening is not None and model.port else None
+    exit_code: Optional[int] = None
+    if alive:
+        pid_ = pid(model.id)
+    else:
+        pid_ = holders[0] if holders else None
+        if state.proc is not None:
+            exit_code = state.proc.poll()
+    launch = state.launch
+    obs = Observation(
+        alive=alive,
+        exit_code=exit_code,
+        launched=launch is not None,
+        was_ready=bool(launch and launch.ready),
+        load_age_s=None if launch is None else t - launch.spawned_at,
+        probe=reachable,
+        port_held=None if listening is None and model.port else bool(holders),
+        pid=pid_,
+    )
+    result = derive(obs)
+    if result.state is ServingState.READY and launch is not None:
+        launch.ready = True
+    return result
+
+
 def log_lines(model_id: str, limit: int = LOG_TAIL_LINES) -> list[str]:
     """Tail of the backend's log file (``data/logs/backend-<id>.log``).
 
@@ -333,12 +391,16 @@ def start(model_id: str) -> tuple[bool, str]:
         log_file.close()
 
     state.proc = proc
+    state.launch = LaunchRecord(spawned_at=time.monotonic())
     return True, f"started (pid={proc.pid})"
 
 
 def stop(model_id: str) -> tuple[bool, str]:
     state = _state_for(model_id)
     p = state.proc
+    # A deliberate stop (even of an already-dead process) ends the launch: what
+    # happens to the process afterwards is not a failure of ours.
+    state.launch = None
     # Inherited backend: we don't hold a Popen handle, so polite shutdown
     # isn't an option — taskkill the PID directly.
     if p is None:
@@ -409,6 +471,7 @@ def inherit_running_backends() -> int:
             state = _state_for(m.id)
             state.inherited_pid = candidate
             state.inherited_identity = identity
+            state.launch = LaunchRecord(spawned_at=time.monotonic())
             count += 1
             logger.info(
                 "📎 Inherited %s on :%s (PID %s) — log tail at %s",

@@ -8,6 +8,9 @@
 import { els, state, MODELS_ACTIVE_ONLY_KEY } from './state.js';
 import { jsonApi, postJson, toast, escapeHtml, fmtGb } from './api.js';
 import { icon } from './_vendored/icons/icons.js';
+import {
+  servingState, isServing, servingBadge, canStart, canStop, onDemandWord,
+} from './serving_state.js';
 
 export async function fetchModels() {
   try {
@@ -17,10 +20,10 @@ export async function fetchModels() {
   } catch (_) { /* ignore */ }
 }
 
-// A row counts as "active" only if it's a controllable backend that's
-// currently running or adopted from an earlier hub.
+// A row counts as "active" if it's a controllable backend in any state but
+// stopped, so a loading, failed or unknown tile is never hidden.
 function isActive(m) {
-  return m.controllable && (m.ownership === 'ours' || m.ownership === 'external');
+  return m.controllable && servingState(m) !== 'stopped';
 }
 
 function renderModels() {
@@ -71,9 +74,9 @@ function buildItem(m) {
 }
 
 function fillItem(li, m) {
-  const ownership = m.ownership || 'none';
-  const reachable = !!m.reachable;
-  const adopted = ownership === 'external';
+  const adopted = m.controllable && servingState(m) === 'adopted';
+  // A virtual alias has no process of its own, so its Ping follows the probe.
+  const canPing = m.controllable ? isServing(m) : !!m.reachable;
 
   // Rebuild the .app-main block in place rather than wiping the whole <li>.
   let main = li.querySelector(':scope > .app-main');
@@ -98,12 +101,12 @@ function fillItem(li, m) {
   icons.className = 'app-icons';
   const buttons = [];
   if (m.controllable) {
-    buttons.push({ act: 'start', glyph: icon('play'), label: 'Start', disabled: ownership !== 'none' });
-    buttons.push({ act: 'stop',  glyph: icon('square'), label: 'Stop',  disabled: ownership !== 'ours', danger: true });
+    buttons.push({ act: 'start', glyph: icon('play'), label: 'Start', disabled: !canStart(m) });
+    buttons.push({ act: 'stop',  glyph: icon('square'), label: 'Stop',  disabled: !canStop(m), danger: true });
   }
   buttons.push({
     act: 'ping', glyph: icon('signal'), label: 'Ping',
-    disabled: !reachable,
+    disabled: !canPing,
   });
   if (adopted) {
     buttons.push({ act: 'force-stop', glyph: icon('skull'), label: 'Force stop', danger: true });
@@ -136,6 +139,9 @@ function fillItem(li, m) {
     m.backend +
     (m.port ? ' · :' + m.port : '') +
     (m.pid && adopted ? ' · PID ' + m.pid : '') +
+    // Why a tile reads failed or unknown (exit code, missed deadline, failed
+    // port lookup): visible without hovering, which phones can't do.
+    (m.controllable && m.reason ? ' · ' + m.reason : '') +
     (m.aliases && m.aliases.length ? ' · ' + m.aliases.join(', ') : '') +
     // Model footprint — the registry's static est_vram_mb as a
     // meta-line suffix. Truthy-only: a row that declares no footprint (0 or
@@ -174,7 +180,11 @@ function startupBadge(m) {
     const idleNote = m.idle_unload_minutes
       ? 'Loads on first request; unloads after ' + m.idle_unload_minutes + ' min idle'
       : 'Loads on first request; stays up until stopped';
-    if (m.reachable) {
+    const word = onDemandWord(m);
+    if (word) {
+      el.className = 'badge' + (word === 'failed' ? ' danger' : ' warn');
+      el.textContent = 'on-demand · ' + word;
+    } else if (isServing(m)) {
       el.className = 'badge good';
       el.textContent = 'on-demand · loaded';
     } else {
@@ -192,9 +202,9 @@ function startupBadge(m) {
 
 function badge(m) {
   if (!m.controllable) return ' <span class="badge">' + escapeHtml(m.backend) + '</span>';
-  if (m.ownership === 'ours') return ' <span class="badge good">running</span>';
-  if (m.ownership === 'external') return ' <span class="badge warn">adopted</span>';
-  return ' <span class="badge">stopped</span>';
+  const b = servingBadge(m);
+  return ' <span class="badge' + (b.tone ? ' ' + b.tone : '') + '"' +
+    (b.title ? ' title="' + escapeHtml(b.title) + '"' : '') + '>' + b.text + '</span>';
 }
 
 async function handleAction(m, act) {

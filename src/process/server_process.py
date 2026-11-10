@@ -79,6 +79,23 @@ def is_reachable(timeout: float = 1.5) -> bool:
         return False
 
 
+class ListeningSnapshot(dict):
+    """Port → PIDs map that also says whether the lookup worked.
+
+    ``known`` is False when every lookup path failed: the map is then empty
+    because nothing could be read, not because nothing listens. A plain
+    ``dict`` (a test double, an older caller) counts as known; use
+    :func:`snapshot_is_known` to read the flag.
+    """
+
+    known: bool = True
+
+
+def snapshot_is_known(snapshot: dict) -> bool:
+    """False only for a :class:`ListeningSnapshot` whose lookup failed."""
+    return getattr(snapshot, "known", True)
+
+
 def snapshot_listening_pids() -> dict[int, list[int]]:
     """One-shot map of every listening TCP port → PID list.
 
@@ -89,8 +106,9 @@ def snapshot_listening_pids() -> dict[int, list[int]]:
     if psutil refuses (Windows sometimes denies access without admin for
     system-wide queries).
 
-    Returns an empty dict if all paths fail — callers must tolerate
-    that and treat it as "no information; fall back to ``[]``".
+    When all paths fail the result is an empty :class:`ListeningSnapshot`
+    with ``known = False``: callers that act on ownership must read that as
+    "no information", never as "nothing listens".
     """
     try:
         import psutil
@@ -150,7 +168,10 @@ def snapshot_listening_pids() -> dict[int, list[int]]:
                             continue
                         result_fb.setdefault(port, set()).add(pid)
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
-        return {}
+        failed = ListeningSnapshot()
+        failed.known = False
+        logger.warning("⚠️ listening-port snapshot failed on every path; ownership is unknown")
+        return failed
     return {p: sorted(pids) for p, pids in result_fb.items()}
 
 
