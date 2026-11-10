@@ -22,6 +22,7 @@ import sys
 from fastapi.testclient import TestClient  # noqa: E402
 
 from src.process import backend_process as bp  # noqa: E402
+from src.process.outcomes import Outcome  # noqa: E402
 
 # --------------------------------------------------------------------------
 # spawn → file capture, rolling, restart-safety
@@ -49,8 +50,8 @@ def _patch_spawn(monkeypatch, tmp_path, token: str) -> None:
 
 
 def _start_and_wait(model_id: str, timeout: float = 15.0) -> None:
-    ok, msg = bp.start(model_id)
-    assert ok, msg
+    result = bp.start(model_id)
+    assert result.ok, result.message
     proc = bp._state_for(model_id).proc
     assert proc is not None
     proc.wait(timeout=timeout)
@@ -74,9 +75,9 @@ def test_start_reports_launch_failure(monkeypatch, tmp_path):
 
     monkeypatch.setattr(bp.subprocess, "Popen", boom)
 
-    ok, msg = bp.start("xfail")
-    assert not ok
-    assert msg == "failed to launch: no such binary"
+    result = bp.start("xfail")
+    assert result.outcome is Outcome.LAUNCH_FAILED
+    assert result.message == "failed to launch: no such binary"
     assert bp._state_for("xfail").proc is None
 
 
@@ -87,12 +88,12 @@ def test_stop_terminates_a_spawned_backend(monkeypatch, tmp_path):
         lambda m: [sys.executable, "-c", "import time; time.sleep(60)"],
     )
 
-    ok, msg = bp.start("xstop")
-    assert ok, msg
+    result = bp.start("xstop")
+    assert result.outcome is Outcome.STARTED, result.message
     proc = bp._state_for("xstop").proc
     assert proc is not None and proc.poll() is None
 
-    assert bp.stop("xstop") == (True, "stopped")
+    assert bp.stop("xstop").outcome is Outcome.STOPPED
     assert proc.poll() is not None
     assert bp._state_for("xstop").proc is None
 

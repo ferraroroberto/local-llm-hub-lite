@@ -15,9 +15,11 @@ The shape differences (binary location, -m vs --model flag, health
 endpoint) are absorbed in `build_command` and `is_reachable`.
 
 ``start(model_id)`` adopts an already-reachable backend on the model's
-port instead of spawning a duplicate; ``stop(model_id)`` only stops what
-we spawned. Use :func:`force_stop_external` to reclaim a port held by
-someone else.
+port instead of spawning a duplicate, but only once the listener is
+confirmed to be that engine's binary; ``stop(model_id)`` only stops what
+we spawned or inherited. Both return a :class:`~.outcomes.Result` whose
+``outcome`` is the declared value callers branch on. Use
+:func:`force_stop_external` to reclaim a port held by someone else.
 """
 
 from __future__ import annotations
@@ -34,6 +36,7 @@ from typing import TYPE_CHECKING, Dict, Mapping, Optional
 from ..http_client import get_sync_client
 from ..model_registry import Model, enabled_models
 from ..runtime_files import checked_write_path
+from .outcomes import Outcome, Result
 from .server_process import (
     WIN_NEW_GROUP,
     kill_pid,
@@ -158,6 +161,20 @@ def _state_for(model_id: str) -> _BackendState:
     return state
 
 
+def spawned_backends() -> Dict[str, Model]:
+    """Backends this hub spawned itself and still owns, keyed by model id.
+
+    Narrower than :func:`running_backends`: an inherited backend is excluded.
+    Another hub started it, so this hub's shutdown must leave it running.
+    """
+    out: Dict[str, Model] = {}
+    for m in enabled_models():
+        p = _state_for(m.id).proc
+        if m.backend in ("openai", "whisper") and p is not None and p.poll() is None:
+            out[m.id] = m
+    return out
+
+
 def is_running(model_id: str) -> bool:
     state = _state_for(model_id)
     p = state.proc
@@ -237,6 +254,26 @@ def is_reachable(model: Model, timeout: float = 1.5) -> bool:
         return False
 
 
+def holder_confirmed(model: Model, holder_pid: Optional[int]) -> Optional[bool]:
+    """Is the process holding *model*'s port that engine's binary?
+
+    ``True`` confirmed, ``False`` it is another program, ``None`` it could not
+    be established (no PID, the process is gone, or its exe is unreadable). A
+    listener only counts as the backend once this is ``True``.
+    """
+    if holder_pid is None:
+        return None
+    try:
+        import psutil
+
+        exe = psutil.Process(holder_pid).exe()
+    except Exception:  # noqa: BLE001 — NoSuchProcess / AccessDenied / OSError all mean "unreadable"
+        return None
+    if not exe:
+        return None
+    return _looks_like_backend_binary(exe, model)
+
+
 def serving(
     model: Model,
     reachable: Optional[bool],
@@ -276,6 +313,7 @@ def serving(
         probe=reachable,
         port_held=None if listening is None and model.port else bool(holders),
         pid=pid_,
+        holder_confirmed=None if alive or not holders else holder_confirmed(model, pid_),
     )
     result = derive(obs)
     if result.state is ServingState.READY and launch is not None:
@@ -340,25 +378,38 @@ def build_command(model: Model) -> list[str]:
     return cmd
 
 
-def start(model_id: str) -> tuple[bool, str]:
+def start(model_id: str) -> Result:
     model = resolve_model_by_id(model_id)
     if model is None:
-        return False, f"model {model_id!r} not enabled on this host"
+        return Result(Outcome.UNKNOWN_MODEL, model_id)
     if is_running(model_id):
-        return False, "already running"
+        return Result(Outcome.ALREADY_RUNNING)
 
-    # Adopt an external instance already listening on this model's port.
+    # Adopt an external instance already listening on this model's port, but
+    # only once it is confirmed to be this engine's binary: a stranger that
+    # answers on the port is not a backend we may route to as ours.
     if is_reachable(model, timeout=0.4):
         ext = external_pid(model_id)
-        suffix = f" (PID {ext})" if ext else ""
-        return True, f"adopted external instance{suffix}"
+        if holder_confirmed(model, ext) is not True:
+            who = f"PID {ext}" if ext else "an unidentified process"
+            logger.warning(
+                "⚠️ %s: :%s answers but its holder (%s) is not confirmed as the model's server; not adopting",
+                model_id, model.port, who,
+            )
+            return Result(
+                Outcome.UNCONFIRMED_LISTENER,
+                f"port {model.port} answers but its holder ({who}) is not confirmed "
+                f"as this model's server binary",
+                ext,
+            )
+        return Result(Outcome.ADOPTED, pid=ext)
 
     state = _state_for(model_id)
 
     try:
         cmd = build_command(model)
     except Exception as e:
-        return False, str(e)
+        return Result(Outcome.NOT_LAUNCHABLE, str(e))
 
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
@@ -383,7 +434,7 @@ def start(model_id: str) -> tuple[bool, str]:
             creationflags=WIN_NEW_GROUP,
         )
     except Exception as e:
-        return False, f"failed to launch: {e}"
+        return Result(Outcome.LAUNCH_FAILED, f"failed to launch: {e}")
     finally:
         # The child duplicated the handle at spawn; the hub no longer needs
         # its own copy (and keeping it open would pin the file). Closing it is
@@ -392,10 +443,10 @@ def start(model_id: str) -> tuple[bool, str]:
 
     state.proc = proc
     state.launch = LaunchRecord(spawned_at=time.monotonic())
-    return True, f"started (pid={proc.pid})"
+    return Result(Outcome.STARTED, pid=proc.pid)
 
 
-def stop(model_id: str) -> tuple[bool, str]:
+def stop(model_id: str) -> Result:
     state = _state_for(model_id)
     p = state.proc
     # A deliberate stop (even of an already-dead process) ends the launch: what
@@ -408,11 +459,11 @@ def stop(model_id: str) -> tuple[bool, str]:
             pid_ = state.inherited_pid
             state.forget_inherited()
             ok, msg = kill_pid(int(pid_))
-            return ok, msg
-        return False, "not running"
+            return Result(Outcome.STOPPED if ok else Outcome.STOP_FAILED, msg, int(pid_))
+        return Result(Outcome.NOT_RUNNING)
     if p.poll() is not None:
         state.proc = None
-        return False, "not running"
+        return Result(Outcome.NOT_RUNNING)
     try:
         if sys.platform == "win32":
             try:
@@ -426,9 +477,9 @@ def stop(model_id: str) -> tuple[bool, str]:
             p.kill()
             p.wait(timeout=5)
     except Exception as e:
-        return False, f"error stopping: {e}"
+        return Result(Outcome.STOP_FAILED, f"error stopping: {e}")
     state.proc = None
-    return True, "stopped"
+    return Result(Outcome.STOPPED)
 
 
 def inherit_running_backends() -> int:

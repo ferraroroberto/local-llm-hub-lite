@@ -14,6 +14,7 @@ import pytest
 from src import host_profile, model_registry, on_demand
 from src.model_registry import Model
 from src.process import backend_process as bp
+from src.process.outcomes import Outcome, Result
 
 
 def _model(**kw) -> Model:
@@ -73,7 +74,7 @@ def test_ensure_ready_spawns_and_waits_for_readiness(monkeypatch):
     started: list[str] = []
     monkeypatch.setattr(bp, "is_reachable", _reachable)
     monkeypatch.setattr(bp, "running_backends", dict)
-    monkeypatch.setattr(bp, "start", lambda mid: (started.append(mid), (True, "started"))[1])
+    monkeypatch.setattr(bp, "start", lambda mid: (started.append(mid), Result(Outcome.STARTED, pid=1))[1])
 
     on_demand.ensure_ready(_model(), deadline_s=5.0)
     assert started == ["gemma"]
@@ -84,7 +85,7 @@ def test_ensure_ready_raises_on_deadline(monkeypatch):
     monkeypatch.setattr(host_profile, "resolve", lambda: _Profile(None))
     monkeypatch.setattr(bp, "is_reachable", lambda m, timeout=1.5: False)
     monkeypatch.setattr(bp, "running_backends", dict)
-    monkeypatch.setattr(bp, "start", lambda mid: (True, "started"))
+    monkeypatch.setattr(bp, "start", lambda mid: Result(Outcome.STARTED, pid=1))
 
     with pytest.raises(on_demand.OnDemandNotReady):
         on_demand.ensure_ready(_model(), deadline_s=0.05)
@@ -94,7 +95,7 @@ def test_ensure_ready_raises_on_start_failure(monkeypatch):
     monkeypatch.setattr(host_profile, "resolve", lambda: _Profile(None))
     monkeypatch.setattr(bp, "is_reachable", lambda m, timeout=1.5: False)
     monkeypatch.setattr(bp, "running_backends", dict)
-    monkeypatch.setattr(bp, "start", lambda mid: (False, "GGUF not found"))
+    monkeypatch.setattr(bp, "start", lambda mid: Result(Outcome.NOT_LAUNCHABLE, "GGUF not found"))
 
     with pytest.raises(on_demand.OnDemandNotReady, match="GGUF not found"):
         on_demand.ensure_ready(_model(), deadline_s=0.05)
@@ -139,7 +140,7 @@ def _wire_sweep(monkeypatch, models, running=True):
     monkeypatch.setattr(model_registry, "enabled_models", lambda host=None: models)
     monkeypatch.setattr(bp, "is_running", lambda mid: running)
     stopped: list[str] = []
-    monkeypatch.setattr(bp, "stop", lambda mid: (stopped.append(mid), (True, "stopped"))[1])
+    monkeypatch.setattr(bp, "stop", lambda mid: (stopped.append(mid), Result(Outcome.STOPPED))[1])
     return stopped
 
 
@@ -243,7 +244,7 @@ def test_ensure_ready_fails_fast_when_the_child_exits_during_load(monkeypatch):
     def _start(mid):
         st.proc = _Dead()
         st.launch = LaunchRecord(spawned_at=time.monotonic())
-        return True, "started"
+        return Result(Outcome.STARTED, pid=1)
 
     monkeypatch.setattr(on_demand, "READY_POLL_S", 0.01)
     monkeypatch.setattr(host_profile, "resolve", lambda: _Profile(None))

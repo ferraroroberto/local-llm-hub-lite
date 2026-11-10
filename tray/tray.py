@@ -413,10 +413,10 @@ class TrayApp:
         if _tcp_reachable("127.0.0.1", model.port, 0.3):
             # Try a graceful Stop first; fall back to Force stop if the
             # hub doesn't own it (e.g. a leftover from a previous run).
-            ok, msg = self._admin_request("POST", f"/admin/api/models/{model_id}/stop")
+            ok, msg, outcome = self._admin_call("POST", f"/admin/api/models/{model_id}/stop")
             if ok:
                 self._notify(model_id, "■ Stopped")
-            elif "not running" in (msg or "").lower():
+            elif outcome == "not_running":
                 ok2, msg2 = self._admin_request(
                     "POST", f"/admin/api/models/{model_id}/force-stop"
                 )
@@ -428,10 +428,10 @@ class TrayApp:
         self._update_menu()
 
     def _start_model_worker(self, model_id: str) -> None:
-        ok, msg = self._admin_request("POST", f"/admin/api/models/{model_id}/start")
+        ok, msg, outcome = self._admin_call("POST", f"/admin/api/models/{model_id}/start")
         if not ok:
-            # "already running" is a 409 — surface as info, not error.
-            if "already running" in (msg or "").lower():
+            # ``already_running`` is a 409 — surface as info, not error.
+            if outcome == "already_running":
                 self._notify(model_id, f"✅ {msg}")
             else:
                 self._notify(model_id, f"⚠️ {msg}")
@@ -462,18 +462,28 @@ class TrayApp:
         bypasses on loopback so we don't need to attach the token here.
         Returns ``(ok, detail)``; ``ok`` is True on 2xx, False on any error.
         """
+        ok, detail, _outcome = self._admin_call(method, path)
+        return ok, detail
+
+    def _admin_call(self, method: str, path: str) -> Tuple[bool, str, Optional[str]]:
+        """Like :meth:`_admin_request`, plus the response's declared ``outcome``
+        (``None`` when the route does not declare one, or the hub was unreachable).
+        """
         url = self.hub.base_url() + path
         try:
             r = httpx.request(method, url, timeout=15.0)
         except httpx.HTTPError as exc:
-            return False, f"hub unreachable: {exc}"
+            return False, f"hub unreachable: {exc}", None
         try:
             body = r.json() if r.content else {}
         except Exception:  # noqa: BLE001
             body = {}
+        if not isinstance(body, dict):
+            body = {}
+        outcome = body.get("outcome")
         if r.is_success:
-            return True, str(body.get("detail") or "ok")
-        return False, str(body.get("detail") or f"HTTP {r.status_code}")
+            return True, str(body.get("detail") or "ok"), outcome
+        return False, str(body.get("detail") or f"HTTP {r.status_code}"), outcome
 
     # ---------------------------------------------------- copy / open helpers
 

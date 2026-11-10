@@ -10,6 +10,7 @@ import psutil
 import pytest
 
 from src.process import backend_process as bp
+from src.process.outcomes import Outcome
 
 
 @pytest.fixture
@@ -74,7 +75,7 @@ def test_stop_never_kills_a_reused_pid(sleeper, monkeypatch):
     killed: list[int] = []
     monkeypatch.setattr(bp, "kill_pid", lambda pid: (killed.append(pid), (True, "killed"))[1])
 
-    assert bp.stop("m") == (False, "not running")
+    assert bp.stop("m").outcome is Outcome.NOT_RUNNING
     assert killed == []
     assert bp.is_running("m") is False
 

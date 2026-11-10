@@ -20,6 +20,7 @@ import time
 
 from .hub_log import HUB_LOG
 from .hub_observability import OBS
+from .process.outcomes import Outcome
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ async def stop_background_tasks() -> None:
 
 
 async def stop_backend_children() -> None:
-    """Tear down every model subprocess the hub spawned.
+    """Tear down every model subprocess this hub spawned.
 
     The hub owns its backend children (since the tray drives them via
     the admin API). Without this, a clean ``CTRL+C`` would leave
@@ -55,6 +56,10 @@ async def stop_backend_children() -> None:
     respawned hub re-adopts them (``inherit_running_backends``). The
     restart endpoint sets ``backend_process.restart_pending()`` before
     signalling shutdown; we honour it by skipping teardown.
+
+    A backend this hub only inherited or adopted (another hub, a launcher or
+    the user started it) is never stopped here: shutdown ends what the hub
+    started, nothing else.
     """
     from . import http_client
     from .process import backend_process as bp
@@ -73,10 +78,10 @@ async def stop_backend_children() -> None:
         )
         return
 
-    for model_id in list(bp.running_backends().keys()):
+    for model_id in list(bp.spawned_backends().keys()):
         try:
-            ok, msg = bp.stop(model_id)
-            logger.info("shutdown: stop %s -> %s %s", model_id, ok, msg)
+            result = bp.stop(model_id)
+            logger.info("shutdown: stop %s -> %s %s", model_id, result.outcome.value, result.message)
         except Exception as exc:  # noqa: BLE001
             logger.warning("shutdown: stop %s raised: %s", model_id, exc)
 
@@ -122,14 +127,14 @@ async def _autostart_configured_backends() -> None:
     logger.info("autostart: configured backend set: %s", model_ids)
     for model_id in model_ids:
         try:
-            ok, msg = await asyncio.to_thread(bp.start, model_id)
+            result = await asyncio.to_thread(bp.start, model_id)
         except Exception as exc:  # noqa: BLE001
             logger.warning("autostart: %s raised: %s", model_id, exc)
             continue
-        if ok or "already running" in msg.lower():
-            logger.info("autostart: %s -> %s", model_id, msg)
+        if result.ok or result.outcome is Outcome.ALREADY_RUNNING:
+            logger.info("autostart: %s -> %s", model_id, result.message)
         else:
-            logger.warning("autostart: %s -> %s", model_id, msg)
+            logger.warning("autostart: %s -> %s", model_id, result.message)
 
 
 async def _on_demand_idle_loop() -> None:

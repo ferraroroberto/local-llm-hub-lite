@@ -13,12 +13,13 @@ States:
 * ``loading`` — ours, spawned (or inherited) and not yet answering, still
   inside the load deadline.
 * ``ready`` — ours and answering.
-* ``adopted`` — someone else's process holds the port (the hub routes to it
-  but did not start it).
+* ``adopted`` — someone else's process holds the port, confirmed to be this
+  engine's binary (the hub routes to it but did not start it).
 * ``failed`` — ours died on its own, never answered within the deadline, or
   stopped answering after it was ready; ``reason`` says which.
 * ``unknown`` — a fact needed to tell the states apart could not be gathered
-  (the listening-port snapshot or the readiness probe), or the facts
+  (the listening-port snapshot, the readiness probe or the port holder's
+  identity), the port holder is not this engine's binary, or the facts
   contradict each other.
 
 :func:`derive` is pure: it reads one frozen :class:`Observation` and returns
@@ -73,9 +74,10 @@ class LaunchRecord:
 class Observation:
     """What a reader saw for one model at one moment.
 
-    ``probe`` is ``None`` when the readiness probe could not be run; and
-    ``port_held`` is ``None`` when the listening-port snapshot failed. Both
-    are unknown, never a negative.
+    ``probe`` is ``None`` when the readiness probe could not be run;
+    ``port_held`` is ``None`` when the listening-port snapshot failed; and
+    ``holder_confirmed`` is ``None`` when the holder's identity could not be
+    read. Each is unknown, never a negative.
     """
 
     alive: bool                         # our Popen, or an adopted PID whose identity still matches
@@ -86,6 +88,10 @@ class Observation:
     probe: Optional[bool]               # the backend answered its probe; None = not run
     port_held: Optional[bool]           # someone listens on the port; None = snapshot failed
     pid: Optional[int] = None           # ours while alive, else the port holder's
+    # The port holder is this engine's binary: True confirmed, False another
+    # program, None could not be established. Unset is unconfirmed, so a
+    # reader that skips the check cannot produce ``adopted``.
+    holder_confirmed: Optional[bool] = None
 
 
 @dataclass(frozen=True)
@@ -128,18 +134,26 @@ def _derive_alive(obs: Observation, deadline_s: float) -> Serving:
     return Serving(ServingState.LOADING, **ours)
 
 
+def _derive_foreign_holder(obs: Observation) -> Serving:
+    """Someone else holds the port: ``adopted`` only once it is confirmed to be the backend."""
+    if obs.holder_confirmed:
+        return Serving(ServingState.ADOPTED, ownership=OWNERSHIP_EXTERNAL, pid=obs.pid)
+    if obs.holder_confirmed is False:
+        return Serving(ServingState.UNKNOWN, "port holder is not this model's server binary")
+    return Serving(ServingState.UNKNOWN, "port holder's identity could not be confirmed")
+
+
 def derive(obs: Observation, deadline_s: float = LOAD_DEADLINE_S) -> Serving:
     """The one derivation of a model's serving state from what a reader saw."""
     if obs.alive:
         return _derive_alive(obs, deadline_s)
     if obs.port_held:
-        return Serving(ServingState.ADOPTED, ownership=OWNERSHIP_EXTERNAL, pid=obs.pid)
+        return _derive_foreign_holder(obs)
     # Not alive, but the hub never stopped it: it died on its own.
     if obs.launched:
         return Serving(ServingState.FAILED, _exited(obs.exit_code, obs.was_ready))
     if obs.port_held is None:
-        if obs.probe:
-            return Serving(ServingState.ADOPTED, ownership=OWNERSHIP_EXTERNAL)
+        # No holder to identify, so even an answering listener is unconfirmed.
         return Serving(ServingState.UNKNOWN, "listening-port snapshot failed")
     if obs.probe:
         return Serving(ServingState.UNKNOWN, "answers its probe but no process holds the port")

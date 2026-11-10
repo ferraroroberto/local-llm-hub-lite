@@ -16,6 +16,7 @@ import pytest
 
 from src import server_lifecycle
 from src.process import backend_process as bp
+from src.process.outcomes import Outcome, Result
 
 
 def _run(coro):
@@ -59,8 +60,8 @@ def _reset_restart_flag():
 def _patch_backends(monkeypatch):
     """Pretend two backends are running and record any stop() calls."""
     stopped: list[str] = []
-    monkeypatch.setattr(bp, "running_backends", lambda: {"qwen": object(), "whisper": object()})
-    monkeypatch.setattr(bp, "stop", lambda mid: (stopped.append(mid), (True, "stopped"))[1])
+    monkeypatch.setattr(bp, "spawned_backends", lambda: {"qwen": object(), "whisper": object()})
+    monkeypatch.setattr(bp, "stop", lambda mid: (stopped.append(mid), Result(Outcome.STOPPED))[1])
     return stopped
 
 
