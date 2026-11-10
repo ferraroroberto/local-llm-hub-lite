@@ -34,7 +34,12 @@ from typing import TYPE_CHECKING, Dict, Mapping, Optional
 from ..http_client import get_sync_client
 from ..model_registry import Model, enabled_models
 from ..runtime_files import checked_write_path
-from .server_process import WIN_NEW_GROUP, kill_pid, resolve_external_pid, snapshot_is_known
+from .server_process import (
+    WIN_NEW_GROUP,
+    kill_pid,
+    resolve_external_pid,
+    snapshot_is_known,
+)
 from .serving_state import LaunchRecord, Observation, Serving, ServingState, derive
 
 if TYPE_CHECKING:
