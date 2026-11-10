@@ -15,6 +15,7 @@ import asyncio
 from src import model_registry
 from src import server_lifecycle as sl
 from src.process import backend_process
+from src.process.outcomes import Outcome, Result
 
 
 def _stub_real_ops(monkeypatch):
@@ -64,7 +65,7 @@ def test_autostart_starts_the_desired_set(monkeypatch):
     """Autostart drives exactly the registry-derived desired set."""
     started: list[str] = []
     monkeypatch.setattr(model_registry, "desired_model_ids", lambda *a, **kw: ["qwen", "whisper"])
-    monkeypatch.setattr(backend_process, "start", lambda mid: (started.append(mid), (True, "started"))[1])
+    monkeypatch.setattr(backend_process, "start", lambda mid: (started.append(mid), Result(Outcome.STARTED, pid=1))[1])
 
     asyncio.run(sl._autostart_configured_backends())
     assert started == ["qwen", "whisper"]

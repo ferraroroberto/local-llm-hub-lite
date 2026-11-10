@@ -77,6 +77,7 @@ def test_bound_port_probes_and_reports_reachable(monkeypatch):
     )
     monkeypatch.setattr(bp, "is_reachable", lambda m, timeout=1.5: True)
     monkeypatch.setattr(bp, "is_running", lambda mid: False)
+    monkeypatch.setattr(bp, "holder_confirmed", lambda m, pid: True)
 
     body = _admin_client().get("/api/models").json()
     qwen = _row(body, "qwen35_4b")
@@ -194,6 +195,7 @@ def test_ready_and_adopted_rows_carry_state(monkeypatch):
     monkeypatch.setattr(bp, "is_reachable", lambda m, timeout=1.5: True)
     monkeypatch.setattr(bp, "is_running", lambda mid: mid == "qwen35_4b")
     monkeypatch.setattr(bp, "pid", lambda mid: 4242)
+    monkeypatch.setattr(bp, "holder_confirmed", lambda m, pid: True)
 
     body = _admin_client().get("/api/models").json()
     assert _row(body, "qwen35_4b")["state"] == "ready"

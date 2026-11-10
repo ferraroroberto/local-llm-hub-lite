@@ -12,6 +12,7 @@ import pytest
 
 from src.process import backend_process as bp
 from src.process import server_process
+from src.process.outcomes import Outcome
 from src.process.serving_state import LaunchRecord, ServingState
 
 S = ServingState
@@ -68,7 +69,7 @@ def test_a_process_that_exits_while_loading_reads_failed_with_its_exit_code():
 def test_a_deliberate_stop_reads_stopped_not_failed():
     # state-machine-proof: serving
     _launch(FakePopen(returncode=3))
-    assert bp.stop(MODEL_ID) == (False, "not running")
+    assert bp.stop(MODEL_ID).outcome is Outcome.NOT_RUNNING
     got = bp.serving(_model(), False, {}, now=101.0)
     assert got.state is S.STOPPED
 
@@ -101,7 +102,8 @@ def test_a_failed_port_lookup_is_unknown_not_stopped():
     assert bp.serving(_model(), False, {}).state is S.STOPPED
 
 
-def test_a_foreign_listener_reads_adopted_with_its_pid():
+def test_a_confirmed_foreign_listener_reads_adopted_with_its_pid(monkeypatch):
+    monkeypatch.setattr(bp, "holder_confirmed", lambda model, pid: True)
     got = bp.serving(_model(), True, {_model().port: [777]})
     assert got.state is S.ADOPTED
     assert (got.ownership, got.pid) == ("external", 777)
@@ -115,10 +117,10 @@ def test_start_writes_a_launch_record(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(bp, "is_reachable", lambda m, timeout=1.5: False)
     monkeypatch.setattr(subprocess, "Popen", lambda *a, **kw: FakePopen())
 
-    assert bp.start(MODEL_ID)[0] is True
+    assert bp.start(MODEL_ID).outcome is Outcome.STARTED
     launch = bp._state_for(MODEL_ID).launch
     assert launch is not None and not launch.ready
-    assert bp.stop(MODEL_ID) == (True, "stopped")
+    assert bp.stop(MODEL_ID).outcome is Outcome.STOPPED
     assert bp._state_for(MODEL_ID).launch is None
 
 

@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 
 from src.http_client import get_async_client
 from src.model_registry import (
@@ -21,6 +22,7 @@ from src.model_registry import (
     resolve as resolve_model,
 )
 from src.process import backend_process as bp
+from src.process.outcomes import Result
 from src.process.server_process import (
     OWNERSHIP_NONE,
     snapshot_is_known,
@@ -38,6 +40,18 @@ def _add_startup_fields(row: Dict[str, Any], m: Model) -> None:
     row["startup"] = m.startup
     row["idle_unload_minutes"] = m.idle_unload_minutes
     row["est_vram_mb"] = m.est_vram_mb
+
+
+def _lifecycle_response(result: Result) -> JSONResponse:
+    """Shape a start/stop ``Result``: 200 on success, 409 otherwise.
+
+    ``outcome`` is the declared value clients branch on; ``detail`` is the
+    message derived from it, for display only.
+    """
+    return JSONResponse(
+        status_code=200 if result.ok else 409,
+        content={"ok": result.ok, "detail": result.message, "outcome": result.outcome.value},
+    )
 
 
 def _require_model(model_id: str) -> Model:
@@ -123,7 +137,7 @@ async def list_models_for_admin() -> Dict[str, Any]:
 
 
 @router.post("/api/models/{model_id}/start")
-async def model_start(model_id: str) -> Dict[str, Any]:
+async def model_start(model_id: str) -> JSONResponse:
     target = _require_model(model_id)
     if target.virtual:
         raise HTTPException(
@@ -135,20 +149,14 @@ async def model_start(model_id: str) -> Dict[str, Any]:
             status_code=400,
             detail=f"backend {target.backend!r} has no managed process",
         )
-    ok, msg = bp.start(model_id)
-    if not ok:
-        # "already running" is OK in the SPA — surface as 409 so the UI can ignore.
-        raise HTTPException(status_code=409, detail=msg)
-    return {"ok": True, "detail": msg}
+    # A refusal (``already_running`` included) is a 409 carrying its outcome.
+    return _lifecycle_response(bp.start(model_id))
 
 
 @router.post("/api/models/{model_id}/stop")
-async def model_stop(model_id: str) -> Dict[str, Any]:
+async def model_stop(model_id: str) -> JSONResponse:
     _require_model(model_id)
-    ok, msg = bp.stop(model_id)
-    if not ok:
-        raise HTTPException(status_code=409, detail=msg)
-    return {"ok": True, "detail": msg}
+    return _lifecycle_response(bp.stop(model_id))
 
 
 @router.post("/api/models/{model_id}/force-stop")

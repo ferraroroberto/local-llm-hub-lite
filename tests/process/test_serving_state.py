@@ -27,6 +27,7 @@ def obs(**kw: Any) -> Observation:
     base: dict[str, Any] = dict(
         alive=False, exit_code=None, launched=False, was_ready=False,
         load_age_s=None, probe=False, port_held=False, pid=None,
+        holder_confirmed=None,
     )
     base.update(kw)
     return Observation(**base)
@@ -51,10 +52,10 @@ ROWS = [
     ("was ready, process alive, no longer answers",
      obs(alive=True, launched=True, was_ready=True, load_age_s=60.0, pid=42),
      S.FAILED, "ours", "stopped answering"),
-    ("someone else holds the port",
-     obs(port_held=True, probe=True, pid=111), S.ADOPTED, "external", None),
-    ("someone else holds the port but does not answer",
-     obs(port_held=True, pid=111), S.ADOPTED, "external", None),
+    ("a confirmed backend binary holds the port",
+     obs(port_held=True, probe=True, pid=111, holder_confirmed=True), S.ADOPTED, "external", None),
+    ("a confirmed backend binary holds the port but does not answer",
+     obs(port_held=True, pid=111, holder_confirmed=True), S.ADOPTED, "external", None),
     ("process exited while loading",
      obs(launched=True, exit_code=3, load_age_s=1.0),
      S.FAILED, "none", "process exited during load (exit code 3)"),
@@ -64,7 +65,7 @@ ROWS = [
     ("adopted process died, exit code never seen",
      obs(launched=True, load_age_s=70.0), S.FAILED, "none", "process exited during load"),
     ("our process died and a stranger took the port",
-     obs(launched=True, exit_code=1, port_held=True, probe=True, pid=111),
+     obs(launched=True, exit_code=1, port_held=True, probe=True, pid=111, holder_confirmed=True),
      S.ADOPTED, "external", None),
     # unknown: a fact could not be gathered, or the facts contradict
     ("port snapshot failed, nothing answers",
@@ -72,7 +73,16 @@ ROWS = [
     ("port snapshot failed, probe not run",
      obs(port_held=None, probe=None), S.UNKNOWN, "none", "listening-port snapshot failed"),
     ("port snapshot failed, something answers",
-     obs(port_held=None, probe=True), S.ADOPTED, "external", None),
+     obs(port_held=None, probe=True), S.UNKNOWN, "none", "listening-port snapshot failed"),
+    ("an unrelated program holds the port and answers",
+     obs(port_held=True, probe=True, pid=111, holder_confirmed=False),
+     S.UNKNOWN, "none", "not this model's server binary"),
+    ("an unrelated program holds the port",
+     obs(port_held=True, pid=111, holder_confirmed=False),
+     S.UNKNOWN, "none", "not this model's server binary"),
+    ("the port holder's identity could not be read",
+     obs(port_held=True, probe=True, pid=111, holder_confirmed=None),
+     S.UNKNOWN, "none", "identity could not be confirmed"),
     ("process alive, probe could not be run",
      obs(alive=True, launched=True, probe=None, load_age_s=3.0, pid=42),
      S.UNKNOWN, "ours", "readiness probe could not be run"),
@@ -124,11 +134,13 @@ def test_derive_refuses_every_illegal_combination():
         (None, 1.0, 999.0),       # load_age_s
         (None, False, True),      # probe
         (None, False, True),      # port_held
+        (None, False, True),      # holder_confirmed
     )
     seen = set()
-    for alive, exit_code, launched, was_ready, age, probe, held in space:
+    for alive, exit_code, launched, was_ready, age, probe, held, confirmed in space:
         o = obs(alive=alive, exit_code=exit_code, launched=launched,
-                was_ready=was_ready, load_age_s=age, probe=probe, port_held=held)
+                was_ready=was_ready, load_age_s=age, probe=probe, port_held=held,
+                holder_confirmed=confirmed)
         got = derive(o)
         seen.add(got.state)
         if got.state is S.READY:
@@ -138,7 +150,7 @@ def test_derive_refuses_every_illegal_combination():
         if got.state is S.STOPPED:
             assert not alive and not launched and held is False and probe is not True, o
         if got.state is S.ADOPTED:
-            assert not alive, o
+            assert not alive and held and confirmed is True, o
         if got.state is S.FAILED and not alive:
             assert launched and not held, o
         # failed and unknown always say why; no other state carries a reason.

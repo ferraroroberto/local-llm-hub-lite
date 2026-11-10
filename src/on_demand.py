@@ -31,6 +31,7 @@ import time
 from typing import Any, Dict, Optional
 
 from .model_registry import STARTUP_ON_DEMAND, Model
+from .process.outcomes import Outcome
 from .process.serving_state import LOAD_DEADLINE_S, ServingState
 
 logger = logging.getLogger(__name__)
@@ -203,13 +204,15 @@ def ensure_ready(model: Model, deadline_s: float = READY_DEADLINE_S) -> None:
         if bp.is_reachable(model, timeout=0.4):
             return
         _warn_on_vram_overcommit(model)
-        ok, msg = bp.start(model.id)
-        # "already running" means a process exists but isn't answering yet
+        started_result = bp.start(model.id)
+        # ``already_running`` means a process exists but isn't answering yet
         # (mid-load) — that's exactly what the readiness poll below absorbs.
-        if not ok and "already running" not in msg.lower():
-            raise OnDemandNotReady(f"on-demand start of {model.id!r} failed: {msg}")
+        if not started_result.ok and started_result.outcome is not Outcome.ALREADY_RUNNING:
+            raise OnDemandNotReady(
+                f"on-demand start of {model.id!r} failed: {started_result.message}"
+            )
         logger.info("⏳ on-demand: loading %s (%s) — request waits for readiness",
-                    model.id, msg)
+                    model.id, started_result.message)
         started = time.monotonic()
         while time.monotonic() - started < deadline_s:
             if bp.is_reachable(model, timeout=1.0):
@@ -274,12 +277,12 @@ def idle_unload_pass(now: Optional[float] = None) -> Dict[str, Any]:
         if idle_s < window_s:
             results[m.id] = "warm"
             continue
-        ok, msg = bp.stop(m.id)
+        stopped = bp.stop(m.id)
         logger.info(
             "💤 on-demand: unloaded %s after %.0f min idle (window %s min) -> %s %s",
-            m.id, idle_s / 60.0, m.idle_unload_minutes, ok, msg,
+            m.id, idle_s / 60.0, m.idle_unload_minutes, stopped.ok, stopped.message,
         )
-        results[m.id] = "unloaded" if ok else f"stop failed: {msg}"
+        results[m.id] = "unloaded" if stopped.ok else f"stop failed: {stopped.message}"
     return results
 
 
