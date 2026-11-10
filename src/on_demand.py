@@ -31,13 +31,15 @@ import time
 from typing import Any, Dict, Optional
 
 from .model_registry import STARTUP_ON_DEMAND, Model
+from .process.serving_state import LOAD_DEADLINE_S, ServingState
 
 logger = logging.getLogger(__name__)
 
 # How long the first request waits for a cold backend to come up. Generous
 # on purpose: an on-demand llama-server row can be reading several GB of
-# GGUF weights from disk before it answers /health.
-READY_DEADLINE_S = 180.0
+# GGUF weights from disk before it answers /health. It is the serving
+# state's load budget, so a tile and a request agree on when a load failed.
+READY_DEADLINE_S = LOAD_DEADLINE_S
 READY_POLL_S = 1.0
 # Idle watchdog cadence — coarse on purpose; unload windows are minutes.
 IDLE_CHECK_INTERVAL_S = 60.0
@@ -214,6 +216,15 @@ def ensure_ready(model: Model, deadline_s: float = READY_DEADLINE_S) -> None:
                 logger.info("✅ on-demand: %s ready after %.1fs",
                             model.id, time.monotonic() - started)
                 return
+            # Only the process verdict matters here, so the port snapshot is
+            # not gathered: a child that exited reads ``failed`` with its exit
+            # code, and waiting out the deadline would only repeat that.
+            verdict = bp.serving(model, False, None)
+            if verdict.state is ServingState.FAILED:
+                raise OnDemandNotReady(
+                    f"on-demand backend {model.id!r} failed to load: {verdict.reason} "
+                    f"— check data/logs/backend-{model.id}.log"
+                )
             time.sleep(READY_POLL_S)
         raise OnDemandNotReady(
             f"on-demand backend {model.id!r} did not become ready within "

@@ -124,3 +124,32 @@ def test_audio_health_degraded_when_down(monkeypatch):
     body = resp.json()
     assert body["status"] == "degraded"
     assert any(not b["reachable"] for b in body["backends"])
+
+
+def test_audio_health_names_a_loading_backend(monkeypatch):
+    """A whisper process that is up but not answering reads ``loading``, not just down."""
+    import time
+
+    from src.process import backend_process as bp
+    from src.process.serving_state import LaunchRecord
+
+    class _Live:
+        pid = 4242
+
+        def poll(self):
+            return None
+
+    whisper = next(m for m in bp.enabled_models() if m.backend == "whisper")
+    st = bp._BackendState()
+    st.proc = _Live()
+    st.launch = LaunchRecord(spawned_at=time.monotonic())
+    monkeypatch.setitem(bp._STATES, whisper.id, st)
+    monkeypatch.setattr(bp, "is_reachable", lambda m, timeout=1.0: False)
+
+    resp = TestClient(server_mod.app).get("/v1/audio/health")
+
+    assert resp.status_code == 503, resp.text
+    backend = resp.json()["backends"][0]
+    assert backend["reachable"] is False
+    assert backend["state"] == "loading"
+    assert backend["reason"] is None

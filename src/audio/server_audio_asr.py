@@ -266,8 +266,10 @@ def audio_health() -> Response:
     """Probe-only liveness of the audio backend — lets a consumer preflight
     instead of discovering an outage one failed transcription at a time.
 
-    Reports the enabled whisper backend with its port and whether it is
-    currently reachable (a cheap GET to the backend, never a transcription).
+    Reports the enabled whisper backend with its port, whether it is
+    currently reachable (a cheap GET to the backend, never a transcription)
+    and its serving ``state`` / ``reason`` (``loading`` and ``failed`` tell a
+    consumer why a down backend is down).
     ``status`` is ``ok`` when it answers, ``degraded`` when it is down, and
     ``none`` when no whisper backend is enabled on this host. A degraded/none
     result returns HTTP 503 so a consumer can branch on the status code
@@ -278,16 +280,22 @@ def audio_health() -> Response:
     """
     import json as _json
 
-    from ..process.backend_process import is_reachable
+    from ..process.backend_process import is_reachable, serving
+    from ..process.server_process import snapshot_is_known, snapshot_listening_pids
 
     backends = []
     target = _local_whisper()
     if target is not None:
+        reachable = is_reachable(target, timeout=1.0)
+        listening = snapshot_listening_pids()
+        verdict = serving(target, reachable, listening if snapshot_is_known(listening) else None)
         backends.append({
             "id": target.id,
             "backend": target.backend,
             "port": target.port,
-            "reachable": is_reachable(target, timeout=1.0),
+            "reachable": reachable,
+            "state": verdict.state.value,
+            "reason": verdict.reason,
         })
 
     if not backends:

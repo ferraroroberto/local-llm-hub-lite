@@ -171,6 +171,15 @@ baseline    = ".conventions-ratchet-baseline.json"
 rules       = ["no-window", "logging-not-print", "no-drive-path", "password-input-vendored", "login-lockout", "subprocess-timeout", "state-literal", "state-set-repeat", "state-write"]
 print_paths = ["src/", "app_web/", "tray/"]
 
+# [[state_machines]] -- the one module that owns a declared lifecycle; the state rules
+# stop reporting it and keep reporting any other module that re-derives it.
+# Doc: docs/serving-state.md.
+[[state_machines]]
+name   = "serving"
+module = "src/process/serving_state.py"
+type   = "ServingState"
+derive = "derive"
+
 [e2e]
 static_pytest_target = "tests/e2e/test_smoke.py"
 static_browsers       = ["chromium"]
