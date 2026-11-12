@@ -1,6 +1,6 @@
 """Response header contract — X-Trace-Id, request-id, and Anthropic parity.
 
-Many small clients — voice-transcriber, ad-hoc curl scripts — mint a UUID4
+Many small clients — transcription apps, ad-hoc curl scripts — mint a UUID4
 and shove it in an ``X-Trace-Id`` header. This middleware bridges:
 
 - **Inbound:** if a request carries ``X-Trace-Id``, derive a deterministic

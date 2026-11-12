@@ -7,9 +7,8 @@ construction + route registration.
 
 ``server.py`` wires these on with ``app.add_event_handler(...)`` (the
 non-decorator form of ``@app.on_event``) rather than decorating them here,
-so the functions stay plain, directly-callable, and directly-testable —
-``tests/test_restart_keepalive.py`` calls ``stop_backend_children()``
-straight, with no FastAPI app in the loop.
+so the functions stay plain, directly-callable, and directly-testable with
+no FastAPI app in the loop.
 """
 
 from __future__ import annotations
@@ -52,11 +51,6 @@ async def stop_backend_children() -> None:
     orphan ``llama-server`` / ``whisper-server`` processes holding
     their ports until the user logged out.
 
-    Exception: on an admin **restart** the children must survive so the
-    respawned hub re-adopts them (``inherit_running_backends``). The
-    restart endpoint sets ``backend_process.restart_pending()`` before
-    signalling shutdown; we honour it by skipping teardown.
-
     A backend this hub only inherited or adopted (another hub, a launcher or
     the user started it) is never stopped here: shutdown ends what the hub
     started, nothing else.
@@ -69,14 +63,6 @@ async def stop_backend_children() -> None:
         http_client.close()
     except Exception as exc:  # noqa: BLE001
         logger.warning("shutdown: closing shared httpx clients raised: %s", exc)
-
-    if bp.restart_pending():
-        survivors = list(bp.running_backends().keys())
-        logger.info(
-            "shutdown: restart in progress — leaving %d backend(s) running for adoption: %s",
-            len(survivors), survivors,
-        )
-        return
 
     for model_id in list(bp.spawned_backends().keys()):
         try:
@@ -202,8 +188,7 @@ def register(app) -> None:
     return value) rather than using ``@app.on_event(...)`` sugar directly
     on these functions, so the handlers themselves stay plain module-level
     callables — importable and directly testable without needing a
-    FastAPI app (``tests/test_restart_keepalive.py`` calls
-    ``stop_backend_children()`` straight).
+    FastAPI app.
     """
     app.on_event("shutdown")(stop_background_tasks)
     app.on_event("shutdown")(stop_backend_children)

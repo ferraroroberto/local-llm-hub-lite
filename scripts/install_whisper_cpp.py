@@ -249,9 +249,9 @@ def _purge_vendor() -> None:
     except (PermissionError, OSError) as exc:
         raise InstallError(
             f"could not remove {VENDOR_DIR} ({exc}). whisper-server is "
-            "likely still running and holding the binary. Stop it first "
-            "(coordinate with voice-transcriber on the shared :8090/:8091 "
-            "mutex), then re-run with --force."
+            "likely still running and holding the binary. Stop "
+            "whisper-server (Models tab or tray) first, then re-run with "
+            "--force."
         )
 
 

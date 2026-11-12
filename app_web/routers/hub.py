@@ -1,9 +1,7 @@
-"""Hub tab API — status, control, live request stream, log tail, install.
+"""Hub tab API — status, live request stream, log tail, install.
 
 Endpoints (all under /admin/api/hub):
   * GET  /status            — pid, uptime, local/lan URLs, build identity
-  * POST /stop              — graceful shutdown (the page will then 502)
-  * POST /restart           — spawn a watchdog that respawns ``src.server``
   * GET  /log/tail          — SSE stream of root-logger lines
   * GET  /log/recent        — non-SSE seed (last N lines)
   * GET  /stats             — 5-minute ring of RAM/CPU/GPU samples (sparklines)
@@ -20,12 +18,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import signal
-import subprocess
-import sys
 import time
 from dataclasses import asdict
-from pathlib import Path
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException, Request
@@ -33,8 +27,7 @@ from fastapi.responses import StreamingResponse
 
 from src.hub_log import HUB_LOG
 from src.hub_observability import OBS
-from src.process.server_process import WIN_NEW_GROUP, lan_ip
-from src.runtime_files import checked_write_path
+from src.process.server_process import lan_ip
 
 from ._helpers import maybe_json, sse_stream
 
@@ -43,9 +36,6 @@ router = APIRouter()
 
 
 # ----------------------------------------------------------------- helpers
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-
 
 def _hub_port() -> int:
     from src.host_profile import hub_port
@@ -72,106 +62,6 @@ async def hub_status(request: Request) -> Dict[str, Any]:
         "uptime_s": round(uptime_s, 1),
         "host": resolve_host().id,
     }
-
-
-# ---------------------------------------------------------------- control
-
-def _delayed_shutdown(delay: float = 0.4) -> None:
-    """Signal ourselves to exit after ``delay`` seconds, so the HTTP
-    response can flush first. Uvicorn handles SIGINT/SIGTERM as a clean
-    shutdown on both Windows and POSIX."""
-
-    def _runner() -> None:
-        time.sleep(delay)
-        try:
-            if sys.platform == "win32":
-                # signal.raise_signal arrived in 3.8 and works under
-                # uvicorn's SIGINT handler.
-                signal.raise_signal(signal.SIGINT)
-            else:
-                os.kill(os.getpid(), signal.SIGTERM)
-        except Exception as exc:  # noqa: BLE001 — fall back
-            logger.error("⚠️ shutdown signal failed: %s — using os._exit", exc)
-            os._exit(0)
-
-    import threading
-    threading.Thread(target=_runner, daemon=True).start()
-
-
-def _restart_log_path() -> Path:
-    """File the detached watchdog redirects the relaunched server into.
-
-    The respawn is detached and outlives this process, so its stdout has
-    nowhere to go in-process — and under ``pythonw`` there is no console
-    at all. We give it a real file so (a) ``src.server``'s import-time
-    logging write doesn't crash a console-less child, and (b) a failed
-    restart leaves a diagnostic trail instead of vanishing silently.
-    """
-    return PROJECT_ROOT / "data" / "logs" / "restart.log"
-
-
-def _spawn_respawn_watchdog() -> None:
-    """Spawn a detached Python that waits for our PID to die then re-launches us.
-
-    The relaunch uses the tray's process-group flags for the hub —
-    never a bare ``pythonw`` with no stdout. The actual wait/relaunch
-    logic lives in ``src/_respawn_watchdog.py`` as a real module instead of
-    a string literal fed to ``python -c``, so it stays visible to
-    lint/type-check. That module is deliberately
-    stdlib-only with no import from any other ``src.*`` module: it's the
-    thing recovering *from* a broken deploy, so it can't assume the rest
-    of the hub's package still imports cleanly — only its own module and
-    the empty ``src/__init__.py`` need to load.
-    """
-    parent_pid = os.getpid()
-    port = _hub_port()
-    log_path = checked_write_path(_restart_log_path())
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    logger.info("🔄 respawn watchdog: relaunch log → %s", log_path)
-    # Same flags the tray uses to spawn the hub —
-    # DETACHED_PROCESS is deliberately omitted, it's mutually exclusive
-    # with CREATE_NO_WINDOW per the Win32 CreateProcess docs.
-    creationflags = WIN_NEW_GROUP
-    # Capture the watchdog's own stdout/stderr to the same log so a
-    # failure *before* it opens its own handle (e.g. a bad argv) is still
-    # visible rather than swallowed by DEVNULL.
-    wd_log = open(log_path, "a", encoding="utf-8", errors="replace")
-    subprocess.Popen(
-        [
-            sys.executable, "-m", "src._respawn_watchdog",
-            "--parent-pid", str(parent_pid),
-            "--port", str(port),
-            "--log-path", str(log_path),
-            "--root", str(PROJECT_ROOT),
-        ],
-        cwd=str(PROJECT_ROOT),
-        stdin=subprocess.DEVNULL,
-        stdout=wd_log,
-        stderr=subprocess.STDOUT,
-        creationflags=creationflags,
-    )
-
-
-@router.post("/api/hub/stop")
-async def hub_stop() -> Dict[str, Any]:
-    logger.info("🛑 /admin/api/hub/stop — scheduling self-shutdown")
-    _delayed_shutdown()
-    return {"ok": True, "detail": "hub will exit shortly"}
-
-
-@router.post("/api/hub/restart")
-async def hub_restart() -> Dict[str, Any]:
-    # Tell the shutdown handler to leave the model backends running so the
-    # respawned hub adopts them, instead of killing the survivors that
-    # inherit_running_backends() exists to reclaim.
-    from src.process import backend_process as bp
-
-    bp.set_restart_pending(True)
-
-    logger.info("🔄 /admin/api/hub/restart — spawning respawn watchdog")
-    _spawn_respawn_watchdog()
-    _delayed_shutdown(delay=0.8)
-    return {"ok": True, "detail": "hub will restart shortly"}
 
 
 # ----------------------------------------------------------------- log tail
