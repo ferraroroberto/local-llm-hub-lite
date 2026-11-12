@@ -18,7 +18,8 @@ THIS_FILE = Path(__file__).resolve()
 # names in auth_middleware are a live concern and deliberately not matched.
 VESTIGES = re.compile(
     r"satellite|another host|remote-owned|mac-mini|gaming's"
-    r"|cloudflare tunnel|copy cloudflare url",
+    r"|cloudflare tunnel|copy cloudflare url"
+    r"|voice-transcriber|:8091\b",
     re.IGNORECASE,
 )
 

@@ -3,8 +3,8 @@
 Two coupled fixes (issue #46, also resolving the #39 reachability finding):
 
   * ``is_reachable`` used ``model.url.rstrip("/v1")`` — ``str.rstrip`` strips
-    a *character set*, so a whisper port ending in ``1`` (``:8091``) got its
-    last digit eaten, the probe hit a dead ``:809``, and the translate row's
+    a *character set*, so a whisper port ending in ``1`` (``:8071``) got its
+    last digit eaten, the probe hit a dead ``:807``, and the translate row's
     Ping icon stayed dimmed. The fix uses ``removesuffix``.
   * ``model_ping`` always sent a chat request, which whisper (an ASR backend)
     rejects with ``400``. Whisper rows now get a real audio-transcription
@@ -27,7 +27,7 @@ from src.process import backend_process as bp  # noqa: E402
 # --------------------------------------------------------------------------
 
 def test_is_reachable_whisper_probes_correct_port(monkeypatch):
-    """:8091 must be probed as :8091, not the mangled :809."""
+    """:8071 must be probed as :8071, not the mangled :807."""
     captured = {}
 
     class _Resp:
@@ -47,10 +47,10 @@ def test_is_reachable_whisper_probes_correct_port(monkeypatch):
         display_name="whisper-medium-translate",
         backend="whisper",
         engine="whisper-server",
-        port=8091,
+        port=8071,
     )
     assert bp.is_reachable(m, timeout=0.1) is True
-    assert captured["url"] == "http://127.0.0.1:8091/"
+    assert captured["url"] == "http://127.0.0.1:8071/"
 
 
 def test_silent_wav_is_decodable():
