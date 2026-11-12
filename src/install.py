@@ -64,19 +64,22 @@ class Report:
 
 # ---------- individual checks ----------
 
+# Single source for the supported interpreter floor; a test pins it to CLAUDE.md and CI.
+MIN_PYTHON = (3, 12)
+_MIN_PYTHON_LABEL = f"Python >= {MIN_PYTHON[0]}.{MIN_PYTHON[1]}"
+
+
 def _check_python_venv() -> Check:
     ver = sys.version_info
-    if ver < (3, 10):
-        return Check("python", "Python >= 3.10", "error",
+    if ver < MIN_PYTHON:
+        return Check("python", _MIN_PYTHON_LABEL, "error",
                      f"found {ver.major}.{ver.minor}.{ver.micro}")
-    try:
-        in_project_venv = Path(sys.prefix).resolve().is_relative_to((PROJECT_ROOT / ".venv").resolve())
-    except (AttributeError, ValueError):
-        in_project_venv = str(Path(sys.prefix).resolve()).startswith(str((PROJECT_ROOT / ".venv").resolve()))
+    label = f"{_MIN_PYTHON_LABEL}, running from .venv"
+    in_project_venv = Path(sys.prefix).resolve().is_relative_to((PROJECT_ROOT / ".venv").resolve())
     if not in_project_venv:
-        return Check("python", "Python >= 3.10, running from .venv", "warn",
+        return Check("python", label, "warn",
                      f"python={sys.version.split()[0]} prefix={sys.prefix} (not the project .venv)")
-    return Check("python", "Python >= 3.10, running from .venv", "ok",
+    return Check("python", label, "ok",
                  f"python={sys.version.split()[0]} prefix={sys.prefix}")
 
 
