@@ -462,3 +462,23 @@ def test_install_assets_extracts_flattens_and_removes_archive(monkeypatch, tmp_p
     assert (vendor / "llama-server.exe").read_text() == "binary-contents"
     assert not (vendor / "rel.zip").exists()
     assert not (vendor / "release-dir").exists()
+
+
+def test_python_floor_matches_documented_and_ci_version():
+    # The doctor's floor must not drift from what CLAUDE.md and CI state.
+    root = Path(__file__).resolve().parent.parent
+    major, minor = install_mod.MIN_PYTHON
+    claude_md = (root / "CLAUDE.md").read_text(encoding="utf-8")
+    assert f"Python {major}.{minor}+" in claude_md
+    workflow = (root / ".github" / "workflows" / "e2e.yml").read_text(encoding="utf-8")
+    assert f"python-version: '{major}.{minor}'" in workflow
+
+
+def test_python_check_rejects_below_floor(monkeypatch):
+    from collections import namedtuple
+
+    version_info = namedtuple("version_info", "major minor micro releaselevel serial")
+    monkeypatch.setattr(install_mod.sys, "version_info", version_info(3, 11, 9, "final", 0))
+    check = install_mod._check_python_venv()
+    assert check.status == "error"
+    assert "3.12" in check.label
