@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, Set
 
 import httpx
 
@@ -254,7 +254,7 @@ def _fold_reasoning_into_content(message: Dict[str, Any]) -> None:
     """If ``content`` is empty but ``reasoning_content`` isn't, swap them.
 
     Mutates ``message`` in place. Used for non-streaming responses;
-    streaming fold is handled per-delta in :func:`clean_openai_chunk`.
+    the streaming fold lives in :func:`clean_openai_chunk`.
     """
     content = message.get("content")
     reasoning = message.get("reasoning_content")
@@ -284,29 +284,38 @@ def clean_openai_response(resp: Dict[str, Any]) -> Dict[str, Any]:
 def clean_openai_chunk(
     chunk: Dict[str, Any],
     strippers: Dict[int, ThinkStripper],
+    content_seen: Optional[Set[int]] = None,
 ) -> Dict[str, Any]:
     """Apply think-strip + reasoning fold to a single SSE chunk dict.
 
     ``strippers`` is a per-stream cache keyed by ``choice.index`` so a
     ``<think>`` tag spanning multiple chunks is still recognised.
-    Mutates and returns ``chunk``.
+    ``content_seen`` is the per-stream set of choice indexes that have
+    already produced a real ``content`` delta; pass the same set for every
+    chunk of one stream. Mutates and returns ``chunk``.
     """
+    if content_seen is None:
+        content_seen = set()
     for choice in chunk.get("choices") or []:
         delta = choice.get("delta")
         if not isinstance(delta, dict):
             continue
-        # Fold reasoning delta into content delta when content is empty.
+        idx = int(choice.get("index", 0) or 0)
         # llama-server with --reasoning-format=deepseek emits
         # ``reasoning_content`` deltas separately; OpenAI-shape clients
-        # ignore them. Treat them as part of the answer if and only if
-        # the model never produced a real ``content`` delta on this
-        # stream — that's still better than emitting nothing.
-        if not delta.get("content") and delta.get("reasoning_content"):
+        # ignore them. Fold such a delta into ``content`` only until the
+        # choice has produced a real content delta. A stream cannot know
+        # ahead whether content will follow, so unlike the non-stream path
+        # (which folds only when the final content is empty) reasoning that
+        # arrives before the answer is still folded; registry rows avoid
+        # that with ``--reasoning-format none``.
+        if delta.get("content"):
+            content_seen.add(idx)
+        elif delta.get("reasoning_content") and idx not in content_seen:
             delta["content"] = delta["reasoning_content"]
             delta["reasoning_content"] = ""
         text = delta.get("content")
         if isinstance(text, str) and text:
-            idx = int(choice.get("index", 0) or 0)
             stripper = strippers.get(idx)
             if stripper is None:
                 stripper = ThinkStripper()
@@ -348,6 +357,7 @@ def iter_cleaned_sse(raw_lines: Iterator[str]) -> Iterator[str]:
     (emitted as one extra synthetic chunk per choice).
     """
     strippers: Dict[int, ThinkStripper] = {}
+    content_seen: Set[int] = set()
     last_meta: Optional[Dict[str, Any]] = None
     for line in raw_lines:
         if not line.startswith("data:"):
@@ -368,7 +378,7 @@ def iter_cleaned_sse(raw_lines: Iterator[str]) -> Iterator[str]:
             # forward an oddly shaped line than to drop it silently.
             yield line
             continue
-        clean_openai_chunk(obj, strippers)
+        clean_openai_chunk(obj, strippers, content_seen)
         last_meta = {k: obj[k] for k in ("id", "object", "created", "model") if k in obj}
         for choice in obj.get("choices") or []:
             if not choice.get("finish_reason"):

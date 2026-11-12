@@ -138,3 +138,25 @@ def test_listening_snapshot_says_unknown_when_every_lookup_fails(monkeypatch):
     assert dict(snapshot) == {}
     assert server_process.snapshot_is_known(snapshot) is False
     assert server_process.snapshot_is_known({}) is True
+
+
+def test_stop_gives_ctrl_break_a_grace_wait_before_terminating(monkeypatch):
+    monkeypatch.setattr(bp.sys, "platform", "win32")
+    monkeypatch.setattr(bp.signal, "CTRL_BREAK_EVENT", 1, raising=False)
+    calls: list = []
+
+    class Polite(FakePopen):
+        def send_signal(self, sig: int) -> None:
+            calls.append("signal")
+
+        def wait(self, timeout: float = 0) -> int:
+            calls.append(("wait", timeout))
+            self.returncode = 0
+            return 0
+
+        def terminate(self) -> None:
+            calls.append("terminate")
+
+    _launch(Polite())
+    assert bp.stop(MODEL_ID).outcome is Outcome.STOPPED
+    assert calls == ["signal", ("wait", bp.STOP_GRACE_S)]

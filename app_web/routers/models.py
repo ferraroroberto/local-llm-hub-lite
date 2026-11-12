@@ -32,6 +32,12 @@ from src.process.server_process import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Per-backend readiness-probe timeout for the tile list. Short on purpose: a
+# live local llama/whisper-server answers its health endpoint in milliseconds,
+# and a wedged one must not stall the whole list (probes run concurrently, so
+# the worst case is one timeout, not one per backend).
+_READINESS_PROBE_TIMEOUT_S = 0.4
+
 
 def _add_startup_fields(row: Dict[str, Any], m: Model) -> None:
     """Annotate a tile row with its declared startup policy — the registry
@@ -68,11 +74,11 @@ async def list_models_for_admin() -> Dict[str, Any]:
     model operates purely on this host's ``backend_process``.
 
     Two pieces are expensive: probing reachability over HTTP per backend
-    (each costs up to 0.5 s) and resolving port → PID via netstat (one
+    (each costs up to ``_READINESS_PROBE_TIMEOUT_S``) and resolving port → PID via netstat (one
     shell-out per call). We fan the HTTP probes out concurrently, and
     do a single netstat snapshot up front instead of one per backend —
-    O(N) → O(1) subprocesses, O(N) → O(0.5 s) wall time when all
-    backends are alive.
+    O(N) → O(1) subprocesses, O(N) → one probe timeout of wall time when
+    all backends are alive.
 
     A controllable row's ``state`` / ``reason`` come from
     ``backend_process.serving``; ``ownership``, ``pid`` and ``reachable``
@@ -91,11 +97,11 @@ async def list_models_for_admin() -> Dict[str, Any]:
             return False
         if listening_known and m.port not in listening:
             # Port isn't bound → definitely not reachable; skip the
-            # 1-second-per-dead-backend HTTP probe. With an unknown
+            # per-dead-backend HTTP probe. With an unknown
             # snapshot nothing is known to be unbound, so probe anyway.
             return False
         try:
-            return await asyncio.to_thread(bp.is_reachable, m, 0.4)
+            return await asyncio.to_thread(bp.is_reachable, m, _READINESS_PROBE_TIMEOUT_S)
         except Exception as exc:  # noqa: BLE001 — an unrun probe is unknown, not "down"
             logger.warning("⚠️ readiness probe for %s could not be run: %s", m.id, exc)
             return None

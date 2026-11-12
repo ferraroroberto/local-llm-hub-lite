@@ -39,6 +39,17 @@ router = APIRouter()
 # against the full hub's role addressing.
 _ROLE_ALIASES = {"audio_transcribe"}
 
+# Upstream (whisper-server) timeouts for the proxied transcription request.
+# Connect is generous enough for a busy loopback accept queue.
+_UPSTREAM_CONNECT_TIMEOUT_S = 30.0
+# Read is sized for a cold whisper model load plus a long transcription: the
+# response only starts once decoding finishes, so it is the dominant wait.
+_UPSTREAM_READ_TIMEOUT_S = 300.0
+# Write covers streaming the uploaded audio body to the backend.
+_UPSTREAM_WRITE_TIMEOUT_S = 60.0
+# Pool wait for a free connection in the shared async client.
+_UPSTREAM_POOL_TIMEOUT_S = 10.0
+
 
 def _local_whisper() -> Optional[Model]:
     """The single locally-enabled whisper backend, or ``None``."""
@@ -212,7 +223,12 @@ async def _dispatch_audio(
         if k.lower() in {"content-type", "accept"}
     }
     url = f"http://127.0.0.1:{target.port}{ctx_path}"
-    timeout = _httpx.Timeout(30.0, read=300.0, write=60.0, pool=10.0)
+    timeout = _httpx.Timeout(
+        _UPSTREAM_CONNECT_TIMEOUT_S,
+        read=_UPSTREAM_READ_TIMEOUT_S,
+        write=_UPSTREAM_WRITE_TIMEOUT_S,
+        pool=_UPSTREAM_POOL_TIMEOUT_S,
+    )
     client = get_async_client()
     try:
         upstream = await client.post(

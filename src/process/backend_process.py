@@ -61,6 +61,16 @@ LOG_TAIL_LINES = 400
 # machines go through the hub on :8000. A row's own ``args`` come later on
 # the command line, so ``--host`` there still overrides this.
 BACKEND_LISTEN_HOST = "127.0.0.1"
+# ``stop()`` timings. After CTRL_BREAK the child gets this long to exit on its
+# own, so a backend that handles the signal shuts down cleanly before
+# TerminateProcess is used.
+STOP_GRACE_S = 3.0
+# Wait for the process to disappear after TerminateProcess; a healthy exit is
+# near-instant, so running past this means it is stuck and is killed outright.
+STOP_TERMINATE_WAIT_S = 8.0
+# Final wait after kill(); the process is gone unless the OS holds it in an
+# uninterruptible state, which this bounds so ``stop()`` always returns.
+STOP_KILL_WAIT_S = 5.0
 
 
 def _log_path(model_id: str) -> Path:
@@ -470,12 +480,19 @@ def stop(model_id: str) -> Result:
                 p.send_signal(signal.CTRL_BREAK_EVENT)
             except (OSError, ValueError):
                 pass
+            else:
+                try:
+                    p.wait(timeout=STOP_GRACE_S)
+                    state.proc = None
+                    return Result(Outcome.STOPPED)
+                except subprocess.TimeoutExpired:
+                    pass
         p.terminate()
         try:
-            p.wait(timeout=8)
+            p.wait(timeout=STOP_TERMINATE_WAIT_S)
         except subprocess.TimeoutExpired:
             p.kill()
-            p.wait(timeout=5)
+            p.wait(timeout=STOP_KILL_WAIT_S)
     except Exception as e:
         return Result(Outcome.STOP_FAILED, f"error stopping: {e}")
     state.proc = None
