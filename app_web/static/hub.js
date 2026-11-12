@@ -3,7 +3,7 @@
  * disclosure cards, folded by default.
  */
 
-import { els, state } from './state.js';
+import { els, state, STATS_POLL_MS } from './state.js';
 import { jsonApi, postJson, eventStream, toast, escapeHtml, fmtClock, renderCounterTable, shortGpu, modelLabel } from './api.js';
 import { icon } from './_vendored/icons/icons.js';
 
@@ -228,10 +228,11 @@ export function wireHub() {
   }
 
   // Sparklines: lightweight inline-SVG renderer driven by /admin/api/hub/stats.
+  // STATS_POLL_MS matches the 2 s sample cadence the README documents.
   setInterval(function () {
     if (state.tab !== 'hub') return;
     renderSparklines();
-  }, 2500);
+  }, STATS_POLL_MS);
 }
 
 async function renderSparklines() {

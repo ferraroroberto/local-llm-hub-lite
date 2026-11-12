@@ -279,6 +279,9 @@ def test_shutdown_leaves_an_adopted_backend_running_and_stops_a_spawned_one(
             spawned.terminated = True
 
         def wait(self, timeout: float = 0) -> int:
+            # Ignores CTRL_BREAK like a wedged backend: only terminate() ends it.
+            if not spawned.terminated:
+                raise subprocess.TimeoutExpired("backend", timeout)
             return 0
 
         def send_signal(self, sig: int) -> None:

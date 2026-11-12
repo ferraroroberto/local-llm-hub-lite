@@ -25,6 +25,7 @@ from src import openai_upstream as upstream_mod
 from src import server as server_mod
 from src.openai_upstream import (
     ThinkStripper,
+    clean_openai_chunk,
     clean_openai_response,
     iter_cleaned_sse,
     strip_think_blocks,
@@ -555,3 +556,24 @@ def test_nothink_alias_caller_chat_template_kwargs_wins(monkeypatch, write_confi
     )
     assert r.status_code == 200, r.text
     assert captured["extra"] == {"chat_template_kwargs": {"enable_thinking": True}}
+
+
+# ---- streaming reasoning fold ----
+
+
+def test_stream_folds_reasoning_only_until_a_real_content_delta():
+    strippers: dict = {}
+    seen: set = set()
+    out = []
+    for chunk in (
+        _delta(reasoning_content="think "),
+        _delta(content="answer"),
+        _delta(reasoning_content="late reasoning"),
+    ):
+        cleaned = clean_openai_chunk(chunk, strippers, seen)
+        out.append(cleaned["choices"][0]["delta"])
+    assert out[0]["content"] == "think "
+    assert out[1]["content"] == "answer"
+    # Once real content was seen, reasoning is no longer promoted to answer text.
+    assert not out[2].get("content")
+    assert out[2]["reasoning_content"] == "late reasoning"
