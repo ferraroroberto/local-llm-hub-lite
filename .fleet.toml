@@ -62,7 +62,7 @@ instruction_repeats = { src = "scripts/instruction_repeats.py", sha = "c5535ac32
 text-size    = { src = "app/webapp/static/_vendored/text-size", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/text-size" }
 page-foot    = { src = "app/webapp/static/_vendored/page-foot", sha = "fe8cc1bdbd038ed65947186248df13072eceb25a", dest = "app_web/static/_vendored/page-foot" }
 select-native = { src = "app/webapp/static/_vendored/select-native", sha = "8c64876f0a69eb3158eaa889cb6769807af5412b", dest = "app_web/static/_vendored/select-native" }
-sign-in     = { src = "app/webapp/static/_vendored/sign-in", sha = "6c8ae06472edc4c7448a767656060cd2b79cefe9", dest = "app_web/static/_vendored/sign-in" }
+sign-in     = { src = "app/webapp/static/_vendored/sign-in", sha = "ccd47c75f8b27e30497b28a3f7d094bd98d8b8c5", dest = "app_web/static/_vendored/sign-in" }
 
 # [static_ratchet] -- the scaffold's baseline-and-ratchet static analysis. The gate
 # (scripts/verify-before-ship.ps1) runs scripts/static_ratchet.py, which fails on a
