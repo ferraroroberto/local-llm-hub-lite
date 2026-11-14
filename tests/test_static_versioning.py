@@ -130,8 +130,8 @@ def test_toast_stacks_above_the_floating_mobile_nav() -> None:
     """The toast's z-index clears the vendored floating nav's, so command
     progress stays readable on a phone."""
     static_dir = Path(__file__).resolve().parents[1] / "app_web" / "static"
-    styles = re.sub(r"/\*.*?\*/", "", (static_dir / "styles.css").read_text("utf-8"), flags=re.S)
-    toast = re.search(r"\.toast\s*\{[^}]*?z-index:\s*(\d+)", styles, re.S)
+    styles = re.sub(r"/\*.*?\*/", "", (static_dir / "_vendored/toast/toast.css").read_text("utf-8"), flags=re.S)
+    toast = re.search(r"\.toast[^{]*\{[^}]*?z-index:\s*(\d+)", styles, re.S)
     nav_levels = re.findall(r"z-index:\s*(\d+)", (static_dir / "_vendored/nav/nav-tabs.css").read_text("utf-8"))
     assert toast and nav_levels
     assert int(toast.group(1)) > max(int(z) for z in nav_levels)

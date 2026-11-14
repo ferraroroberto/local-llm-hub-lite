@@ -57,6 +57,9 @@
   --radius: 16px;           /* rounded.lg — cards */
   --radius-pill: 9999px;
   --radius-nav: 30px;       /* the floating bottom-tab bar */
+  /* sizes */
+  --icon-inline: 16px;      /* icons.size.inline: an icon-button's glyph */
+  --hit-min: 44px;          /* the touch-target floor (build-watch's Reload) */
   /* spacing scale */
   --space-xs: 4px;
   --space-sm: 8px;
@@ -861,22 +864,3 @@ h2 { display: flex; align-items: center; gap: 8px; }
  * The canonical zero-items block is the vendored component
  * (_vendored/empty-state) — no app-side .empty style anymore. */
 
-/* ---------- toast ---------- */
-.toast {
-  position: fixed;
-  left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0) + 20px);
-  transform: translateX(-50%);
-  background: var(--card);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: 10px 16px;
-  font-size: var(--font-label);
-  max-width: calc(100vw - 32px);
-  box-shadow: var(--shadow);
-  /* Clear the vendored floating mobile nav (z-index: 120) so command
-   * progress and results remain readable after the nav migration. */
-  z-index: 130;
-}
-.toast.error { border-color: var(--danger); }
