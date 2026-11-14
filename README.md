@@ -145,7 +145,7 @@ To add a model: add a row, list its id in `hosts.local.enabled`, run `python -m 
 | `cors_allow_origins` | `[]` | CORS origins for browser callers. |
 | `telegram_bot_token`, `telegram_alert_chat_id` | `""` | Telegram bot token and chat id for the wrong-password alert (below). Either empty sends nothing. |
 
-`POST /admin/api/login` answers `429` with a `Retry-After` header once a client has typed six wrong passwords: the wait starts at 2 s and doubles to 300 s, and a correct password clears it. The PC itself (the same check that lets it skip the token) is never locked out. Behind a tunnel, a client is told apart by the tunnel's client header, read only when the request arrives over loopback. Three wrong passwords in a row from one client send one Telegram message (app name, client address, count; never a password or token), at most one per five minutes. State is in memory, so a restart clears it.
+`POST /admin/api/login` answers `429` with a `Retry-After` header once a client has typed six wrong passwords: the wait starts at 2 s and doubles to 300 s, and a correct password clears it. The PC itself (the same check that lets it skip the token) is never locked out. Behind a tunnel, a client is told apart by the tunnel's client header, read only when the request arrives over loopback. Three wrong passwords in a row from one client send one Telegram message (app name, client address, count; never a password or token), at most one per five minutes, through the vendored `src/login_alert.py`; with no Telegram chat set the alert is logged as `unconfigured`. State is in memory, so a restart clears it.
 
 ## Layout
 

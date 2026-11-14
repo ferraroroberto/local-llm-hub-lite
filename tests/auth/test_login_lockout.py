@@ -6,6 +6,7 @@ notifier is a recording fake, so nothing reaches Telegram.
 
 from __future__ import annotations
 
+import logging
 import threading
 
 import pytest
@@ -162,7 +163,7 @@ def test_a_failing_notifier_never_breaks_the_login(caplog):
     client = _client(FakeClock(), on_alert)
     for _ in range(3):
         assert _login(client, "wrong", ATTACKER).status_code == 401
-    assert "not delivered" in caplog.text
+    assert "login alert failed (NotifierError)" in caplog.text
 
 
 @pytest.mark.parametrize("password", ["", "x"])
@@ -182,3 +183,12 @@ def test_stored_hash_replaces_the_legacy_password(tmp_path, monkeypatch):
     client = _client(FakeClock())
     assert _login(client, "4321").json() == {"token": TOKEN}
     assert _login(client, PASSWORD).status_code == 401
+
+
+def test_no_alert_channel_is_reported_unconfigured(caplog):
+    on_alert = login_alert.make_alert_owner(lambda: WebappConfig(), run=lambda send: send())
+    client = _client(FakeClock(), on_alert)
+    with caplog.at_level(logging.WARNING, logger="src.login_alert"):
+        for _ in range(3):
+            _login(client, "wrong", ATTACKER)
+    assert "unconfigured" in caplog.text and "3 wrong passwords" in caplog.text
