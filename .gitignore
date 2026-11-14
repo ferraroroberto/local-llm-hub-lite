@@ -51,3 +51,6 @@ tests/e2e/snapshots/
 playwright-report/
 test-results/
 .proof/
+
+# The app password hash (src/password.py)
+config/app_password.json

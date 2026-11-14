@@ -35,6 +35,7 @@
 /src/login_lockout.py
 /src/no_window.py
 /src/notify
+/src/password.py
 /src/runtime_data.py
 /src/usage_log.py
 /tray/single_instance.py
