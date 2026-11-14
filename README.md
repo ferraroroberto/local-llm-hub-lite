@@ -140,7 +140,7 @@ To add a model: add a row, list its id in `hosts.local.enabled`, run `python -m 
 | Key | Default | Effect |
 | --- | --- | --- |
 | `auth_token` | auto-generated on first tray boot | Bearer token required for **non-loopback** callers (`Authorization: Bearer`, `x-api-key`, or `?token=`). Loopback needs no token. |
-| `auth_password` | `""` | Optional login password for the admin SPA (`POST /api/login` swaps it for the token). |
+| `auth_password` | `""` | Legacy plaintext login password for the admin SPA (`POST /api/login` swaps the password for the token), checked only until `python -m src.password set` stores a salted hash in the git-ignored `config/app_password.json` through the vendored `src/password.py`; the hash then wins and this can be deleted. |
 | `extra_allowlist` | `[]` | IPs allowed without a token (e.g. a trusted LAN peer). |
 | `cors_allow_origins` | `[]` | CORS origins for browser callers. |
 | `telegram_bot_token`, `telegram_alert_chat_id` | `""` | Telegram bot token and chat id for the wrong-password alert (below). Either empty sends nothing. |

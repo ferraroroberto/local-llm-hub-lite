@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from app_web import login_alert
 from app_web import server as admin_server
+from src import password as app_password
 from src.login_lockout import LoginLockout
 from src.notify import NotifierError
 from src.webapp_config import WebappConfig
@@ -173,3 +174,11 @@ def test_the_existing_503_and_401_replies_are_unchanged(password):
     assert _login(TestClient(app), password).status_code == 503
     app.state.webapp_config = WebappConfig(auth_token=TOKEN, auth_password=PASSWORD)
     assert _login(TestClient(app), password).status_code == 401
+
+
+def test_stored_hash_replaces_the_legacy_password(tmp_path, monkeypatch):
+    monkeypatch.setenv(app_password.ENV_VAR, str(tmp_path / "app_password.json"))
+    app_password.set_password("4321")
+    client = _client(FakeClock())
+    assert _login(client, "4321").json() == {"token": TOKEN}
+    assert _login(client, PASSWORD).status_code == 401
