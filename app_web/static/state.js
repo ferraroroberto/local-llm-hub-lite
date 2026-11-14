@@ -103,6 +103,5 @@ export const els = {
   transcribeServedModel: document.getElementById('transcribeServedModel'),
 
   // Misc
-  toast: document.getElementById('toast'),
   buildReadout: document.getElementById('buildReadout'),
 };

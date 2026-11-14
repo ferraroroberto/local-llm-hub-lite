@@ -116,17 +116,8 @@ export function setSignInHandler(onLoginSuccess) {
 }
 
 // --------------------------------------------------------------- toast
-let toastTimer = null;
-export function toast(msg, kind) {
-  if (!els.toast) return;
-  els.toast.textContent = msg;
-  els.toast.className = 'toast ' + (kind || '');
-  els.toast.hidden = false;
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(function () {
-    els.toast.hidden = true;
-  }, kind === 'error' ? 4500 : 2200);
-}
+// The fleet's vendored toast; only 'error' tints, every other kind renders neutral.
+export { showToast as toast } from './_vendored/toast/toast.js';
 
 // --------------------------------------------------------------- fmt
 /* Shared across hub.js / models.js — one definition instead of copies

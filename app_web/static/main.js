@@ -8,6 +8,7 @@ import { jsonApi, tokenFromUrl, writeToken, setSignInHandler, toast } from './ap
 import { icon } from './_vendored/icons/icons.js';
 import { bindTextSize } from './_vendored/text-size/text-size.js';
 import { buildReadoutText } from './_vendored/page-foot/page-foot.js';
+import { initBuildWatch } from './_vendored/build-watch/build-watch.js';
 import { wireTabs, onTabChange } from './tabs.js';
 import { wireUsageLog } from './usage.js';
 import { wireHub, fetchHubStatus, fetchCounters, startHubStreams, stopHubStreams, fetchInstallStatus } from './hub.js';
@@ -95,6 +96,8 @@ async function boot() {
   setInterval(function () {
     if (state.tab === 'models') fetchModels().catch(function () {});
   }, MODELS_POLL_MS);
+  // "New version available · Reload" when a deploy lands under an open page.
+  initBuildWatch({ endpoint: '/admin/api/version', fetchJson: jsonApi });
 }
 
 async function resumeAfterLogin() {
