@@ -52,13 +52,13 @@ single_instance = { src = "app/tray/single_instance.py", sha = "fe8cc1bdbd038ed6
 # Admin-SPA components, byte-identical to project-scaffolding at the recorded sha. icons/ is not
 # listed: its sprite is trimmed to the glyphs this app uses, so it is not a verbatim copy.
 button       = { src = "app/webapp/static/_vendored/button", sha = "fe8cc1bdbd038ed65947186248df13072eceb25a", dest = "app_web/static/_vendored/button" }
-card         = { src = "app/webapp/static/_vendored/card", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/card" }
+card         = { src = "app/webapp/static/_vendored/card", sha = "8f15c49560adbc076d24a8a63dd671868ffa7a4e", dest = "app_web/static/_vendored/card" }
 disclosure   = { src = "app/webapp/static/_vendored/disclosure", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/disclosure" }
 empty-state  = { src = "app/webapp/static/_vendored/empty-state", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/empty-state" }
 modal        = { src = "app/webapp/static/_vendored/modal", sha = "713b1d1e36989440679ec4e415ff149b14d96c81", dest = "app_web/static/_vendored/modal" }
 nav          = { src = "app/webapp/static/_vendored/nav", sha = "cb9fff9130453c781146f2cdf5083d83fb43b0df", dest = "app_web/static/_vendored/nav" }
 segmented    = { src = "app/webapp/static/_vendored/segmented", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/segmented" }
-switch       = { src = "app/webapp/static/_vendored/switch", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/switch" }
+switch       = { src = "app/webapp/static/_vendored/switch", sha = "8f15c49560adbc076d24a8a63dd671868ffa7a4e", dest = "app_web/static/_vendored/switch" }
 instruction_frontmatter = { src = "scripts/instruction_frontmatter.py", sha = "c5535ac326c398df8f44486f386ff0e0b6d4c61c", dest = "scripts/instruction_frontmatter.py" }
 instruction_repeats = { src = "scripts/instruction_repeats.py", sha = "c5535ac326c398df8f44486f386ff0e0b6d4c61c", dest = "scripts/instruction_repeats.py" }
 text-size    = { src = "app/webapp/static/_vendored/text-size", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/text-size" }
