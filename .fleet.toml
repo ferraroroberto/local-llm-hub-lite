@@ -66,7 +66,7 @@ page-foot    = { src = "app/webapp/static/_vendored/page-foot", sha = "fe8cc1bdb
 select-native = { src = "app/webapp/static/_vendored/select-native", sha = "09fe2436b6bf3ee608d43fc8a26165e3e2400840", dest = "app_web/static/_vendored/select-native" }
 sign-in     = { src = "app/webapp/static/_vendored/sign-in", sha = "fb7591e8a80afb39ccbff994563f9b318e969baf", dest = "app_web/static/_vendored/sign-in" }
 toast = { src = "app/webapp/static/_vendored/toast", sha = "e56c8330f8500b83635773033a09de6fc3cba342", dest = "app_web/static/_vendored/toast" }
-build-watch = { src = "app/webapp/static/_vendored/build-watch", sha = "241d2fde53645497376a19c073bb2b6c4e540f86", dest = "app_web/static/_vendored/build-watch" }
+build-watch = { src = "app/webapp/static/_vendored/build-watch", sha = "2d871dd5a6a3ee6fe12a3c5c6439d2c53a93c2c4", dest = "app_web/static/_vendored/build-watch" }
 icon-button = { src = "app/webapp/static/_vendored/icon-button", sha = "241d2fde53645497376a19c073bb2b6c4e540f86", dest = "app_web/static/_vendored/icon-button" }
 
 # [static_ratchet] -- the scaffold's baseline-and-ratchet static analysis. The gate
