@@ -180,6 +180,8 @@ The e2e stage asks `scripts/classify_e2e.py` what the diff needs (rules in the `
 
 The last stdout line of a gate run is `GATE-RESULT: PASS` or `GATE-RESULT: FAIL`, so a caller that must pipe the gate (a pipe reports its last command's exit code) asserts on that line; a run without it is not a pass.
 
+The browser suite shares one context per engine and names a drained loopback port pool (`PORT POOL EXHAUSTED`) instead of a page defect: [`docs/e2e-loopback-ports.md`](docs/e2e-loopback-ports.md).
+
 CI (`.github/workflows/e2e.yml`) runs the same three steps on every PR/push to `main` — advisory, the local gate is the contract.
 
 ## Scope & usage policy
