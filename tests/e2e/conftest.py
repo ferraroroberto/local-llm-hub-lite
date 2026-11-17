@@ -8,6 +8,7 @@ event loop, so a single boot covers every endpoint.
 
 from __future__ import annotations
 
+import logging
 import os
 import socket
 import subprocess
@@ -19,9 +20,16 @@ from typing import Iterator
 
 import httpx
 import pytest
+from playwright.sync_api import Browser, BrowserContext, Page
 
 from src.process import win_job
 from src.runtime_data import app_dir_env_var
+from tests.e2e._port_pool import (  # noqa: F401 - port-pool report hooks
+    pytest_runtest_makereport,
+    pytest_terminal_summary,
+)
+
+logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -30,6 +38,50 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 # toward Playwright's opaque 30 s default.  Explicit per-call timeout= and
 # expect() web-first assertions are unaffected.
 _DEFAULT_TIMEOUT_MS = int(os.environ.get("E2E_DEFAULT_TIMEOUT_MS", "15000"))
+
+
+@pytest.fixture(scope="session")
+def _shared_context(browser: Browser, browser_context_args: dict) -> Iterator[BrowserContext]:
+    """One browser context per engine for the whole run.
+
+    A closed context drops its connections to the hub, and every closed
+    connection parks a loopback ephemeral port in TIME_WAIT; a drained pool
+    fails the next page load with ``net::ERR_ADDRESS_IN_USE`` (see
+    ``_port_pool.py``). Reusing the context keeps its connections and HTTP cache
+    alive across tests.
+    """
+    context = browser.new_context(**browser_context_args)
+    yield context
+    context.close()
+
+
+@pytest.fixture
+def page(_shared_context: BrowserContext) -> Iterator[Page]:
+    """A new page in the shared context, reset to a first-visit state afterwards.
+
+    Routes, init scripts, listeners and the viewport belong to the page and go
+    with it; the page's storage and the context's cookies and permissions are
+    cleared. ``unroute_all`` is skipped because it blocks on a handler that still
+    holds a request. A reset step that fails is logged, never raised, so one
+    broken page cannot mask the test's own result.
+    """
+    pg = _shared_context.new_page()
+    try:
+        yield pg
+    finally:
+        steps = (
+            lambda: pg.evaluate(
+                "() => { try { localStorage.clear(); sessionStorage.clear(); } catch (e) {} }"
+            ),
+            pg.close,
+            _shared_context.clear_cookies,
+            _shared_context.clear_permissions,
+        )
+        for step in steps:
+            try:
+                step()
+            except Exception as exc:  # noqa: BLE001 - see docstring
+                logger.warning("⚠️  shared context reset step failed: %s", exc)
 
 
 @pytest.fixture(autouse=True)
@@ -88,21 +140,27 @@ def hub_url() -> Iterator[str]:
 
     deadline = time.time() + 30.0
     last_err = "timed out"
+    # One client, so the readiness polls reuse a connection instead of opening
+    # (and leaving in TIME_WAIT) a socket per attempt.
+    poll = httpx.Client(timeout=1.0)
     while time.time() < deadline:
         if proc.poll() is not None:
+            poll.close()
             log_fp.close()
             if job:
                 win_job.terminate_and_close(job)
             tail = log_path.read_text(encoding="utf-8")[-1500:]
             pytest.fail(f"hub exited before becoming reachable. Log tail:\n{tail}")
         try:
-            r = httpx.get(f"{url}/health", timeout=1.0)
+            r = poll.get(f"{url}/health")
             if r.status_code == 200:
+                poll.close()
                 break
         except httpx.HTTPError as exc:
             last_err = repr(exc)
         time.sleep(0.3)
     else:
+        poll.close()
         proc.terminate()
         log_fp.close()
         if job:
