@@ -1,0 +1,519 @@
+# UX surface map: the single source for docs/ux-surface-map.md.
+#
+# Every screen, card, sheet, dialog, toast, Settings choice, state and key a person can
+# reach in the admin SPA, one entry per surface. The convention is project-scaffolding's
+# docs/ux-surface-map.md. Edit this file, never the generated page; then run
+# `python scripts/ux_surface_map.py`.
+#
+# A change that adds, removes, renames or reshapes a user-visible surface updates its
+# entry here in the same change, adds or removes the matching `data-surface` attribute in
+# app_web/static, and regenerates the page.
+#
+# The file is a strict YAML subset (scripts/ux_surface_map.py lists it): keys are plain
+# identifiers, indentation is spaces, a value stays on one line or goes in a `>` block, and
+# a value that starts with a backtick, quote or bracket, or holds ": ", is quoted.
+
+app: local-llm-hub-lite
+
+notes: >
+  The admin SPA served at /admin/ is one page with three tabs, Hub, Models and Play, switched by the
+  floating nav pill (a left rail from 1100 px on a fine pointer). Every card is a native details
+  disclosure, so Enter and Space on its summary open and close it. Loopback callers are trusted and
+  never see the sign-in sheet; a caller from another address sees it on the first 401. Settings has no
+  tab of its own. The two choices it holds (theme, text size) sit on the Hub tab. The text-size and
+  theme choices are stored in the browser (localStorage), the open tab too, and the Models tab's
+  Active only filter. A ?token= query parameter on the page URL is stored as the bearer token and then
+  stripped from the address bar.
+
+walk:
+  date: 2026-11-18
+  build: 03ee6f3
+  widths: [390, 1280]
+  themes: [light, dark]
+
+areas:
+  - id: chrome
+    title: Chrome
+    notes: What every tab shares. The nav, the build footer, the toast and the two banners or sheets that can appear over any tab.
+  - id: hub
+    title: Hub tab
+    notes: Live status of the hub process and its diagnostics. Only this tab holds the two event streams, which stop while another tab is open.
+  - id: models
+    title: Models tab
+    notes: One tile per backend the registry enables on this machine, and the role assignments.
+  - id: playground
+    title: Play tab
+    notes: One-off requests through the admin API (never counted as client traffic in the hub's own request ring).
+  - id: settings
+    title: Settings
+    notes: The two display choices, both persisted in the browser.
+  - id: keys
+    title: Keys and gestures
+
+surfaces:
+  - id: chrome.nav
+    area: chrome
+    title: Nav
+    root: data-surface
+    reach:
+      - always on screen
+    holds:
+      - three tabs in order, Hub, Models and Play, each a glyph over its label
+    does:
+      - switches the visible tab and remembers it for the next visit
+      - starts the Hub tab's event streams when Hub opens and stops them when it closes
+    why: the fleet navigation contract, a floating pill on a phone and a left rail on a wide fine pointer
+    phone: a floating pill at the top of the screen
+    desktop: a left rail from 1100 px
+    links:
+      - to: hub.screen
+        via: Hub
+      - to: models.screen
+        via: Models
+      - to: playground.screen
+        via: Play
+
+  - id: chrome.toast
+    area: chrome
+    title: Toast
+    root: data-surface
+    reach:
+      - opens by itself after Start, Stop, Force stop, Ping, Fix, Fix all, a signed-in retry, and every validation or request failure
+    holds:
+      - one line of text, tinted only when it reports an error
+    does:
+      - hides itself after about 2 s, or 4.5 s for an error
+    states:
+      - success and neutral messages render untinted, errors render tinted
+    why: one toast element at body level, outside the scrolling main, so it stays fixed on iOS
+
+  - id: chrome.build-readout
+    area: chrome
+    title: Build readout
+    root: data-surface
+    reach:
+      - the foot of every tab
+    holds:
+      - the running build, "Build" followed by the short git sha and the build time
+    states:
+      - reads "unknown" for the sha when the version endpoint is unreachable
+
+  - id: app.update-banner
+    area: chrome
+    title: Update banner
+    root: data-surface
+    reach:
+      - appears over any tab when the server reports a newer build than the page booted with, checked every 5 min and when the tab becomes visible
+    holds:
+      - the text "New version available"
+      - Reload
+      - a dismiss button
+    does:
+      - Reload refreshes the page onto the new build
+      - the dismiss button hides the banner until the server moves to yet another build
+    why: stamped by the vendored build-watch component, which builds the banner itself
+
+  - id: shared.login
+    area: chrome
+    title: Sign-in sheet
+    root: data-surface
+    reach:
+      - opens by itself on any 401 from the admin API, which only a non-loopback caller without a valid bearer token gets
+    holds:
+      - the title "Sign in" and the hint "This hub is locked. Enter the configured password."
+      - a password field
+      - the Sign in button, disabled until something is typed
+    does:
+      - posts the password to /admin/api/login and stores the returned token
+      - on success closes, shows a "Signed in." toast and reloads the hub, models and install data
+    states:
+      - wrong password, not set up on this server, too many attempts (with the wait), cannot reach the app
+    why: the one fleet sign-in sheet, vendored so the password input exists nowhere else
+    links:
+      - to: chrome.toast
+        via: Signed in.
+
+  - id: chrome.token-link
+    area: chrome
+    title: Token in the address
+    root:
+      none: "a query parameter read at boot, with nothing drawn"
+    reach:
+      - opening /admin/?token=VALUE, the form the hub prints for a non-loopback client
+    does:
+      - stores the token as the bearer token for every later call and removes it from the address bar
+
+  - id: hub.screen
+    area: hub
+    title: Hub tab
+    root: data-surface
+    reach:
+      - the Hub tab, the default on a first visit
+    holds:
+      - the Hub status card
+      - Health and install
+      - Live requests, Counters, Errors and Log, each folded
+    why: the five diagnostics are folded by default so the tab opens on status and nothing scrolls past noise
+    links:
+      - to: hub.status
+        via: top card
+      - to: hub.install
+        via: Health and install
+      - to: hub.live-requests
+        via: Live requests
+      - to: hub.counters
+        via: Counters
+      - to: hub.errors
+        via: Errors
+      - to: hub.log
+        via: Log
+
+  - id: hub.status
+    area: hub
+    title: Hub status card
+    root: data-surface
+    reach:
+      - the top of the Hub tab
+    holds:
+      - the title "Hub" with a live dot and word
+      - the process id and the uptime
+      - the sparkline tiles
+      - the theme toggle, right-aligned in the header
+    does:
+      - polls the hub every few seconds and refreshes the dot, the PID and the uptime
+    states:
+      - up (green) while the status call answers
+      - unreachable (red) when it fails
+      - checking… before the first answer
+    links:
+      - to: hub.sparklines
+        via: tiles
+      - to: settings.theme
+        via: moon or sun button
+
+  - id: hub.sparklines
+    area: hub
+    title: Resource tiles
+    root: data-surface
+    reach:
+      - inside the Hub status card, redrawn every 2 s while the Hub tab is open
+    holds:
+      - a CPU tile
+      - a GPU utilisation tile, only when a GPU is reported
+      - a RAM tile
+      - a VRAM tile, only when a GPU is reported
+    states:
+      - a tile with fewer than two samples shows its percentage with no line
+      - empty before the first sample arrives
+
+  - id: hub.install
+    area: hub
+    title: Health and install
+    root: data-surface
+    reach:
+      - the Hub tab's second card, folded
+    holds:
+      - a summary line, "N checks · overall" followed by the worst status
+      - one row per check with a status glyph, its label and its detail
+      - a Fix button on a row whose check is missing or failed
+      - the Text size choice
+      - Fix all and Re-check
+    does:
+      - Fix runs that one repair, toasts the result and re-checks
+      - Fix all runs every repair in turn and re-checks
+      - Re-check reads the status again
+    states:
+      - the buttons read "Running…" while a repair runs and are disabled
+      - a failed Fix toasts the error and the button reads Retry
+      - overall status colours the summary ok, warn, missing or error
+    why: one card holds both the checks and their repairs, so nothing needs a terminal
+    links:
+      - to: settings.text-size
+        via: Text size
+      - to: chrome.toast
+        via: Fix, Fix all
+
+  - id: hub.live-requests
+    area: hub
+    title: Live requests
+    root: data-surface
+    reach:
+      - the Hub tab's third card, folded
+    holds:
+      - a count badge
+      - the 50 newest requests, newest first, each with its time, model, backend, status and latency, and its token counts
+      - a note that audio posted straight to the whisper port is not shown
+    does:
+      - fills from an event stream that reconnects by itself and drops repeats
+    states:
+      - empty, see the empty state
+    links:
+      - to: hub.live-requests-empty
+        via: no requests
+
+  - id: hub.live-requests-empty
+    area: hub
+    title: No requests yet
+    root: data-surface
+    reach:
+      - inside Live requests while the ring is empty
+    holds:
+      - a glyph and the line "No requests yet — the ring fills as clients call the hub."
+
+  - id: hub.counters
+    area: hub
+    title: Counters
+    root: data-surface
+    reach:
+      - the Hub tab's fourth card, folded
+    holds:
+      - a table with one row per backend and its requests, errors, p50, p95 and in and out tokens
+      - a note that the counts reset when the hub restarts
+    states:
+      - an empty table before any request
+
+  - id: hub.errors
+    area: hub
+    title: Errors
+    root: data-surface
+    reach:
+      - the Hub tab's fifth card, folded
+    holds:
+      - a count badge
+      - the newest non-2xx responses, each with its time, model, backend, status and the first 80 characters of the error
+    links:
+      - to: hub.errors-empty
+        via: none recorded
+
+  - id: hub.errors-empty
+    area: hub
+    title: No errors
+    root: data-surface
+    reach:
+      - inside Errors while no non-2xx response is in the ring
+    holds:
+      - a check glyph and the line "No non-2xx responses in the ring."
+
+  - id: hub.log
+    area: hub
+    title: Log
+    root: data-surface
+    reach:
+      - the Hub tab's last card, folded
+    holds:
+      - a Pause button that turns into Resume
+      - the live tail of the hub's own log, 800 lines at most
+    does:
+      - Pause stops appending lines and Resume starts again, without closing the stream
+
+  - id: settings.theme
+    area: settings
+    title: Theme toggle
+    root: data-surface
+    reach:
+      - the moon or sun button in the Hub status card's header
+    does:
+      - flips between light and dark and remembers the choice
+    states:
+      - with no stored choice the page follows the system colour scheme
+    why: the glyph shows the action, a sun to go light and a moon to go dark
+
+  - id: settings.text-size
+    area: settings
+    title: Text size
+    root: data-surface
+    reach:
+      - the Text size row inside Health and install
+    holds:
+      - a three-way control, Small, Default and Large
+    does:
+      - rescales the type on every tab and remembers the step
+
+  - id: models.screen
+    area: models
+    title: Models tab
+    root: data-surface
+    reach:
+      - the Models tab
+    holds:
+      - the Models card, open
+      - Model decisions, folded
+    links:
+      - to: models.list
+        via: Models
+      - to: models.decisions
+        via: Model decisions
+
+  - id: models.list
+    area: models
+    title: Models card
+    root: data-surface
+    reach:
+      - the Models tab's first card, open by default
+    holds:
+      - an Active only toggle in the header
+      - one explanatory line
+      - one tile per enabled backend
+    does:
+      - Active only hides tiles that are stopped, leaving loading, failed, adopted, unknown and ready ones; the choice is remembered
+      - refreshes every 5 s while the tab is open, keeping each tile's element so focus survives
+    states:
+      - Active only is on by default, so a hub with nothing running opens on the empty state
+    why: the toggle sits in the card header so the filter is one tap from the list it filters
+    links:
+      - to: models.row
+        via: each backend
+      - to: models.empty
+        via: nothing to show
+
+  - id: models.row
+    area: models
+    title: Backend tile
+    root: data-surface
+    reach:
+      - one per backend inside the Models card
+    holds:
+      - the display name
+      - a state pill, one of stopped, loading, running, adopted, failed or unknown, or the backend name for an alias with no process of its own
+      - Start, Stop and Ping glyph buttons, and Force stop on an adopted tile
+      - a meta line with the backend, the port, the process id when adopted, the failure reason, the aliases and the estimated memory
+      - a startup badge, eager or on-demand with its live word
+    does:
+      - Start launches the backend and toasts, Stop ends it, Ping probes it and toasts the status and latency
+      - Force stop asks first, then kills whatever holds the port
+    states:
+      - Start is on for a stopped or failed tile, Stop for anything the hub started or is loading, Ping once it serves
+      - an alias tile has Ping only
+      - on-demand reads loaded while it answers and idle-unloaded when not
+    why: every control is a glyph with a title so a tile stays one line on a phone
+    links:
+      - to: models.force-stop-confirm
+        via: Force stop
+      - to: chrome.toast
+        via: Start, Stop, Ping
+
+  - id: models.force-stop-confirm
+    area: models
+    title: Force stop confirmation
+    root:
+      none: "the browser's own confirm dialog, which has no element"
+    reach:
+      - Force stop on an adopted tile
+    holds:
+      - the text naming the port and the process id that will be killed
+    does:
+      - OK kills the process on that port, Cancel changes nothing
+
+  - id: models.empty
+    area: models
+    title: No models
+    root: data-surface
+    reach:
+      - inside the Models card when no tile is visible
+    holds:
+      - a glyph and one line
+    states:
+      - an empty registry reads "No models enabled for this host — check config/models.yaml."
+      - a filter that hides every tile reads "No active models right now — turn off “Active only” to see the full list."
+
+  - id: models.decisions
+    area: models
+    title: Model decisions
+    root: data-surface
+    reach:
+      - the Models tab's second card, folded
+    holds:
+      - a Roles list with each role and the model it resolves to, plus its fallbacks
+    does:
+      - reads the assignments only when opened, and again on each reopen, with no timer
+    states:
+      - while the call runs it reads "Loading…"
+      - a failed call reads "Could not load role data."
+      - with no roles it reads "No roles configured in config/models.yaml."
+
+  - id: playground.screen
+    area: playground
+    title: Play tab
+    root: data-surface
+    reach:
+      - the Play tab
+    holds:
+      - the Playground card and the Transcribe card, both folded
+    links:
+      - to: playground.tester
+        via: Playground
+      - to: playground.transcribe
+        via: Transcribe
+
+  - id: playground.tester
+    area: playground
+    title: Playground
+    root: data-surface
+    reach:
+      - the Play tab's first card, folded
+    holds:
+      - a model picker listing the chat backends
+      - a System field and a Prompt field
+      - More options
+      - Send and Clear
+      - the round-trip time, the Reply and a Usage grid of input, output and cache tokens
+    does:
+      - Send posts the prompt and shows the reply, its time and its token usage
+      - Clear empties the reply, the usage and the time
+    states:
+      - with no model or no prompt a toast says "Pick a model first." or "Prompt is empty." and nothing is sent
+      - the reply reads "…" while waiting and "[status] message" on a failure
+    links:
+      - to: playground.more-options
+        via: More options
+      - to: chrome.toast
+        via: validation or failure
+
+  - id: playground.more-options
+    area: playground
+    title: More options
+    root: data-surface
+    reach:
+      - the folded More options row inside the Playground card
+    holds:
+      - the Max tokens presets 256, 512, 2048 and 8192, and a number field
+    does:
+      - a preset fills the number field, and typing in the field lights the matching preset, or none
+
+  - id: playground.transcribe
+    area: playground
+    title: Transcribe
+    root: data-surface
+    reach:
+      - the Play tab's second card, folded
+    holds:
+      - Choose file and the chosen name
+      - Transcribe, disabled until a file is chosen
+      - the round-trip time, the Transcript and the model that served it
+    does:
+      - Transcribe sends the audio through the hub and prints the text
+    states:
+      - the transcript reads "…" while waiting and "[status] message" on a failure
+    links:
+      - to: playground.file-picker
+        via: Choose file
+
+  - id: playground.file-picker
+    area: playground
+    title: File picker
+    root:
+      none: "the browser's own file chooser, which has no element"
+    reach:
+      - Choose file in Transcribe
+    does:
+      - takes one audio file and shows its name beside the button
+
+  - id: keys.nav-arrows
+    area: keys
+    title: Nav keys
+    root:
+      none: "key handling on the nav, with nothing drawn"
+    reach:
+      - focus on a tab, then an arrow key, Home or End
+    does:
+      - the arrow keys move to the neighbouring tab (wrapping at the ends) and open it; Home and End jump to the first and last

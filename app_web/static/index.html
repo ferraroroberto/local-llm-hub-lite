@@ -52,7 +52,7 @@
   <!-- Primary nav — the vendored fleet component (_vendored/nav). Body-level
        sibling of the scrolling <main class="app">: iOS captures position:fixed
        descendants of scroll containers (see _vendored/nav/README.md). -->
-  <nav class="tabs" role="tablist" aria-label="Sections" data-active-tab="hub">
+  <nav class="tabs" data-surface="chrome.nav" role="tablist" aria-label="Sections" data-active-tab="hub">
     <button id="tabHub" type="button" class="tab active" data-tab="hub" role="tab" aria-selected="true" aria-controls="paneHub">
       <svg class="icon tab-icon" aria-hidden="true"><use href="#i-house"></use></svg>
       <span class="tab-label">Hub</span>
@@ -68,10 +68,10 @@
   </nav>
 
   <main class="app">
-    <section id="paneHub" class="pane" role="tabpanel" aria-labelledby="tabHub">
+    <section id="paneHub" data-surface="hub.screen" class="pane" role="tabpanel" aria-labelledby="tabHub">
       <!-- Hub card: title + inline live status, PID + Uptime (one line),
            sparklines. Theme toggle sits alone in the header, right-aligned. -->
-      <section class="card">
+      <section class="card" data-surface="hub.status">
         <div class="card-header">
           <div class="hub-title-block">
             <h2><svg class="icon" aria-hidden="true"><use href="#i-house"></use></svg>Hub</h2>
@@ -81,18 +81,18 @@
             </span>
           </div>
           <div class="card-header-actions">
-            <button data-track="theme-toggle" id="themeToggleBtn" type="button" class="icon-header-btn" aria-label="Toggle dark mode" title="Toggle theme"><svg class="icon" aria-hidden="true"><use href="#i-moon"></use></svg></button>
+            <button data-track="theme-toggle" data-surface="settings.theme" id="themeToggleBtn" type="button" class="icon-header-btn" aria-label="Toggle dark mode" title="Toggle theme"><svg class="icon" aria-hidden="true"><use href="#i-moon"></use></svg></button>
           </div>
         </div>
         <div class="hub-meta-row">
           <span><span>PID</span><code id="hubPid">—</code></span>
           <span><span>Uptime</span><span id="hubUptime">—</span></span>
         </div>
-        <div class="sparklines" id="hubSparklines"></div>
+        <div class="sparklines" id="hubSparklines" data-surface="hub.sparklines"></div>
       </section>
 
       <!-- Health & install — vendored disclosure card (_vendored/disclosure) -->
-      <details class="card card--collapsible" id="installCard">
+      <details class="card card--collapsible" id="installCard" data-surface="hub.install">
         <summary data-track="hub-health-install" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-stethoscope"></use></svg>
@@ -103,7 +103,7 @@
         </summary>
         <div class="collapse-body">
           <div id="installRows"></div>
-          <div class="setting-row">
+          <div class="setting-row" data-surface="settings.text-size">
             <span class="setting-label">Text size</span>
             <div class="segmented" id="textSizeControl" role="group" aria-label="Text size">
               <button data-track="text-size-small" type="button" class="segmented-item" aria-pressed="false" data-textsize="small">Small</button>
@@ -121,7 +121,7 @@
       <!-- Diagnostic surfaces: four vendored disclosure cards
            (_vendored/disclosure), folded by default — same pattern as
            Health & install. The density toggle + compact tabbed pane are gone. -->
-      <details class="card card--collapsible">
+      <details class="card card--collapsible" data-surface="hub.live-requests">
         <summary data-track="hub-live-requests" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-radio"></use></svg>
@@ -132,12 +132,12 @@
         </summary>
         <div class="collapse-body">
           <ul id="liveRequestsList" class="card-list dense" aria-label="Live request stream"></ul>
-          <div id="liveRequestsEmpty" class="empty-state"><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-radio"></use></svg><p class="empty-state-message">No requests yet — the ring fills as clients call the hub.</p></div>
+          <div id="liveRequestsEmpty" class="empty-state" data-surface="hub.live-requests-empty"><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-radio"></use></svg><p class="empty-state-message">No requests yet — the ring fills as clients call the hub.</p></div>
           <p class="muted small" style="margin: 8px 0 0;">Audio calls posted directly to <code>:8090</code> bypass the hub and don't show here.</p>
         </div>
       </details>
 
-      <details class="card card--collapsible">
+      <details class="card card--collapsible" data-surface="hub.counters">
         <summary data-track="hub-counters" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-chart-column"></use></svg>
@@ -157,7 +157,7 @@
         </div>
       </details>
 
-      <details class="card card--collapsible">
+      <details class="card card--collapsible" data-surface="hub.errors">
         <summary data-track="hub-errors" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-triangle-alert"></use></svg>
@@ -168,11 +168,11 @@
         </summary>
         <div class="collapse-body">
           <ul id="recentErrorsList" class="card-list dense" aria-label="Recent errors"></ul>
-          <div id="recentErrorsEmpty" class="empty-state"><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-circle-check"></use></svg><p class="empty-state-message">No non-2xx responses in the ring.</p></div>
+          <div id="recentErrorsEmpty" class="empty-state" data-surface="hub.errors-empty"><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-circle-check"></use></svg><p class="empty-state-message">No non-2xx responses in the ring.</p></div>
         </div>
       </details>
 
-      <details class="card card--collapsible">
+      <details class="card card--collapsible" data-surface="hub.log">
         <summary data-track="hub-log" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-scroll-text"></use></svg>
@@ -189,10 +189,10 @@
       </details>
     </section>
 
-    <section id="paneModels" class="pane" hidden role="tabpanel">
+    <section id="paneModels" data-surface="models.screen" class="pane" hidden role="tabpanel">
       <!-- Vendored disclosure card (_vendored/disclosure), open by default —
            the inventory is what you came to this tab to see. -->
-      <details class="card card--collapsible" id="modelsCard" open>
+      <details class="card card--collapsible" id="modelsCard" data-surface="models.list" open>
         <summary data-track="models-list" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-boxes"></use></svg>
@@ -207,7 +207,7 @@
           <p class="muted small">One row per backend enabled for this host. Each <code>llama-server</code>
             and <code>whisper-server</code> backend can be started or stopped individually.</p>
           <ul id="modelsList" class="models-list"></ul>
-          <div id="modelsEmpty" class="empty-state" hidden><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-boxes"></use></svg><p class="empty-state-message">No models enabled for this host — check <code>config/models.yaml</code>.</p></div>
+          <div id="modelsEmpty" class="empty-state" data-surface="models.empty" hidden><svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-boxes"></use></svg><p class="empty-state-message">No models enabled for this host — check <code>config/models.yaml</code>.</p></div>
         </div>
       </details>
 
@@ -215,7 +215,7 @@
            default and fetched only when expanded — mirrors app-launcher's
            System Map lazy-load discipline (a folded, low-noise card),
            adapted for small live JSON instead of a static image. -->
-      <details class="card card--collapsible" id="rolesCard">
+      <details class="card card--collapsible" id="rolesCard" data-surface="models.decisions">
         <summary data-track="models-decisions" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-boxes"></use></svg>
@@ -232,10 +232,10 @@
       </details>
     </section>
 
-    <section id="panePlayground" class="pane" hidden role="tabpanel">
+    <section id="panePlayground" data-surface="playground.screen" class="pane" hidden role="tabpanel">
       <!-- The testers are vendored disclosure cards, folded by default,
            so one opens at a time by choice. -->
-      <details class="card card--collapsible">
+      <details class="card card--collapsible" data-surface="playground.tester">
         <summary data-track="playground-section" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-flask-conical"></use></svg>
@@ -260,7 +260,7 @@
           <textarea id="playgroundPrompt" rows="6" placeholder="Hello"></textarea>
         </div>
 
-        <details class="opt-stack" id="playgroundMore">
+        <details class="opt-stack" id="playgroundMore" data-surface="playground.more-options">
           <summary data-track="playground-more-options" class="opt-group-title" style="cursor: pointer; list-style: revert;">More options</summary>
 
           <div class="opt-stack">
@@ -290,7 +290,7 @@
         </div>
       </details>
 
-      <details class="card card--collapsible" id="transcribeCard">
+      <details class="card card--collapsible" id="transcribeCard" data-surface="playground.transcribe">
         <summary data-track="transcribe-section" class="collapse-summary">
           <span class="collapse-main">
             <svg class="icon" aria-hidden="true"><use href="#i-radio"></use></svg>
@@ -322,7 +322,7 @@
     </section>
 
     <!-- Build identity: which build the PWA is running. Filled by main.js. -->
-    <footer class="page-foot">
+    <footer class="page-foot" data-surface="chrome.build-readout">
       <p id="buildReadout"></p>
     </footer>
 
@@ -331,7 +331,7 @@
   <!-- Fixed layers live at body level, outside the .app scroller (the
        standalone-PWA shell makes .app a fixed-inset element scroller —
        fixed descendants of a scroller are an iOS capture hazard). -->
-  <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+  <div id="toast" class="toast" data-surface="chrome.toast" hidden role="status" aria-live="polite"></div>
 
   <script type="module" src="/admin/static/main.js"></script>
 </body>
