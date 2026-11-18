@@ -164,7 +164,7 @@ vendor/            llama.cpp + whisper.cpp binaries (downloaded, gitignored)
 models/            GGUF/BIN weights (downloaded, gitignored)
 ```
 
-Where new code goes, and the structure ratchet that enforces it: [`docs/layout.md`](docs/layout.md).
+Where new code goes, and the structure ratchet that enforces it: [`docs/layout.md`](docs/layout.md). Every screen, card, sheet, toast and state of the admin SPA, with how to reach it: [`docs/ux-surface-map.md`](docs/ux-surface-map.md), generated from `docs/ux-surfaces.yaml` and held to the markup by the UX-surface ratchet (each surface root carries a `data-surface` id).
 
 ## Restart & verify
 

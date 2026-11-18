@@ -69,6 +69,7 @@ function buildItem(m) {
   const li = document.createElement('li');
   li.className = 'app-item';
   li.dataset.id = m.id;
+  li.dataset.surface = 'models.row';
   fillItem(li, m);
   return li;
 }

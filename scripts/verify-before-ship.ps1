@@ -55,6 +55,11 @@
 #      the usage log wired. Whole tree, never routed. Any non-zero exit fails, so
 #      exit 3 (a file that cannot be read or closed) is NOT CONFIRMED and never a
 #      pass.
+#   9d. UX surface ratchet: no unmarked surface root, unmapped id, stale or
+#      duplicate map entry, dangling link or stale docs/ux-surface-map.md page in
+#      app_web/static beyond .ux-surface-ratchet-baseline.json. Whole tree, never
+#      routed. Any non-zero exit fails, so exit 3 (a file that cannot be read or
+#      closed) is NOT CONFIRMED and never a pass.
 #  10. `pytest -q` (unit tests, no GPU / no real CLIs); stages 10-11 run inside
 #      the runtime write probe (--snapshot before, --probe after), which fails on
 #      any untracked or ignored file they leave under a code folder.
@@ -227,6 +232,13 @@ Step "usage track ratchet" {
     # exit, so exit 3 (a file that cannot be read, or JS that never closes) stops
     # the gate like a finding does.
     & $Python scripts\usage_track_ratchet.py
+}
+
+Step "ux surface ratchet" {
+    # Called directly, like the usage track ratchet: Step fails on any non-zero
+    # exit, so exit 3 (a file that cannot be read, or JS that never closes) stops
+    # the gate like a finding does.
+    & $Python scripts\ux_surface_ratchet.py
 }
 
 # Runtime write probe, first half: what already sits untracked or ignored under
