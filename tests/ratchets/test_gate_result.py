@@ -24,7 +24,12 @@ from src.no_window import NO_WINDOW
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GATE = REPO_ROOT / "scripts" / "verify-before-ship.ps1"
 
-windows_only = pytest.mark.skipif(sys.platform != "win32", reason="the gate is a Windows PowerShell script")
+_skip_off_windows = pytest.mark.skipif(sys.platform != "win32", reason="the gate is a Windows PowerShell script")
+
+
+def windows_only(test):
+    """Mark a test that runs the gate's PowerShell: the nightly excludes it, other platforms skip it."""
+    return pytest.mark.windows_only(_skip_off_windows(test))
 
 
 def _powershell() -> str:

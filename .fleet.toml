@@ -189,6 +189,18 @@ module = "src/process/serving_state.py"
 type   = "ServingState"
 derive = "derive"
 
+# [ci.nightly] -- the Mac Mini nightly's settings (project-scaffolding docs/mac-runner.md,
+# "The [ci.nightly] table"). The unit leg skips tests marked `windows_only` (pytest.ini);
+# the e2e leg boots the hub itself (tests/e2e/conftest.py hub_url) on Playwright WebKit.
+# No `views`: the iOS Simulator smoke needs a [design.review.synthetic] command this repo
+# does not declare.
+[ci.nightly]
+python       = "3.12"
+requirements = ["requirements.txt", "requirements-dev.txt"]
+samples      = "config"
+unit         = ["tests", "--ignore=tests/e2e"]
+e2e          = ["tests/e2e"]
+
 [e2e]
 static_pytest_target = "tests/e2e/test_smoke.py"
 static_browsers       = ["chromium"]

@@ -84,12 +84,14 @@ def _run_event_loop_worker(mode: str) -> subprocess.CompletedProcess:
     )
 
 
+@pytest.mark.windows_only
 @pytest.mark.skipif(sys.platform != "win32", reason="proactor-loop bug is Windows-only")
 def test_selector_loop_survives_aborted_connections():
     result = _run_event_loop_worker("selector")
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+@pytest.mark.windows_only
 @pytest.mark.skipif(sys.platform != "win32", reason="proactor-loop bug is Windows-only")
 def test_proactor_loop_dies_on_aborted_connections():
     """Documents the bug this issue fixes -- the shim exists because this
