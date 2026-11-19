@@ -30,9 +30,10 @@ from src.process import win_job
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-pytestmark = pytest.mark.skipif(
-    sys.platform != "win32", reason="Job Objects are a Windows-only API"
-)
+pytestmark = [
+    pytest.mark.windows_only,
+    pytest.mark.skipif(sys.platform != "win32", reason="Job Objects are a Windows-only API"),
+]
 
 
 def _wait_until(predicate, timeout: float = 10.0, interval: float = 0.1) -> bool:
