@@ -92,10 +92,16 @@ def test_a_listener_whose_identity_cannot_be_read_reads_unknown(stub_port, monke
 def test_start_refuses_to_adopt_an_unrelated_listener(stub_port, monkeypatch):
     model = _stub_model(stub_port)
     monkeypatch.setattr(bp, "resolve_model_by_id", lambda mid: model)
-    monkeypatch.setattr(
-        subprocess, "Popen",
-        lambda *a, **k: pytest.fail("start must not spawn over a listener it cannot identify"),
-    )
+    real_popen = subprocess.Popen
+    scan_tools = {"lsof", "netstat"}  # the port scan's own fallback spawns (psutil needs root on macOS)
+
+    def _trap(args, *a, **k):
+        argv = args if isinstance(args, (list, tuple)) else [args]
+        if str(argv[0]) in scan_tools:
+            return real_popen(args, *a, **k)
+        pytest.fail("start must not spawn over a listener it cannot identify")
+
+    monkeypatch.setattr(subprocess, "Popen", _trap)
 
     result = bp.start(MODEL_ID)
 
