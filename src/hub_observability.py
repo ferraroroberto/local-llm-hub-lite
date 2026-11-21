@@ -51,12 +51,9 @@ class RequestRecord:
     latency_ms: float = 0.0
     in_tok: int = 0
     out_tok: int = 0
-    cache_read_tok: int = 0
-    cache_write_tok: int = 0
     stop_reason: str = ""
     client: str = ""          # client IP (best-effort)
     error_detail: str = ""    # filled when status >= 400
-    trace_id: str = ""        # trace id (when a route stamps one)
 
 
 @dataclass
@@ -93,11 +90,8 @@ class ObservabilityCtx:
         "backend",
         "in_tok",
         "out_tok",
-        "cache_read_tok",
-        "cache_write_tok",
         "stop_reason",
         "error_detail",
-        "trace_id",
     )
 
     def __init__(self) -> None:
@@ -108,11 +102,8 @@ class ObservabilityCtx:
         self.backend: str = ""
         self.in_tok: int = 0
         self.out_tok: int = 0
-        self.cache_read_tok: int = 0
-        self.cache_write_tok: int = 0
         self.stop_reason: str = ""
         self.error_detail: str = ""
-        self.trace_id: str = ""
 
 
 class Observatory:
@@ -245,12 +236,9 @@ def _rec_to_dict(r: RequestRecord) -> Dict[str, Any]:
         "latency_ms": round(r.latency_ms, 1),
         "in_tok": r.in_tok,
         "out_tok": r.out_tok,
-        "cache_read_tok": r.cache_read_tok,
-        "cache_write_tok": r.cache_write_tok,
         "stop_reason": r.stop_reason,
         "client": r.client,
         "error_detail": r.error_detail,
-        "trace_id": r.trace_id,
     }
 
 
@@ -322,11 +310,8 @@ class ObservatoryMiddleware(BaseHTTPMiddleware):
                     latency_ms=latency_ms,
                     in_tok=ctx.in_tok,
                     out_tok=ctx.out_tok,
-                    cache_read_tok=ctx.cache_read_tok,
-                    cache_write_tok=ctx.cache_write_tok,
                     stop_reason=ctx.stop_reason,
                     client=client,
                     error_detail=ctx.error_detail or error_detail,
-                    trace_id=ctx.trace_id,
                 )
             )

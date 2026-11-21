@@ -232,13 +232,10 @@ def messages(req: MessagesRequest, request: Request) -> JSONResponse:
     if ctx is not None:
         ctx.in_tok = int(u["input_tokens"])
         ctx.out_tok = int(u["output_tokens"])
-        ctx.cache_read_tok = int(u["cache_read_input_tokens"])
-        ctx.cache_write_tok = int(u["cache_creation_input_tokens"])
         ctx.stop_reason = str(payload.get("stop_reason") or "")
     logger.info(
-        "<- in=%d out=%d (cache_r=%d cache_w=%d) stop=%s backend=%s",
+        "<- in=%d out=%d stop=%s backend=%s",
         u["input_tokens"], u["output_tokens"],
-        u["cache_read_input_tokens"], u["cache_creation_input_tokens"],
         payload["stop_reason"], model.backend,
     )
     return JSONResponse(payload)
