@@ -130,3 +130,15 @@ def test_chat_ping_probes_messages_endpoint(monkeypatch):
     assert len(calls) == 1
     assert calls[0]["url"].endswith("/v1/messages")
     assert calls[0]["kwargs"]["json"]["max_tokens"] == 1
+
+
+def test_chat_ping_waits_out_an_on_demand_cold_load(monkeypatch):
+    """The chat ping's timeout covers the load budget a cold row can take."""
+    from src.process.serving_state import LOAD_DEADLINE_S
+
+    calls: list = []
+    _patch_async_client(monkeypatch, calls)
+
+    _admin_client().post("/api/models/qwen35_4b/ping")
+
+    assert calls[0]["kwargs"]["timeout"] > LOAD_DEADLINE_S
