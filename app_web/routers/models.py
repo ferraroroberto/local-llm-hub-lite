@@ -23,6 +23,7 @@ from src.model_registry import (
 )
 from src.process import backend_process as bp
 from src.process.outcomes import Result
+from src.process.serving_state import LOAD_DEADLINE_S
 from src.process.server_process import (
     OWNERSHIP_NONE,
     snapshot_is_known,
@@ -37,6 +38,13 @@ router = APIRouter()
 # and a wedged one must not stall the whole list (probes run concurrently, so
 # the worst case is one timeout, not one per backend).
 _READINESS_PROBE_TIMEOUT_S = 0.4
+# A whisper ping sends a silent clip through the hub; a lazy/CPU whisper
+# backend may cold-load first, so the budget is generous.
+_WHISPER_PING_TIMEOUT_S = 60.0
+# A chat ping goes through /v1/messages, which on an on-demand row waits for
+# the backend's cold load (up to the serving state's load budget) before it
+# generates its one token, so the ping covers that load plus a margin.
+_CHAT_PING_TIMEOUT_S = LOAD_DEADLINE_S + 20.0
 
 
 def _add_startup_fields(row: Dict[str, Any], m: Model) -> None:
@@ -289,8 +297,9 @@ async def model_ping(model_id: str) -> Dict[str, Any]:
         url = f"http://127.0.0.1:{port}/v1/audio/transcriptions"
         files = {"file": ("ping.wav", _silent_wav(), "audio/wav")}
         data = {"model": target.display_name}
-        # Generous timeout: a lazy/CPU whisper backend may cold-load.
-        r, latency_ms, error = await _probe(url, timeout=60.0, files=files, data=data)
+        r, latency_ms, error = await _probe(
+            url, timeout=_WHISPER_PING_TIMEOUT_S, files=files, data=data
+        )
         if error is not None:
             return {"ok": False, "status": 0, "latency_ms": latency_ms, "error": error}
         return _ping_result(r, latency_ms)
@@ -301,7 +310,7 @@ async def model_ping(model_id: str) -> Dict[str, Any]:
         "max_tokens": 1,
         "messages": [{"role": "user", "content": "ping"}],
     }
-    r, latency_ms, error = await _probe(url, timeout=20.0, json=payload)
+    r, latency_ms, error = await _probe(url, timeout=_CHAT_PING_TIMEOUT_S, json=payload)
     if error is not None:
         return {"ok": False, "status": 0, "latency_ms": latency_ms, "error": error}
     return _ping_result(r, latency_ms)

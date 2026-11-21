@@ -41,7 +41,13 @@ import yaml
 from src.host_profile import CONFIG_PATH, hub_port
 from src.model_registry import Model, enabled_models
 from src.no_window import NO_WINDOW
+from src.process.backend_process import (
+    STOP_GRACE_S,
+    STOP_KILL_WAIT_S,
+    STOP_TERMINATE_WAIT_S,
+)
 from src.process.server_process import WIN_NEW_GROUP, lan_ip
+from src.process.serving_state import LOAD_DEADLINE_S
 from src.webapp_config import append_auth_token, ensure_auth_token
 
 from .icon import COLOR_RUNNING, COLOR_STARTING, COLOR_STOPPED, make_icon_image
@@ -54,6 +60,29 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# ``HubProcess.stop`` escalates CTRL_BREAK -> terminate -> kill, each step with
+# its own wait. After CTRL_BREAK the hub gets this long to run uvicorn's
+# shutdown handler before terminate() (an immediate hard kill on Windows).
+HUB_STOP_GRACE_S = 5.0
+# Wait for the hub to disappear after terminate(); a healthy exit is
+# near-instant, so running past this means it is stuck and is killed outright.
+HUB_STOP_TERMINATE_WAIT_S = 5.0
+# Final wait after kill(); bounds ``stop()`` so it always returns.
+HUB_STOP_KILL_WAIT_S = 5.0
+# Pause between stopping and respawning the hub so the old process releases
+# the listening port before the new one binds it.
+HUB_RESTART_PAUSE_S = 0.6
+# How long the tray waits for a model it started from the menu before it
+# reports failure. It is the hub's load budget plus a margin, so the tray
+# never calls a model unreachable while the hub still counts it as loading.
+MODEL_READY_WAIT_S = LOAD_DEADLINE_S + 10.0
+# Timeout for one tray -> hub admin call. The slowest is a model stop, which
+# can run the backend's full CTRL_BREAK -> terminate -> kill sequence, so the
+# budget covers that sequence plus a margin for the round trip.
+ADMIN_CALL_TIMEOUT_S = (
+    STOP_GRACE_S + STOP_TERMINATE_WAIT_S + STOP_KILL_WAIT_S + 5.0
+)
 
 
 # --------------------------------------------------------------- TrayConfig
@@ -161,7 +190,7 @@ class HubProcess:
                     # terminate() is an immediate hard TerminateProcess on
                     # Windows, so calling it right away never lets the
                     # graceful signal land.
-                    p.wait(timeout=5)
+                    p.wait(timeout=HUB_STOP_GRACE_S)
                 except subprocess.TimeoutExpired:
                     pass
                 except Exception:
@@ -169,10 +198,10 @@ class HubProcess:
             if p.poll() is None:
                 p.terminate()
                 try:
-                    p.wait(timeout=5)
+                    p.wait(timeout=HUB_STOP_TERMINATE_WAIT_S)
                 except subprocess.TimeoutExpired:
                     p.kill()
-                    p.wait(timeout=5)
+                    p.wait(timeout=HUB_STOP_KILL_WAIT_S)
         except Exception as exc:  # noqa: BLE001
             return False, f"error stopping: {exc}"
         self.proc = None
@@ -387,7 +416,7 @@ class TrayApp:
                 "it from here; use tray.bat --restart or stop it manually",
             )
             return
-        time.sleep(0.6)
+        time.sleep(HUB_RESTART_PAUSE_S)
         ok, msg = self.hub.start()
         if not ok:
             self._notify("Hub", f"⚠️ {msg}")
@@ -447,14 +476,14 @@ class TrayApp:
         model = next((m for m in self._models if m.id == model_id), None)
         if model is None or model.port is None:
             return
-        deadline = time.time() + 120.0
+        deadline = time.time() + MODEL_READY_WAIT_S
         while time.time() < deadline:
             if _tcp_reachable("127.0.0.1", model.port, 0.8):
                 self._notify(model_id, "✅ Ready")
                 self._update_menu()
                 return
             time.sleep(1.0)
-        self._notify(model_id, "⚠️ not reachable after 120s")
+        self._notify(model_id, f"⚠️ not reachable after {MODEL_READY_WAIT_S:.0f}s")
         self._update_menu()
 
     def _admin_request(self, method: str, path: str) -> Tuple[bool, str]:
@@ -471,7 +500,7 @@ class TrayApp:
         """
         url = self.hub.base_url() + path
         try:
-            r = httpx.request(method, url, timeout=15.0)
+            r = httpx.request(method, url, timeout=ADMIN_CALL_TIMEOUT_S)
         except httpx.HTTPError as exc:
             return False, f"hub unreachable: {exc}", None
         try:
