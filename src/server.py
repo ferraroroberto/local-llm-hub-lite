@@ -50,6 +50,7 @@ from .routes.anthropic_errors import install_anthropic_error_handlers
 from .server_common import ensure_backend_ready_or_503 as _ensure_backend_ready
 from .server_common import resolve_model_or_400 as _resolve
 from .trace_id_middleware import TraceIdHeaderMiddleware
+from .webapp_config import current_auth_token
 
 logging.basicConfig(
     level=logging.INFO,
@@ -109,17 +110,7 @@ app.add_middleware(ObservatoryMiddleware)
 # extra_allowlist). The /admin sub-app has its own copy of this
 # middleware — its prefix is exempted here so a single auth boundary
 # governs the whole process.
-def _hub_get_token() -> str:
-    """Resolve the bearer token from config/webapp_config.json on every
-    check so the user can edit it without restarting the hub."""
-    try:
-        from .webapp_config import load_webapp_config
-        return getattr(load_webapp_config(), "auth_token", "") or ""
-    except Exception:  # noqa: BLE001
-        return ""
-
-
-app.add_middleware(ParentBearerTokenMiddleware, get_token=_hub_get_token)
+app.add_middleware(ParentBearerTokenMiddleware, get_token=current_auth_token)
 
 # X-Trace-Id contract — accept client-supplied UUID4 / hex in, echo a
 # deterministic trace ID out. Pure-ASGI middleware; added last so it
@@ -128,9 +119,9 @@ app.add_middleware(TraceIdHeaderMiddleware)
 
 
 # Expose the same WebappConfig to the parent app so the middleware can
-# read ``extra_allowlist`` without re-loading on every request. Note the
-# token itself is *not* cached — we always re-read so the user can
-# rotate without restarting.
+# read ``extra_allowlist`` without re-loading on every request. The token
+# is not taken from this snapshot: ``current_auth_token`` follows the file,
+# so a rotation applies without a restart.
 try:
     from .webapp_config import load_webapp_config as _load_wcfg
     app.state.webapp_config = _load_wcfg()

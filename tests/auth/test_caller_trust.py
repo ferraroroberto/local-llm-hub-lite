@@ -13,6 +13,7 @@ from app_web import server as admin_server
 from src import server as server_mod
 from src import webapp_config as webapp_config_mod
 from src.webapp_config import WebappConfig
+from tests._webapp_token import pin_auth_token
 
 _REMOTE = {"X-Forwarded-For": "203.0.113.5"}
 _UNLISTED_ORIGIN = "https://pages.example"
@@ -20,19 +21,14 @@ _LISTED_ORIGIN = "https://llm.example.com"
 
 
 def _admin(token: str = "", origins: list | None = None) -> TestClient:
+    pin_auth_token(token)
     app = admin_server.create_app()
-    app.state.webapp_config = WebappConfig(
-        auth_token=token, cors_allow_origins=list(origins or [])
-    )
+    app.state.webapp_config = WebappConfig(cors_allow_origins=list(origins or []))
     return TestClient(app)
 
 
 def _parent(monkeypatch, token: str = "") -> TestClient:
-    monkeypatch.setattr(
-        webapp_config_mod,
-        "load_webapp_config",
-        lambda *a, **k: WebappConfig(auth_token=token),
-    )
+    pin_auth_token(token)
     return TestClient(server_mod.app)
 
 

@@ -15,14 +15,14 @@ from app_web import server as admin_server
 from src import server as server_mod
 from src import webapp_config as webapp_config_mod
 from src.webapp_config import WebappConfig
+from tests._webapp_token import pin_auth_token
 
 _PROXY_HEADERS = {"X-Forwarded-For": "203.0.113.5"}  # forces is_loopback=False
 
 
 def _admin_client(token: str) -> TestClient:
-    app = admin_server.create_app()
-    app.state.webapp_config = WebappConfig(auth_token=token)
-    return TestClient(app)
+    pin_auth_token(token)
+    return TestClient(admin_server.create_app())
 
 
 def test_admin_blocks_non_loopback_without_token():
@@ -63,12 +63,7 @@ def test_admin_loopback_bypasses_without_token():
 
 
 def _patch_parent_token(monkeypatch, token: str) -> None:
-    # _hub_get_token() (src/server.py) re-reads config/webapp_config.json on
-    # every check via load_webapp_config() — it does not read
-    # app.state.webapp_config — so the token must be patched at that source.
-    monkeypatch.setattr(
-        webapp_config_mod, "load_webapp_config", lambda *a, **k: WebappConfig(auth_token=token)
-    )
+    pin_auth_token(token)
 
 
 def test_parent_blocks_non_loopback_without_token(monkeypatch):

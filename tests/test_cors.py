@@ -22,6 +22,7 @@ from src import cors_policy
 from src import server as server_mod
 from src import webapp_config as webapp_config_mod
 from src.webapp_config import WebappConfig
+from tests._webapp_token import pin_auth_token
 
 LOOPBACK_ORIGIN = "http://localhost:3000"
 FOREIGN_ORIGIN = "https://evil.example"
@@ -148,11 +149,7 @@ def test_preflight_from_loopback_origin_succeeds():
 def test_preflight_succeeds_without_a_token(monkeypatch):
     """A browser sends no credentials on a preflight — if the bearer gate saw
     it, every cross-origin call would die before it started."""
-    monkeypatch.setattr(
-        webapp_config_mod,
-        "load_webapp_config",
-        lambda *a, **k: WebappConfig(auth_token="parentsecret"),
-    )
+    pin_auth_token("parentsecret")
     r = _preflight(_client(), LOOPBACK_ORIGIN, extra=_PROXY_HEADERS)
     assert r.status_code == 200
     assert r.headers["access-control-allow-origin"] == LOOPBACK_ORIGIN
@@ -214,11 +211,7 @@ def test_trace_headers_are_readable_by_page_javascript():
 def test_bearer_gate_still_rejects_non_loopback_without_token(monkeypatch):
     """CORS is not an auth bypass — the real request behind the preflight
     meets exactly the gate it met before."""
-    monkeypatch.setattr(
-        webapp_config_mod,
-        "load_webapp_config",
-        lambda *a, **k: WebappConfig(auth_token="parentsecret"),
-    )
+    pin_auth_token("parentsecret")
     r = _client().get(
         "/v1/models", headers={**_PROXY_HEADERS, "Origin": LOOPBACK_ORIGIN}
     )

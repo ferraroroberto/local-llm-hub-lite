@@ -18,9 +18,15 @@ from src import password as app_password
 from src.login_lockout import LoginLockout
 from src.notify import NotifierError
 from src.webapp_config import WebappConfig
+from tests._webapp_token import pin_auth_token
 
 PASSWORD = "correct horse"
 TOKEN = "tok-for-tests"
+
+
+@pytest.fixture(autouse=True)
+def _token_on_disk():
+    pin_auth_token(TOKEN)
 ATTACKER = {"X-Forwarded-For": "203.0.113.5"}
 
 
@@ -44,7 +50,7 @@ class FakeNotifier:
 
 def _client(clock: FakeClock, on_alert=None, *, peer=None) -> TestClient:
     app = admin_server.create_app()
-    app.state.webapp_config = WebappConfig(auth_token=TOKEN, auth_password=PASSWORD)
+    app.state.webapp_config = WebappConfig(auth_password=PASSWORD)
     app.state.login_lockout = LoginLockout(clock=clock, on_alert=on_alert)
     return TestClient(app, client=peer) if peer else TestClient(app)
 
@@ -129,7 +135,6 @@ def test_the_alert_goes_out_through_the_configured_notifier_on_a_thread(monkeypa
     monkeypatch.setattr(login_alert, "build_notifier", lambda name, cfg: notifier if name == "telegram" else None)
     app = admin_server.create_app()
     app.state.webapp_config = WebappConfig(
-        auth_token=TOKEN,
         auth_password=PASSWORD,
         telegram_bot_token="bot",
         telegram_alert_chat_id="chat",
@@ -145,7 +150,7 @@ def test_without_telegram_credentials_no_alert_is_sent_and_login_still_answers(m
     built: list[str] = []
     monkeypatch.setattr(login_alert, "build_notifier", lambda name, cfg: built.append(name))
     app = admin_server.create_app()
-    app.state.webapp_config = WebappConfig(auth_token=TOKEN, auth_password=PASSWORD)
+    app.state.webapp_config = WebappConfig(auth_password=PASSWORD)
     client = TestClient(app)
     for _ in range(3):
         assert _login(client, "wrong", ATTACKER).status_code == 401
@@ -170,10 +175,10 @@ def test_a_failing_notifier_never_breaks_the_login(caplog):
 def test_the_existing_503_and_401_replies_are_unchanged(password):
     clock = FakeClock()
     app = admin_server.create_app()
-    app.state.webapp_config = WebappConfig(auth_token=TOKEN, auth_password="")
+    app.state.webapp_config = WebappConfig(auth_password="")
     app.state.login_lockout = LoginLockout(clock=clock)
     assert _login(TestClient(app), password).status_code == 503
-    app.state.webapp_config = WebappConfig(auth_token=TOKEN, auth_password=PASSWORD)
+    app.state.webapp_config = WebappConfig(auth_password=PASSWORD)
     assert _login(TestClient(app), password).status_code == 401
 
 
