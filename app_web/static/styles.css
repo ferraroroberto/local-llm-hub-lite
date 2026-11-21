@@ -131,6 +131,9 @@
   --danger-text: #ff7b72;
   --attention: #d29922;
   --toggle-knob: var(--ink);
+  /* Control fill sits above the card (card-off is a darker well, so a filled
+     control would read as a hole); border-muted is the spec's dark control fill. */
+  --input-bg: var(--line-muted);
   /* Depth on a near-black canvas comes from surface lightness, not shadow. */
   --shadow: 0 8px 24px rgba(1, 4, 9, 0.6);
   --tabbar-bg: rgba(42, 45, 52, 0.55);
@@ -475,7 +478,7 @@ h2 { display: flex; align-items: center; gap: 8px; }
   justify-content: center;
   gap: 6px;
   height: var(--control-h);
-  background: var(--card-off);
+  background: var(--input-bg);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   padding: 0 10px;
@@ -780,7 +783,7 @@ h2 { display: flex; align-items: center; gap: 8px; }
 .playground-send-row > button { flex: 1; min-width: 0; }
 /* ---------- badges ---------- */
 .badge {
-  background: var(--card-off);
+  background: var(--input-bg);
   color: var(--muted);
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
