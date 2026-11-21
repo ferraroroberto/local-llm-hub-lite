@@ -89,6 +89,44 @@ def load_webapp_config(path: Optional[Path] = None) -> WebappConfig:
     return cfg
 
 
+# (stat key, token) of the last read. One slot is enough: there is one config
+# file, and every caller on the hub and the /admin sub-app shares it.
+_token_cache: tuple[object, str] = (None, "")
+
+
+def current_auth_token() -> str:
+    """The bearer token both the hub and the /admin sub-app enforce.
+
+    Re-read only when ``config/webapp_config.json`` changes (mtime/size) or
+    appears, so a rotation on disk takes effect on the next request without a
+    restart, while a steady state costs one ``stat``. A missing or unreadable
+    file is logged when it is first seen, not on every request.
+    """
+    global _token_cache
+    target = DEFAULT_CONFIG_PATH
+    try:
+        st = target.stat()
+        key: object = (target, st.st_mtime_ns, st.st_size)
+    except OSError:
+        key = (target, None, None)
+    cached_key, token = _token_cache
+    if key == cached_key:
+        return token
+    try:
+        token = load_webapp_config(target).auth_token or ""
+    except Exception as exc:  # noqa: BLE001 - a bad file means "no token", never a 500
+        logger.warning(f"⚠️  Could not resolve auth_token from {target}: {exc}")
+        token = ""
+    _token_cache = (key, token)
+    return token
+
+
+def reset_auth_token_cache() -> None:
+    """Forget the cached token so the next call re-reads the config file."""
+    global _token_cache
+    _token_cache = (None, "")
+
+
 def save_webapp_config(cfg: WebappConfig, path: Optional[Path] = None) -> Path:
     """Atomically write the config back to disk."""
     target = checked_write_path(path if path is not None else DEFAULT_CONFIG_PATH)

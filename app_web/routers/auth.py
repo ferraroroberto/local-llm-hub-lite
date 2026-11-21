@@ -18,7 +18,7 @@ from src import password
 from src.auth_middleware import is_pc_itself
 from src.login_lockout import LoginLockout, retry_after_header
 from src.runtime_files import checked_write_path
-from src.webapp_config import WebappConfig
+from src.webapp_config import WebappConfig, current_auth_token
 
 from ._helpers import PROJECT_ROOT, client_ip, maybe_json
 
@@ -76,7 +76,8 @@ async def login(request: Request) -> Dict[str, Any]:
         raise HTTPException(
             status_code=503, detail="password auth not configured"
         )
-    if not cfg.auth_token:
+    token = current_auth_token()
+    if not token:
         auth_logger.info(
             f"⚠️  Login attempt from {who} but no auth_token configured"
         )
@@ -95,4 +96,4 @@ async def login(request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="bad password")
     lockout.reset(who)
     auth_logger.info(f"🔓 Password login from {who}")
-    return {"token": cfg.auth_token}
+    return {"token": token}

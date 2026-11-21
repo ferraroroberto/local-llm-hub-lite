@@ -35,7 +35,7 @@ from src.static_versioning import (
     rewrite_js_imports,
 )
 from src.usage_log import usage_router
-from src.webapp_config import load_webapp_config
+from src.webapp_config import current_auth_token, load_webapp_config
 
 from .login_alert import make_alert_owner
 from .routers import auth, hub, misc, models, playground, roles, version
@@ -120,10 +120,9 @@ def create_app() -> FastAPI:
         openapi_url=None,
     )
 
-    app.add_middleware(
-        BearerTokenMiddleware,
-        get_token=lambda: getattr(app.state.webapp_config, "auth_token", ""),
-    )
+    # The same token source as the parent hub (one auth boundary): re-read when
+    # the config file changes, so a rotation reaches /admin without a restart.
+    app.add_middleware(BearerTokenMiddleware, get_token=current_auth_token)
 
     app.state.webapp_config = webapp_cfg
     app.state.login_lockout = LoginLockout(

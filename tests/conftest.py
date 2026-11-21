@@ -61,3 +61,20 @@ def _reset_shared_http_clients():
     yield
     http_client._async_client = None
     http_client._sync_client = None
+
+
+@pytest.fixture(autouse=True)
+def _isolated_webapp_config(tmp_path, monkeypatch):
+    """Point the webapp config at a file that does not exist, per test.
+
+    The bearer token is read from ``config/webapp_config.json`` by both apps and
+    cached on the file's mtime, so a test must neither see the live token nor
+    inherit another test's cached one. Tests that need a token write it with
+    ``tests._webapp_token.pin_auth_token``.
+    """
+    from src import webapp_config
+
+    monkeypatch.setattr(webapp_config, "DEFAULT_CONFIG_PATH", tmp_path / "webapp_config.json")
+    webapp_config.reset_auth_token_cache()
+    yield
+    webapp_config.reset_auth_token_cache()
