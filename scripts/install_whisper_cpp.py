@@ -33,8 +33,8 @@ from _lib import (  # noqa: E402
     detect_cuda_arch,
     flatten_nested_bin,
     install_assets,
-    no_window_flags,
 )
+from src.no_window import NO_WINDOW  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ def already_installed() -> bool:
             # check that the binary can execute at all.
             r = subprocess.run([str(bin_path), "--help"],
                                capture_output=True, text=True, timeout=10,
-                               creationflags=no_window_flags())
+                               creationflags=NO_WINDOW)
             if r.returncode in (0, 1):
                 return True
         except Exception:
@@ -144,7 +144,7 @@ def _macos_build_prereqs() -> str:
         )
     try:
         r = subprocess.run(["xcode-select", "-p"], capture_output=True, text=True, timeout=10,
-                           creationflags=no_window_flags())
+                           creationflags=NO_WINDOW)
     except FileNotFoundError:
         r = None
     if r is None or r.returncode != 0:
@@ -210,7 +210,7 @@ def _macos_build_from_source() -> None:
             r = subprocess.run(
                 ["install_name_tool", "-add_rpath", "@loader_path", str(target)],
                 capture_output=True, text=True, timeout=30,
-                creationflags=no_window_flags(),
+                creationflags=NO_WINDOW,
             )
             if r.returncode != 0:
                 raise InstallError(f"install_name_tool -add_rpath failed for {target}: {r.stderr.strip()}")
@@ -220,7 +220,7 @@ def _macos_build_from_source() -> None:
 
 def _run_build_step(cmd: List[str], *, cwd: Optional[Path] = None, timeout: int) -> None:
     r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout,
-                       creationflags=no_window_flags())
+                       creationflags=NO_WINDOW)
     if r.returncode != 0:
         tail = "\n".join(r.stdout.splitlines()[-20:] + r.stderr.splitlines()[-20:])
         raise InstallError(f"build step failed: {' '.join(cmd)}\n{tail}")
