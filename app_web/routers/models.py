@@ -23,12 +23,12 @@ from src.model_registry import (
 )
 from src.process import backend_process as bp
 from src.process.outcomes import Result
-from src.process.serving_state import LOAD_DEADLINE_S
 from src.process.server_process import (
     OWNERSHIP_NONE,
     snapshot_is_known,
     snapshot_listening_pids,
 )
+from src.process.serving_state import LOAD_DEADLINE_S
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
