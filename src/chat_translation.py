@@ -23,7 +23,7 @@ from .openai_upstream import (
     UpstreamError,
     anthropic_to_openai_messages,
     call_openai_chat,
-    openai_to_anthropic_envelope,
+    openai_to_anthropic_message,
 )
 
 # ---- shared content-block helpers (unchanged shape) ----
@@ -110,4 +110,4 @@ def _run_openai_backend(model: Model, req: MessagesRequest) -> Dict[str, Any]:
             )
     except UpstreamError as e:
         raise HTTPException(status_code=502, detail=str(e))
-    return openai_to_anthropic_envelope(raw)
+    return openai_to_anthropic_message(raw, req.model)
