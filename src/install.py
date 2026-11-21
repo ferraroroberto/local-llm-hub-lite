@@ -30,7 +30,7 @@ log = logging.getLogger(__name__)
 
 from .host_profile import hub_port
 from .host_profile import resolve as resolve_host
-from .model_registry import enabled_models
+from .model_registry import enabled_models, is_launchable, is_spawnable
 from .no_window import NO_WINDOW
 from .process.backend_process import llama_server_binary, whisper_server_binary
 
@@ -207,7 +207,7 @@ def _check_llama_cpp() -> Check:
 def _check_models() -> List[Check]:
     rows: List[Check] = []
     for m in enabled_models():
-        if m.backend not in ("openai", "whisper") or not m.model_path:
+        if not is_spawnable(m) or not m.model_path:
             continue
         path = (PROJECT_ROOT / m.model_path).resolve()
         label = f"Model present: {m.display_name}"
@@ -259,7 +259,7 @@ def _check_ports() -> List[Check]:
     for label, port in [("hub", hub_port())] + [
         (m.display_name, m.port)
         for m in enabled_models()
-        if m.backend in ("openai", "whisper") and m.port and not m.virtual
+        if is_launchable(m) and m.port
     ]:
         if _port_in_use(port):
             rows.append(Check(

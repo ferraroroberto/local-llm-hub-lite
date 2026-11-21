@@ -67,6 +67,22 @@ def test_launchable_local_ids_excludes_virtual_and_nonspawnable(write_config):
     assert model_registry.launchable_local_ids() == ["local_llm", "whisp"]
 
 
+def test_is_spawnable_and_is_launchable_split_on_virtual(write_config):
+    write_config({
+        "hub": {"port": 8000},
+        "hosts": {"pc": {"enabled": ["real", "virt", "tts"]}},
+        "models": {
+            "real": {"display_name": "r", "backend": "openai", "port": 8081},
+            "virt": {"display_name": "v", "backend": "openai", "port": 8081, "virtual": True},
+            "tts": {"display_name": "t", "backend": "tts", "port": 8096},
+        },
+    })
+
+    by_id = {m.id: m for m in model_registry.enabled_models()}
+    assert [model_registry.is_spawnable(by_id[i]) for i in ("real", "virt", "tts")] == [True, True, False]
+    assert [model_registry.is_launchable(by_id[i]) for i in ("real", "virt", "tts")] == [True, False, False]
+
+
 def test_resolve_by_alias(monkeypatch, write_config):
     write_config({
         "hub": {"port": 8000},

@@ -31,6 +31,7 @@ from _lib import (  # noqa: E402
 )
 
 from src.no_window import NO_WINDOW  # noqa: E402
+from src.process.backend_process import llama_server_binary  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -43,13 +44,8 @@ RELEASES_URL = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
 WIN_CUDA_PREFS = ["cuda-13.1", "cuda-12.4"]
 
 
-def _server_binary() -> Path:
-    name = "llama-server.exe" if sys.platform == "win32" else "llama-server"
-    return VENDOR_DIR / name
-
-
 def already_installed() -> bool:
-    bin_path = _server_binary()
+    bin_path = llama_server_binary()
     if not bin_path.exists():
         return False
     try:
@@ -134,7 +130,7 @@ def _pick_assets(release: dict) -> List[dict]:
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     if already_installed():
-        log.info("llama.cpp already installed at %s", _server_binary())
+        log.info("llama.cpp already installed at %s", llama_server_binary())
         return 0
 
     if sys.platform.startswith("linux"):
@@ -149,17 +145,17 @@ def main() -> int:
 
     install_assets(assets, VENDOR_DIR)
 
-    bin_path = _server_binary()
+    bin_path = llama_server_binary()
     if not bin_path.exists():
         # Some zips extract into a `build/bin/` or `bin/` subdirectory.
         flatten_nested_bin(VENDOR_DIR, bin_path.name)
 
     if not already_installed():
         raise InstallError(
-            f"extracted archives but {_server_binary()} still missing or non-runnable"
+            f"extracted archives but {llama_server_binary()} still missing or non-runnable"
         )
 
-    log.info("installed: %s", _server_binary())
+    log.info("installed: %s", llama_server_binary())
     return 0
 
 

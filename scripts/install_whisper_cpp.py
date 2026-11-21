@@ -36,6 +36,7 @@ from _lib import (  # noqa: E402
 )
 
 from src.no_window import NO_WINDOW  # noqa: E402
+from src.process.backend_process import whisper_server_binary  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -57,11 +58,6 @@ WHISPER_CPP_GIT_URL = "https://github.com/ggml-org/whisper.cpp"
 WIN_CUDA_PREFS = ["cublas-12.4.0", "cublas-12.2.0", "cublas-11.8.0"]
 
 
-def _server_binary() -> Path:
-    name = "whisper-server.exe" if sys.platform == "win32" else "whisper-server"
-    return VENDOR_DIR / name
-
-
 def _upstream_server_names() -> List[str]:
     # Upstream has shipped this binary under a couple of names over time.
     if sys.platform == "win32":
@@ -70,7 +66,7 @@ def _upstream_server_names() -> List[str]:
 
 
 def already_installed() -> bool:
-    bin_path = _server_binary()
+    bin_path = whisper_server_binary()
     if not bin_path.exists():
         return False
     # The first exec immediately after a --force extract can transiently
@@ -194,7 +190,7 @@ def _macos_build_from_source() -> None:
         built_binary = build_dir / "bin" / "whisper-server"
         if not built_binary.exists():
             raise InstallError(f"build reported success but {built_binary} is missing")
-        shutil.copy2(built_binary, checked_write_path(_server_binary()))
+        shutil.copy2(built_binary, checked_write_path(whisper_server_binary()))
 
         dylibs = sorted(build_dir.rglob("*.dylib"))
         log.info("flattening %d dylib(s) into %s", len(dylibs), VENDOR_DIR)
@@ -204,7 +200,7 @@ def _macos_build_from_source() -> None:
         # Real (non-symlink) files only — a symlink shares its target's
         # inode, so re-running install_name_tool on it errors with
         # "would duplicate path" once the target has already been fixed.
-        flattened = [_server_binary()] + [VENDOR_DIR / d.name for d in dylibs]
+        flattened = [whisper_server_binary()] + [VENDOR_DIR / d.name for d in dylibs]
         for target in flattened:
             if target.is_symlink():
                 continue
@@ -298,7 +294,7 @@ def _find_macos_asset(release: dict) -> Optional[dict]:
 def _normalise_binary_name() -> None:
     """Upstream names the server binary `server[.exe]`; the manager expects
     `whisper-server[.exe]`. Rename it if we find the upstream name."""
-    want = _server_binary()
+    want = whisper_server_binary()
     if want.exists():
         return
     for candidate_name in _upstream_server_names():
@@ -321,7 +317,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if force:
         _purge_vendor()
     elif already_installed():
-        log.info("whisper.cpp already installed at %s", _server_binary())
+        log.info("whisper.cpp already installed at %s", whisper_server_binary())
         return 0
 
     if sys.platform.startswith("linux"):
@@ -352,9 +348,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
         if not already_installed():
             raise InstallError(
-                f"installed but {_server_binary()} still missing or non-runnable"
+                f"installed but {whisper_server_binary()} still missing or non-runnable"
             )
-        log.info("installed: %s", _server_binary())
+        log.info("installed: %s", whisper_server_binary())
         return 0
 
     release = _fetch_release()
@@ -367,10 +363,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if not already_installed():
         raise InstallError(
-            f"extracted archives but {_server_binary()} still missing or non-runnable"
+            f"extracted archives but {whisper_server_binary()} still missing or non-runnable"
         )
 
-    log.info("installed: %s", _server_binary())
+    log.info("installed: %s", whisper_server_binary())
     return 0
 
 
