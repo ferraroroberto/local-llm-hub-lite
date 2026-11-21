@@ -25,7 +25,7 @@ from huggingface_hub import hf_hub_download, list_repo_files
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.model_registry import Model, enabled_models  # noqa: E402
+from src.model_registry import Model, enabled_models, is_spawnable  # noqa: E402
 from src.runtime_files import checked_write_path  # noqa: E402
 
 
@@ -55,7 +55,7 @@ def download_one(model_id: str) -> List[Path]:
     model = next((m for m in enabled_models() if m.id == model_id), None)
     if model is None:
         raise RuntimeError(f"model {model_id!r} is not enabled on this host")
-    if model.backend not in ("openai", "whisper") or not model.hf_repo:
+    if not is_spawnable(model) or not model.hf_repo:
         raise RuntimeError(f"model {model_id!r} has no hf_repo; nothing to download")
 
     matches = _files_for(model)
@@ -107,7 +107,7 @@ def main(argv: List[str] | None = None) -> int:
     args = p.parse_args(argv)
 
     candidates = [m for m in enabled_models()
-                  if m.backend in ("openai", "whisper") and m.hf_repo]
+                  if is_spawnable(m) and m.hf_repo]
     if args.only:
         candidates = [m for m in candidates if m.id == args.only]
         if not candidates:

@@ -17,6 +17,8 @@ from src.http_client import get_async_client
 from src.model_registry import (
     Model,
     enabled_models,
+    is_launchable,
+    is_spawnable,
 )
 from src.model_registry import (
     resolve as resolve_model,
@@ -120,7 +122,7 @@ async def list_models_for_admin() -> Dict[str, Any]:
     for m, reachable in zip(local_models, reach_results):
         # Virtual aliases share an existing backend's port and own no process,
         # so they're reachable but never independently start/stop-able.
-        controllable = m.backend in ("openai", "whisper") and not m.virtual
+        controllable = is_launchable(m)
         own = OWNERSHIP_NONE
         pid: Any = None
         verdict = None
@@ -158,7 +160,7 @@ async def model_start(model_id: str) -> JSONResponse:
             status_code=400,
             detail=f"model {model_id!r} is a virtual alias of another backend — nothing to start",
         )
-    if not (target.backend in ("openai", "whisper")):
+    if not is_spawnable(target):
         raise HTTPException(
             status_code=400,
             detail=f"backend {target.backend!r} has no managed process",
@@ -199,7 +201,7 @@ async def model_log(model_id: str, limit: int = 400) -> Dict[str, Any]:
     backend has never started; 404 only for an unknown model.
     """
     target = _require_model(model_id)
-    if not (target.backend in ("openai", "whisper")):
+    if not is_spawnable(target):
         raise HTTPException(
             status_code=400,
             detail=f"backend {target.backend!r} has no managed process",

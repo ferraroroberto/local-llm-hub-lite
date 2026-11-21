@@ -133,6 +133,16 @@ def enabled_models(host: Optional[HostProfile] = None) -> List[Model]:
 _SPAWNABLE_BACKENDS = ("openai", "whisper")
 
 
+def is_spawnable(model: Model) -> bool:
+    """True when ``model``'s backend runs a local server process (virtual or not)."""
+    return model.backend in _SPAWNABLE_BACKENDS
+
+
+def is_launchable(model: Model) -> bool:
+    """True when ``model`` owns its own spawnable process: spawnable, not a virtual alias."""
+    return is_spawnable(model) and not model.virtual
+
+
 def launchable_local_ids(host: Optional[HostProfile] = None) -> List[str]:
     """Ids of models this host can actually spawn as its own local process.
 
@@ -143,8 +153,7 @@ def launchable_local_ids(host: Optional[HostProfile] = None) -> List[str]:
     ``enabled:`` contract.
     """
     return [
-        m.id for m in enabled_models(host)
-        if m.backend in _SPAWNABLE_BACKENDS and not m.virtual
+        m.id for m in enabled_models(host) if is_launchable(m)
     ]
 
 

@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Mapping, Optional
 
 from ..http_client import get_sync_client
-from ..model_registry import Model, enabled_models
+from ..model_registry import Model, enabled_models, is_spawnable
 from ..runtime_files import checked_write_path
 from .outcomes import Outcome, Result
 from .server_process import (
@@ -160,7 +160,7 @@ def spawned_backends() -> Dict[str, Model]:
     out: Dict[str, Model] = {}
     for m in enabled_models():
         p = _state_for(m.id).proc
-        if m.backend in ("openai", "whisper") and p is not None and p.poll() is None:
+        if is_spawnable(m) and p is not None and p.poll() is None:
             out[m.id] = m
     return out
 
@@ -500,7 +500,7 @@ def inherit_running_backends() -> int:
     listening = snapshot_listening_pids()
     count = 0
     for m in enabled_models():
-        if m.backend not in ("openai", "whisper"):
+        if not is_spawnable(m):
             continue
         if not m.port:
             continue
@@ -548,7 +548,7 @@ def running_backends() -> Dict[str, Model]:
     """Return {model_id: Model} for each local backend whose process is alive."""
     out: Dict[str, Model] = {}
     for m in enabled_models():
-        if m.backend in ("openai", "whisper") and is_running(m.id):
+        if is_spawnable(m) and is_running(m.id):
             out[m.id] = m
     return out
 

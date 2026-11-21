@@ -23,7 +23,7 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 from .host_profile import resolve as resolve_host
-from .model_registry import enabled_models, launchable_local_ids
+from .model_registry import enabled_models, is_spawnable, launchable_local_ids
 from .process.backend_process import (
     build_command,
     resolve_model_by_id,
@@ -70,7 +70,7 @@ def _run_backend(model_id: str) -> int:
         known = [m.id for m in enabled_models()]
         log.error("model %r not enabled on host %s. known: %s", model_id, host.id, known)
         return 2
-    if model.backend not in ("openai", "whisper"):
+    if not is_spawnable(model):
         log.error("model %r is backend=%s; nothing to spawn", model_id, model.backend)
         return 2
 

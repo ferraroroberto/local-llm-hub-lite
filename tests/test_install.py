@@ -244,6 +244,9 @@ def test_macos_build_from_source_flattens_dylibs_and_fixes_rpath(monkeypatch, tm
 
     vendor_dir = tmp_path / "vendor"
     monkeypatch.setattr(install_whisper_cpp, "VENDOR_DIR", vendor_dir)
+    monkeypatch.setattr(
+        install_whisper_cpp, "whisper_server_binary", lambda: vendor_dir / "whisper-server"
+    )
     monkeypatch.setattr(install_whisper_cpp.sys, "platform", "darwin")
     monkeypatch.setattr(install_whisper_cpp, "_macos_build_prereqs", lambda: "/opt/homebrew/bin/cmake")
 

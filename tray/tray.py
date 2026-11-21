@@ -36,10 +36,9 @@ from typing import List, Optional, Tuple
 
 import httpx
 import pystray
-import yaml
 
-from src.host_profile import CONFIG_PATH, hub_port
-from src.model_registry import Model, enabled_models
+from src.host_profile import CONFIG_PATH, _load_config, hub_port
+from src.model_registry import Model, enabled_models, is_spawnable
 from src.no_window import NO_WINDOW
 from src.process.backend_process import (
     STOP_GRACE_S,
@@ -97,11 +96,10 @@ def load_tray_config() -> TrayConfig:
     # Model autostart is not a tray concern: hub startup derives it from the
     # registry (model_registry.desired_model_ids) — the legacy
     # `tray.autostart_models` list is gone.
-    raw_path = Path(CONFIG_PATH)
     try:
-        cfg = yaml.safe_load(raw_path.read_text(encoding="utf-8")) or {}
+        cfg = _load_config()
     except OSError as exc:
-        logger.warning("⚠️ could not read %s: %s — using tray defaults", raw_path, exc)
+        logger.warning("⚠️ could not read %s: %s — using tray defaults", CONFIG_PATH, exc)
         return TrayConfig()
 
     section = cfg.get("tray") or {}
@@ -240,7 +238,7 @@ class TrayApp:
         self._stop_event = threading.Event()
         # Menu entries are the enabled rows that run a local llama/whisper server.
         self._models: List[Model] = [
-            m for m in enabled_models() if m.backend in ("openai", "whisper")
+            m for m in enabled_models() if is_spawnable(m)
         ]
         # The webapp config holds the bearer token we append to copied URLs.
         # Generate one on first boot so we never have an unprotected non-
