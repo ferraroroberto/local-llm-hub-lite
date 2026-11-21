@@ -34,6 +34,7 @@ from _lib import (  # noqa: E402
     flatten_nested_bin,
     install_assets,
 )
+
 from src.no_window import NO_WINDOW  # noqa: E402
 
 log = logging.getLogger(__name__)
