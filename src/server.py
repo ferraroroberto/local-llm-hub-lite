@@ -18,7 +18,6 @@ still returns a single JSON for ``stream=true``.
 from __future__ import annotations
 
 import logging
-import uuid
 from typing import Any, Dict, List, Optional, Union
 
 from fastapi import FastAPI, HTTPException, Request
@@ -61,33 +60,6 @@ logging.basicConfig(
 # both our logs and uvicorn's (access + error) without re-reading stdout.
 install_root_handler()
 logger = logging.getLogger(__name__)
-
-
-# ---- response-shape translation (endpoint-local; per-backend request
-# translation and dispatch lives in chat_translation.py) ----
-
-def _envelope_to_anthropic(env: Dict[str, Any], requested_model: str) -> Dict[str, Any]:
-    text = env.get("result") or ""
-    usage_raw = env.get("usage") or {}
-    return {
-        "id": f"msg_{uuid.uuid4().hex[:24]}",
-        "type": "message",
-        "role": "assistant",
-        "content": [{"type": "text", "text": text}],
-        "model": requested_model,
-        "stop_reason": env.get("stop_reason") or "end_turn",
-        "stop_sequence": None,
-        "usage": {
-            "input_tokens": int(usage_raw.get("input_tokens", 0) or 0),
-            "output_tokens": int(usage_raw.get("output_tokens", 0) or 0),
-            "cache_creation_input_tokens": int(
-                usage_raw.get("cache_creation_input_tokens", 0) or 0
-            ),
-            "cache_read_input_tokens": int(
-                usage_raw.get("cache_read_input_tokens", 0) or 0
-            ),
-        },
-    }
 
 
 # ---- FastAPI app ----
@@ -250,13 +222,12 @@ def messages(req: MessagesRequest, request: Request) -> JSONResponse:
     logger.info("/v1/messages model=%s backend=%s", req.model, model.backend)
 
     if model.backend == "openai":
-        env = _run_openai_backend(model, req)
+        payload = _run_openai_backend(model, req)
     elif (reject := _reject_non_chat_backend(model, req.model)) is not None:
         raise reject
     else:
         raise HTTPException(status_code=500, detail=f"unknown backend {model.backend!r}")
 
-    payload = _envelope_to_anthropic(env, req.model)
     u = payload["usage"]
     if ctx is not None:
         ctx.in_tok = int(u["input_tokens"])

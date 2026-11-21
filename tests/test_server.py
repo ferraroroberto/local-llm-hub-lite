@@ -72,6 +72,31 @@ def test_messages_single_turn(monkeypatch):
     assert seen["model"] == "qwen3.5-4b"
 
 
+def test_messages_length_finish_maps_to_max_tokens_with_zeroed_cache(monkeypatch):
+    """``finish_reason: length`` becomes ``max_tokens``; llama-server has no
+    prompt cache, so both cache usage fields stay on the wire as zero."""
+    raw = _fake_openai_response("cut off")
+    raw["choices"][0]["finish_reason"] = "length"
+
+    monkeypatch.setattr(
+        chat_translation_mod, "call_openai_chat", lambda *a, **k: raw
+    )
+
+    r = TestClient(server_mod.app).post(
+        "/v1/messages",
+        json={
+            "model": "qwen3.5-4b",
+            "max_tokens": 4,
+            "messages": [{"role": "user", "content": "hi"}],
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["stop_reason"] == "max_tokens"
+    assert body["usage"]["cache_creation_input_tokens"] == 0
+    assert body["usage"]["cache_read_input_tokens"] == 0
+
+
 def test_messages_multi_turn_preserves_roles(monkeypatch):
     captured = {}
 

@@ -6,8 +6,8 @@ Used by the hub when routing to a local llama-server backend. Helpers:
 - ``call_openai_chat_stream()``: POST with ``stream: true``, yield raw
   SSE byte chunks from the upstream (used to proxy SSE through the hub
   without translating shapes).
-- ``openai_to_anthropic_envelope()``: shape the response into the dict
-  ``src.server`` translates into an Anthropic ``/v1/messages`` response.
+- ``openai_to_anthropic_message()``: shape the response into an Anthropic
+  ``/v1/messages`` response body.
 - ``strip_think_blocks()`` / ``ThinkStripper``: scrub ``<think>...``
   ``</think>`` segments from text or from streamed deltas, with carry
   over so a tag split across SSE chunks is still cleaned correctly.
@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import re
+import uuid
 from typing import Any, Dict, Iterator, List, Optional, Set
 
 import httpx
@@ -427,17 +428,25 @@ _STOP_MAP = {
 }
 
 
-def openai_to_anthropic_envelope(resp: Dict[str, Any]) -> Dict[str, Any]:
-    """Shape an OpenAI response into the envelope src.server consumes.
+def openai_to_anthropic_message(
+    resp: Dict[str, Any], requested_model: str
+) -> Dict[str, Any]:
+    """Shape an OpenAI chat completion into an Anthropic ``/v1/messages`` body.
 
-    The hub's `_envelope_to_anthropic` expects `{"result": str,
-    "stop_reason": str, "usage": {...}}`. This builds exactly that.
+    llama-server reports no prompt-cache accounting, so the two cache usage
+    fields are always zero; they stay on the wire because the real API
+    always sends them.
     """
     usage = resp.get("usage") or {}
     finish = (resp.get("choices") or [{}])[0].get("finish_reason") or "stop"
     return {
-        "result": openai_response_text(resp),
+        "id": f"msg_{uuid.uuid4().hex[:24]}",
+        "type": "message",
+        "role": "assistant",
+        "content": [{"type": "text", "text": openai_response_text(resp)}],
+        "model": requested_model,
         "stop_reason": _STOP_MAP.get(finish, "end_turn"),
+        "stop_sequence": None,
         "usage": {
             "input_tokens": int(usage.get("prompt_tokens", 0) or 0),
             "output_tokens": int(usage.get("completion_tokens", 0) or 0),
