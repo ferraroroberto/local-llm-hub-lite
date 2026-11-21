@@ -12,9 +12,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from src.no_window import NO_WINDOW
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CHILD_TIMEOUT_S = 120
-_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 _CONFTEST = """
 from tests.e2e._port_pool import (  # noqa: F401
@@ -45,7 +46,7 @@ def test_port_pool_failure_is_named_and_an_ordinary_one_is_not(tmp_path: Path) -
         text=True,
         encoding="utf-8",
         timeout=CHILD_TIMEOUT_S,
-        creationflags=_NO_WINDOW,
+        creationflags=NO_WINDOW,
         env={**os.environ, "PYTHONPATH": str(REPO_ROOT), "PYTHONUTF8": "1"},
     )
     out = proc.stdout

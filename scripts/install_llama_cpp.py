@@ -28,8 +28,9 @@ from _lib import (  # noqa: E402
     detect_cuda_arch,
     flatten_nested_bin,
     install_assets,
-    no_window_flags,
 )
+
+from src.no_window import NO_WINDOW  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ def already_installed() -> bool:
     try:
         r = subprocess.run([str(bin_path), "--version"],
                            capture_output=True, text=True, timeout=10,
-                           creationflags=no_window_flags())
+                           creationflags=NO_WINDOW)
         return r.returncode == 0
     except Exception:
         return False

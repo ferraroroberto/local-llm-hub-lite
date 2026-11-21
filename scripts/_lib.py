@@ -30,6 +30,7 @@ _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
+from src.no_window import NO_WINDOW  # noqa: E402
 from src.runtime_files import checked_write_path  # noqa: E402
 
 log = logging.getLogger(__name__)
@@ -37,12 +38,6 @@ log = logging.getLogger(__name__)
 
 class InstallError(RuntimeError):
     pass
-
-
-def no_window_flags() -> int:
-    """CREATE_NO_WINDOW on Windows — this also runs from the windowless hub
-    when triggered via the admin SPA's "Fix" button."""
-    return subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
 def detect_cuda_arch() -> str:
@@ -55,7 +50,7 @@ def detect_cuda_arch() -> str:
     try:
         r = subprocess.run(
             ["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=10, creationflags=no_window_flags(),
+            capture_output=True, text=True, timeout=10, creationflags=NO_WINDOW,
         )
         if r.returncode == 0 and r.stdout.strip():
             return r.stdout.strip().splitlines()[0].strip().replace(".", "")
