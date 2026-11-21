@@ -13,8 +13,6 @@ from fastapi.testclient import TestClient
 
 from app_web import server as admin_server
 from src import server as server_mod
-from src import webapp_config as webapp_config_mod
-from src.webapp_config import WebappConfig
 from tests._webapp_token import pin_auth_token
 
 _PROXY_HEADERS = {"X-Forwarded-For": "203.0.113.5"}  # forces is_loopback=False
