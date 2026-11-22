@@ -19,6 +19,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CRASH_FILE = PROJECT_ROOT / "tray-crash.log"
 
 
+def tray_mutex_name() -> str:
+    """Single-instance mutex, per hub port so a second install on another port can run its own tray."""
+    from src.host_profile import hub_port
+
+    return rf"Global\local-llm-hub-lite-{hub_port()}-tray"
+
+
 def _setup_logging() -> None:
     root = logging.getLogger()
     root.setLevel(logging.WARNING)
@@ -42,7 +49,7 @@ def main() -> int:
         # In-process named-mutex single-instance, replacing the former
         # PID-file lock. Held for the tray's lifetime
         # (tray_main blocks); the OS frees the mutex on exit.
-        instance = SingleInstance(r"Global\local-llm-hub-tray")
+        instance = SingleInstance(tray_mutex_name())
         if not instance.acquired:
             return 0
         from .tray import main as tray_main
