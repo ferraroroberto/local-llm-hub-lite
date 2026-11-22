@@ -2,7 +2,7 @@
 
 Mounted into the main hub's FastAPI app at /admin. Built as a sub-app
 rather than a sibling uvicorn so there is only one Python process and
-one port (:8000) for the whole stack.
+one port (:8020) for the whole stack.
 
 Static-asset cache busting:
   * ``.js`` / ``.css`` get ``?v=<8-hex content hash>``, ``Cache-Control:

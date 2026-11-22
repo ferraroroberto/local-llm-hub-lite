@@ -2,7 +2,7 @@
 
 A tiny local HTTP hub for running **open-weight LLMs and Whisper on your own machine** — a lite, single-machine fork of [ferraroroberto/local-llm-hub](https://github.com/ferraroroberto/local-llm-hub) with **no cloud backends and no external dependencies**: no Claude/Gemini CLIs, no Docker, no multi-host fleet, no telemetry stack. Just:
 
-- **`POST /v1/messages`** (Anthropic shape) and **`POST /v1/chat/completions`** (OpenAI shape, streaming supported) on `:8000`, routed by `model` name to local [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server` backends.
+- **`POST /v1/messages`** (Anthropic shape) and **`POST /v1/chat/completions`** (OpenAI shape, streaming supported) on `:8020`, routed by `model` name to local [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server` backends.
 - **`POST /v1/audio/transcriptions`** (OpenAI shape) proxied to a local [whisper.cpp](https://github.com/ggerganov/whisper.cpp) `whisper-server`.
 - An **admin SPA** at `/admin` — three tabs: **Hub** (health, live requests, counters, errors, log, CPU/GPU/RAM/VRAM stats, install checks with one-click fixes, plus the Small/Default/Large text-size setting), **Models** (start/stop each backend, roles card), **Playground** (chat + transcribe).
 - A **Windows tray icon** that owns the hub lifecycle (start at login, restart, per-model toggles).
@@ -11,8 +11,8 @@ Default model lineup (edit `config/models.yaml` to change it):
 
 | Role | Model | Backend | Port |
 |---|---|---|---|
-| `agentic_light` / `agentic_heavy` | `qwen3.5-4b` (Q4_K_M, ~2.1 GB VRAM) | `llama-server` | `:8081` |
-| `audio_transcribe` | `whisper-large-v3-turbo` (~2 GB VRAM) | `whisper-server` | `:8090` |
+| `agentic_light` / `agentic_heavy` | `qwen3.5-4b` (Q4_K_M, ~2.1 GB VRAM) | `llama-server` | `:8021` |
+| `audio_transcribe` | `whisper-large-v3-turbo` (~2 GB VRAM) | `whisper-server` | `:8022` |
 
 Models can be `startup: eager` (autostart with the hub) or `startup: on_demand` (first request spawns the backend; optional `idle_unload_minutes` frees the VRAM again).
 
@@ -23,12 +23,12 @@ git clone https://github.com/ferraroroberto/local-llm-hub-lite
 cd local-llm-hub-lite
 scripts\setup.bat                              REM .venv + requirements + install report
 .venv\Scripts\python.exe -m src.install --fix  REM download llama.cpp + whisper.cpp + weights
-tray.bat                                       REM tray icon -> hub on :8000
+tray.bat                                       REM tray icon -> hub on :8020
 ```
 
 `python -m src.install` reports what's missing (venv, deps, GPU, vendored binaries, model weights, free ports); `--fix` downloads the platform llama.cpp/whisper.cpp release binaries into `vendor/` and the GGUF/BIN weights into `models/` (several GB — grab a coffee). Everything is idempotent; run it again any time. The same checks live in the admin Hub tab with per-item **Fix** buttons.
 
-Open the admin at <http://127.0.0.1:8000/admin/>. `GET /health` returns 200 once the hub is up; `GET /v1/audio/health` preflights the whisper backend specifically — 200 `ok` when reachable, 503 `degraded`/`none` when it is down or disabled, so a caller can branch on the status code alone before sending a clip.
+Open the admin at <http://127.0.0.1:8020/admin/>. `GET /health` returns 200 once the hub is up; `GET /v1/audio/health` preflights the whisper backend specifically — 200 `ok` when reachable, 503 `degraded`/`none` when it is down or disabled, so a caller can branch on the status code alone before sending a clip.
 
 ## Calling it
 
@@ -37,7 +37,7 @@ Point any standard SDK at the hub and pick a backend with the `model` string —
 ```python
 # Anthropic shape
 from anthropic import Anthropic
-client = Anthropic(api_key="local-dummy", base_url="http://127.0.0.1:8000")
+client = Anthropic(api_key="local-dummy", base_url="http://127.0.0.1:8020")
 msg = client.messages.create(
     model="agentic_light",  # or "qwen3.5-4b"
     max_tokens=256,
@@ -49,7 +49,7 @@ print(msg.content[0].text)
 ```python
 # OpenAI shape (streaming works)
 from openai import OpenAI
-client = OpenAI(api_key="local-dummy", base_url="http://127.0.0.1:8000/v1")
+client = OpenAI(api_key="local-dummy", base_url="http://127.0.0.1:8020/v1")
 out = client.chat.completions.create(
     model="qwen3.5-4b",
     messages=[{"role": "user", "content": "Say pong."}],
@@ -59,7 +59,7 @@ print(out.choices[0].message.content)
 
 ```bash
 # Transcription (through the hub -> lands in the observability ring)
-curl -F file=@clip.wav http://127.0.0.1:8000/v1/audio/transcriptions
+curl -F file=@clip.wav http://127.0.0.1:8020/v1/audio/transcriptions
 ```
 
 `GET /v1/models` lists every enabled model. Local requests never leave the machine.
@@ -100,7 +100,7 @@ A **chat card** (pick any enabled chat model, system prompt + message, response 
 Single source of truth for models, ports, and roles. Structure:
 
 ```yaml
-hub:    { port: 8000, bind_host: "0.0.0.0" }
+hub:    { port: 8020, bind_host: "0.0.0.0" }
 tray:   { autostart_hub: true, hub_ready_timeout_s: 30 }
 hosts:
   local:
@@ -114,7 +114,7 @@ models:
     aliases: ["agentic_light"]      # extra ids that resolve here
     backend: openai                 # openai (chat) | whisper (ASR)
     engine: llama-server            # llama-server | whisper-server
-    port: 8081
+    port: 8021
     model_path: "models/Qwen3.5-4B-Q4_K_M.gguf"
     hf_repo: "unsloth/Qwen3.5-4B-GGUF"   # where --fix downloads from
     hf_pattern: "Qwen3.5-4B-Q4_K_M.gguf"
@@ -168,7 +168,7 @@ Where new code goes, and the structure ratchet that enforces it: [`docs/layout.m
 
 ## Restart & verify
 
-The canonical restart is **`tray.bat --restart`** — an orphan-proof reclaim-then-start (kills the tray subtree, reclaims `:8000` by repo-scoped PID via the vendored `scripts\tray_lifecycle.ps1`, starts fresh, verifies the new build's `git_sha`). It never touches the model backend ports. Confirm with `GET /health` (the `/admin/api/version` payload carries `git_sha`).
+The canonical restart is **`tray.bat --restart`** — an orphan-proof reclaim-then-start (kills the tray subtree, reclaims `:8020` by repo-scoped PID via the vendored `scripts\tray_lifecycle.ps1`, starts fresh, verifies the new build's `git_sha`). It never touches the model backend ports. Confirm with `GET /health` (the `/admin/api/version` payload carries `git_sha`).
 
 Before shipping a change, run the local gate:
 

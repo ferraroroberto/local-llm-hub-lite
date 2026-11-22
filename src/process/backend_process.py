@@ -58,7 +58,7 @@ LOG_DIR = PROJECT_ROOT / "data" / "logs"
 LOG_TAIL_LINES = 400
 # Listen address passed to every backend. The hub is the only intended
 # client and reaches each backend over loopback (``Model.url``); other
-# machines go through the hub on :8000. A row's own ``args`` come later on
+# machines go through the hub on :8020. A row's own ``args`` come later on
 # the command line, so ``--host`` there still overrides this.
 BACKEND_LISTEN_HOST = "127.0.0.1"
 # ``stop()`` timings. After CTRL_BREAK the child gets this long to exit on its

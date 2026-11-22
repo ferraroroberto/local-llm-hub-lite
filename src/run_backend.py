@@ -1,6 +1,6 @@
 """Cross-platform backend dispatcher.
 
-    python -m src.run_backend hub        # run the FastAPI hub on port 8000
+    python -m src.run_backend hub        # run the FastAPI hub on port 8020
     python -m src.run_backend qwen35_4b  # run llama-server with the qwen35_4b entry
     python -m src.run_backend whisper    # run whisper-server with the whisper entry
 
@@ -50,7 +50,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 def _run_hub() -> int:
     # Adopt: if the hub is already up (e.g. started by the tray or another
-    # `run_hub` window), don't try to bind :8000 a second time — uvicorn
+    # `run_hub` window), don't try to bind :8020 a second time — uvicorn
     # would crash with WinError 10048. Print and exit cleanly so the user
     # can see what happened in the launcher's terminal.
     if hub_is_reachable(timeout=0.4):

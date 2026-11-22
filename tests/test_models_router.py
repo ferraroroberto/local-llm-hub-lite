@@ -10,7 +10,15 @@ from __future__ import annotations
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app_web.routers import models as models_router  # noqa: E402
+from src.model_registry import resolve_any  # noqa: E402
 from src.process import backend_process as bp  # noqa: E402
+
+
+def _port(model_id: str) -> int:
+    """The shipped registry's port for a row, so the tests follow a port move."""
+    model = resolve_any(model_id)
+    assert model is not None and model.port
+    return model.port
 
 
 def _admin_client() -> TestClient:
@@ -69,8 +77,8 @@ def test_unbound_port_skips_http_probe(monkeypatch):
 
 
 def test_bound_port_probes_and_reports_reachable(monkeypatch):
-    qwen_port = 8081
-    whisper_port = 8090
+    qwen_port = _port("qwen35_4b")
+    whisper_port = _port("whisper")
     monkeypatch.setattr(
         models_router, "snapshot_listening_pids",
         lambda: {qwen_port: [111], whisper_port: [222]},
@@ -90,7 +98,7 @@ def test_bound_port_probes_and_reports_reachable(monkeypatch):
 
 
 def test_hub_owned_backend_reports_ours(monkeypatch):
-    monkeypatch.setattr(models_router, "snapshot_listening_pids", lambda: {8081: [111]})
+    monkeypatch.setattr(models_router, "snapshot_listening_pids", lambda: {_port("qwen35_4b"): [111]})
     monkeypatch.setattr(bp, "is_reachable", lambda m, timeout=1.5: True)
     monkeypatch.setattr(bp, "is_running", lambda mid: mid == "qwen35_4b")
     monkeypatch.setattr(bp, "pid", lambda mid: 4242)
@@ -191,7 +199,7 @@ def test_a_failed_port_lookup_is_unknown_not_stopped(monkeypatch):
 
 
 def test_ready_and_adopted_rows_carry_state(monkeypatch):
-    monkeypatch.setattr(models_router, "snapshot_listening_pids", lambda: {8081: [111], 8090: [222]})
+    monkeypatch.setattr(models_router, "snapshot_listening_pids", lambda: {_port("qwen35_4b"): [111], _port("whisper"): [222]})
     monkeypatch.setattr(bp, "is_reachable", lambda m, timeout=1.5: True)
     monkeypatch.setattr(bp, "is_running", lambda mid: mid == "qwen35_4b")
     monkeypatch.setattr(bp, "pid", lambda mid: 4242)
