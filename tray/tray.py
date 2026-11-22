@@ -6,10 +6,10 @@ Windows login without keeping a console window open.
 
 Menu:
 
-    🛰 Hub  http://127.0.0.1:8000          — status header, disabled
+    🛰 Hub  http://127.0.0.1:8020          — status header, disabled
     🚀 Open admin                          — opens /admin in the default browser
     📋 Copy local URL                      — clipboard the local URL
-    📋 Copy LAN URL                        — clipboard http://<lan-ip>:8000
+    📋 Copy LAN URL                        — clipboard http://<lan-ip>:8020
     🧠 Models ▸                            — toggle per-enabled-local-model
     🔄 Restart hub                         — stop + start so a new pull is picked up
     ℹ Status                               — popup with hub state

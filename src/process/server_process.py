@@ -5,7 +5,7 @@ backends are owned by :mod:`src.process.backend_process`. This module holds what
 both share: the hub's loopback URL and reachability probe, listening-port
 and PID lookups, and a force-kill.
 
-**Ownership model.** A single hub process binds :8000; whoever spawned it
+**Ownership model.** A single hub process binds :8020; whoever spawned it
 owns it. Callers that did not spawn a listener *adopt* it: they see it as
 reachable but don't start a duplicate and don't tear it down on their own
 exit. The three ownership states reported by the Models tab:

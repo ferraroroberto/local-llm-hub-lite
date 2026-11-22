@@ -35,7 +35,7 @@
 #                  blocks the load)
 
 hub:
-  port: 8000
+  port: 8020
   bind_host: "0.0.0.0"
 
 # System-tray launcher (`tray.bat` → `python -m tray`).
@@ -58,7 +58,7 @@ models:
     aliases: ["agentic_light", "agentic_heavy"]
     backend: openai
     engine: llama-server
-    port: 8081
+    port: 8021
     est_vram_mb: 2100
     hf_repo: "unsloth/Qwen3.5-4B-GGUF"
     hf_pattern: "Qwen3.5-4B-Q4_K_M.gguf"
@@ -90,13 +90,13 @@ models:
 
   # --- audio_transcribe: whisper-large-v3-turbo on whisper-server --------
   # OpenAI-compatible POST /v1/audio/transcriptions; reachable through the
-  # hub's own :8000 proxy (observable) or directly on :8090.
+  # hub's own :8020 proxy (observable) or directly on :8022.
   whisper:
     display_name: whisper-large-v3-turbo
     aliases: ["audio_transcribe"]
     backend: whisper
     engine: whisper-server
-    port: 8090
+    port: 8022
     # large-v3-turbo fp16 ≈ 2000 MB VRAM.
     est_vram_mb: 2000
     hf_repo: "ggerganov/whisper.cpp"

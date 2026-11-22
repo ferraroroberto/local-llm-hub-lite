@@ -15,7 +15,7 @@ REM
 REM  Idempotent:
 REM    tray.bat              -> no-op if a Local LLM Hub tray is already running
 REM    tray.bat --restart    -> stop the running tray (and its tree: the hub on
-REM                             :8000) and start a fresh one
+REM                             :8020) and start a fresh one
 REM
 REM  Detection matches the tray process by command line + this project's .venv
 REM  path via CIM, then kills BY PID with /T. We never blanket-kill pythonw, so
@@ -35,7 +35,7 @@ REM  caller and lets stale git_sha verification fail loudly
 REM  (project-scaffolding#54).
 REM
 REM  --restart is orphan-proof: besides killing the tray subtree, it reclaims
-REM  this app's hub port :8000 by its owning PID, regardless of process
+REM  this app's hub port :8020 by its owning PID, regardless of process
 REM  parentage. The hub runs in a separate process (`-m src.server`) that can
 REM  detach from the tray; a stale one would otherwise survive a subtree kill,
 REM  block the fresh hub from binding, and keep serving the old build while the
@@ -46,9 +46,9 @@ REM  still carries the .venv path. Matching the image path would miss the real
 REM  hub; the CommandLine scope keeps the sweep on THIS repo's children only.
 REM  See project-scaffolding#29.
 REM
-REM  IMPORTANT: the model backend ports (llama-server :8081, whisper-server
-REM  :8090) are separate native exes managed by the hub itself. They are
-REM  never reclaimed here -- only :8000, which this tray definitively owns,
+REM  IMPORTANT: the model backend ports (llama-server :8021, whisper-server
+REM  :8022) are separate native exes managed by the hub itself. They are
+REM  never reclaimed here -- only :8020, which this tray definitively owns,
 REM  is in the reclaim list below.
 REM ============================================================================
 
@@ -95,11 +95,11 @@ if not exist "%TRAY_PS%" (
 )
 
 REM === ADAPT (4/4): this tray's exclusively-owned ports as a comma list.
-REM     Exclude any mutex-shared port -- :8090 (whisper) and the llama-server
-REM     backend ports (8081/8082/8086/8087/8088) are NOT owned by this tray. ===
-set "OWNED_PORTS=8000"
+REM     Exclude any mutex-shared port -- :8022 (whisper) and the llama-server
+REM     backend ports (8021, 8022) are NOT owned by this tray. ===
+set "OWNED_PORTS=8020"
 REM This app's version endpoint is /admin/api/version, not the default /api/version.
-set "VERSION_URL=http://127.0.0.1:8000/admin/api/version"
+set "VERSION_URL=http://127.0.0.1:8020/admin/api/version"
 
 set "RESTART_ARG="
 if defined WANT_RESTART set "RESTART_ARG=-Restart"

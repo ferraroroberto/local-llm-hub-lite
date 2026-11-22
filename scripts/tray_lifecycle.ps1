@@ -4,7 +4,7 @@
       Source: ferraroroberto/fleet-config, tray/tray_lifecycle.ps1
       Copied: 2026-08-02 (via app-launcher-lite's vendored copy), byte-for-byte
       except: two em-dashes in comments normalized to "--" per the ASCII-only
-      rule below. This fork's tray owns port 8000. No code changes.
+      rule below. This fork's tray owns port 8020. No code changes.
       Vendored for the lite fork so the tray has zero external dependencies;
       this repo-local copy replaces the machine-shared
       %USERPROFILE%\.claude\tray\tray_lifecycle.ps1. Keep ASCII-only.

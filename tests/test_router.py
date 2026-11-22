@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from src import chat_translation as chat_translation_mod
 from src import server as server_mod
+from src.model_registry import resolve_any
 
 
 def _fake_openai_response(text: str = "pong"):
@@ -59,7 +60,7 @@ def test_messages_routes_openai_backend(monkeypatch):
     assert captured["model"] == "qwen3.5-4b"
     assert captured["messages"][0] == {"role": "system", "content": "Answer briefly."}
     assert captured["messages"][1]["role"] == "user"
-    assert "127.0.0.1:8081" in captured["base_url"]
+    assert f"127.0.0.1:{resolve_any('qwen35_4b').port}" in captured["base_url"]
 
 
 def test_messages_routes_role_alias(monkeypatch):

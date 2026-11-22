@@ -66,9 +66,13 @@ def resolve() -> HostProfile:
     )
 
 
+# Beside the full hub's :8000 on one machine, so the lite hub defaults to its own port.
+DEFAULT_HUB_PORT = 8020
+
+
 def hub_port() -> int:
     cfg = _load_config()
-    return int((cfg.get("hub") or {}).get("port", 8000))
+    return int((cfg.get("hub") or {}).get("port", DEFAULT_HUB_PORT))
 
 
 def hub_bind_host() -> str:
