@@ -4,7 +4,8 @@
  */
 
 import { state, els, THEME_KEY, STATUS_POLL_MS, COUNTERS_POLL_MS, MODELS_POLL_MS } from './state.js';
-import { jsonApi, tokenFromUrl, writeToken, setSignInHandler, toast } from './api.js';
+import { api, jsonApi, tokenFromUrl, writeToken, setSignInHandler, toast } from './api.js';
+import { initRestartSheet } from './_vendored/page-foot/restart-sheet.js';
 import { icon } from './_vendored/icons/icons.js';
 import { bindTextSize } from './_vendored/text-size/text-size.js';
 import { buildReadoutText } from './_vendored/page-foot/page-foot.js';
@@ -43,6 +44,20 @@ if (els.themeToggleBtn) els.themeToggleBtn.addEventListener('click', toggleTheme
 // stored step on the Health & install card control and persists clicks.
 const textSizeControl = document.getElementById('textSizeControl');
 if (textSizeControl) bindTextSize(textSizeControl, 'llmhub');
+
+// The sheet's POST reads the status itself (a refusal is an answer, not an error).
+async function postRestart(url, body) {
+  let res;
+  try {
+    res = await api(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  } catch (exc) {
+    if (exc && exc.message === 'auth required') return { status: 401, body: null };
+    throw exc;
+  }
+  let data = null;
+  try { data = await res.json(); } catch (_) { data = null; }
+  return { status: res.status, body: data };
+}
 
 async function fetchVersion() {
   try {
@@ -85,6 +100,10 @@ async function boot() {
     fetchInstallStatus(),
     fetchPlaygroundModels(),
   ]);
+  initRestartSheet({
+    fetchJson: jsonApi, postJson: postRestart,
+    endpoint: '/admin/api/restart', versionEndpoint: '/admin/api/version',
+  });
 
   // The vendored nav already restored the persisted tab (and its streams)
   // in wireTabs(); only (re)start the hub streams if that's where we are.

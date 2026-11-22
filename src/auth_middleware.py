@@ -33,7 +33,7 @@ import re
 from typing import Any, FrozenSet, List, Optional, Tuple
 from urllib.parse import urlsplit
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
@@ -233,6 +233,19 @@ def _caller_is_trusted(
     return bool(presented and hmac.compare_digest(presented, token))
 
 
+def require_authenticated(request: Request) -> None:
+    """Route dependency: refuse unless the bearer gate let this call in by auth.
+
+    :func:`_authenticate` marks a request it admitted as a trusted caller
+    (loopback, allowlisted or presenting the token); the exempt paths are
+    admitted without that mark. A route that must never be reachable on an
+    exempt path, such as the restart, depends on this so it cannot be mounted
+    open, and an app built without the middleware refuses it too.
+    """
+    if not getattr(request.state, "auth_passed", False):
+        raise HTTPException(status_code=401, detail="missing or invalid bearer token")
+
+
 def _authenticate(
     request: Request,
     get_token,
@@ -258,6 +271,7 @@ def _authenticate(
         app_state=request.app.state,
         get_token=get_token,
     ):
+        request.state.auth_passed = True
         return None
 
     return JSONResponse(

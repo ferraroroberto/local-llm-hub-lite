@@ -43,6 +43,7 @@
 /src/notify
 /src/password.py
 /src/runtime_data.py
+/src/self_restart.py
 /src/usage_log.py
 /tests/e2e/_paced_browser.py
 /tray/single_instance.py

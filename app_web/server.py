@@ -26,9 +26,10 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
 from starlette.types import Scope
 
-from src.auth_middleware import BearerTokenMiddleware
+from src.auth_middleware import BearerTokenMiddleware, require_authenticated
 from src.login_lockout import LoginLockout
-from src.runtime_data import runtime_db_path
+from src.runtime_data import runtime_data_dir, runtime_db_path
+from src.self_restart import TRAY_RESTART, RestartTarget, restart_router
 from src.static_versioning import (
     compute_asset_hashes,
     fleet_hash_of,
@@ -157,6 +158,13 @@ def create_app() -> FastAPI:
     # static/usage.js hands the vendored client the bearer header.
     app.include_router(usage_router(
         runtime_db_path("local-llm-hub-lite", "usage.sqlite3", create=True),
+    ))
+    # The build readout's restart sheet runs this repo's own `tray.bat --restart`
+    # (it restarts the hub too), behind the same bearer gate as the sub-app's other routes.
+    app.include_router(restart_router(
+        targets=[RestartTarget("app", "Restart app", TRAY_RESTART)],
+        status_dir=runtime_data_dir("local-llm-hub-lite") / "restart",
+        guard=require_authenticated,
     ))
 
     return app
