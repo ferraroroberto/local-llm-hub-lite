@@ -168,7 +168,7 @@ Where new code goes, and the structure ratchet that enforces it: [`docs/layout.m
 
 ## Restart & verify
 
-The canonical restart is **`tray.bat --restart`** — an orphan-proof reclaim-then-start (kills the tray subtree, reclaims `:8020` by repo-scoped PID via the vendored `scripts\tray_lifecycle.ps1`, starts fresh, verifies the new build's `git_sha`). It never touches the model backend ports. Confirm with `GET /health` (the `/admin/api/version` payload carries `git_sha`).
+The canonical restart is **`.\.venv\Scripts\python.exe -m src.restart_check restart --port 8020 --version-path /admin/api/version`**, which runs `tray.bat --restart` by absolute path and exits non-zero unless a different process serves `HEAD` — an orphan-proof reclaim-then-start (kills the tray subtree, reclaims `:8020` by repo-scoped PID via the vendored `scripts\tray_lifecycle.ps1`, starts fresh, verifies the new build's `git_sha`). It never touches the model backend ports. Confirm with `GET /health` (the `/admin/api/version` payload carries `git_sha`).
 
 Before shipping a change, run the local gate:
 
