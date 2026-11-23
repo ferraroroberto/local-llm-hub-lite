@@ -65,7 +65,7 @@ switch       = { src = "app/webapp/static/_vendored/switch", sha = "8f15c49560ad
 instruction_frontmatter = { src = "scripts/instruction_frontmatter.py", sha = "c5535ac326c398df8f44486f386ff0e0b6d4c61c", dest = "scripts/instruction_frontmatter.py" }
 instruction_repeats = { src = "scripts/instruction_repeats.py", sha = "c5535ac326c398df8f44486f386ff0e0b6d4c61c", dest = "scripts/instruction_repeats.py" }
 text-size    = { src = "app/webapp/static/_vendored/text-size", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/text-size" }
-page-foot = { src = "app/webapp/static/_vendored/page-foot", sha = "3f1dcc76d5ba40c8b3d12a80a99659816ce1dd0e", dest = "app_web/static/_vendored/page-foot" }
+page-foot = { src = "app/webapp/static/_vendored/page-foot", sha = "564864cb95a8b416c16d1a1e1e9f31b9d5b2ec8e", dest = "app_web/static/_vendored/page-foot" }
 select-native = { src = "app/webapp/static/_vendored/select-native", sha = "09fe2436b6bf3ee608d43fc8a26165e3e2400840", dest = "app_web/static/_vendored/select-native" }
 sign-in     = { src = "app/webapp/static/_vendored/sign-in", sha = "7577aece617ad366e7df8ef522d511184b445144", dest = "app_web/static/_vendored/sign-in" }
 toast = { src = "app/webapp/static/_vendored/toast", sha = "e56c8330f8500b83635773033a09de6fc3cba342", dest = "app_web/static/_vendored/toast" }
@@ -80,7 +80,7 @@ icon-button = { src = "app/webapp/static/_vendored/icon-button", sha = "241d2fde
 # the gate's venv; a detector that cannot run exits 3, which fails the gate. Excluded:
 # vendored admin-SPA components (copies by design) and the gitignored vendor/ and
 # models/ trees. Procedure + limits: project-scaffolding docs/static-ratchet.md.
-self_restart = { src = "src/self_restart.py", sha = "3f1dcc76d5ba40c8b3d12a80a99659816ce1dd0e", dest = "src/self_restart.py" }
+self_restart = { src = "src/self_restart.py", sha = "564864cb95a8b416c16d1a1e1e9f31b9d5b2ec8e", dest = "src/self_restart.py" }
 [static_ratchet]
 enabled  = true
 baseline = ".static-ratchet-baseline.json"
