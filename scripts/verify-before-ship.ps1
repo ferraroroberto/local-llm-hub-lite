@@ -66,6 +66,11 @@
 #      middleware, beyond .request-budget-ratchet-baseline.json. Whole tree, never
 #      routed. Any non-zero exit fails, so exit 3 (a file that cannot be read or closed)
 #      is NOT CONFIRMED and never a pass.
+#   9f. windows-only ratchet: no test that touches a Windows-only API without the
+#      `windows_only` marker the Mac nightly excludes, beyond
+#      .windows-only-ratchet-baseline.json. Whole tree, never routed. Any non-zero
+#      exit fails, so exit 3 (a test module that cannot be read or parsed) is
+#      NOT CONFIRMED and never a pass.
 #  10. `pytest -q` (unit tests, no GPU / no real CLIs); stages 10-11 run inside
 #      the runtime write probe (--snapshot before, --probe after), which fails on
 #      any untracked or ignored file they leave under a code folder.
@@ -252,6 +257,13 @@ Step "request budget ratchet" {
     # exit, so exit 3 (a file that cannot be read, or JS that never closes) stops
     # the gate like a finding does.
     & $Python scripts\request_budget_ratchet.py
+}
+
+Step "windows-only ratchet" {
+    # Called directly, like the request budget ratchet: Step fails on any non-zero
+    # exit, so exit 3 (a test module that cannot be read or parsed) stops the gate
+    # like a finding does.
+    & $Python scripts\windows_only_ratchet.py
 }
 
 # Runtime write probe, first half: what already sits untracked or ignored under
