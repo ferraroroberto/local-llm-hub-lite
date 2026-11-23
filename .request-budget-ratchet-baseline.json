@@ -1,14 +1,4 @@
 {
   "version": 1,
-  "entries": [
-    {"key": "app_web/routers/hub.py", "counts": {"default-pool": 6}},
-    {"key": "app_web/routers/models.py", "counts": {"default-pool": 3}},
-    {"key": "app_web/server.py", "counts": {"timing-middleware": 1}},
-    {"key": "app_web/static/hub.js", "counts": {"fixed-rate-poll": 1}},
-    {"key": "app_web/static/main.js", "counts": {"fixed-rate-poll": 3}},
-    {"key": "src/audio/server_audio_asr.py", "counts": {"default-pool": 1}},
-    {"key": "src/on_demand.py", "counts": {"unwatched-loop": 1, "default-pool": 1}},
-    {"key": "src/server_lifecycle.py", "counts": {"default-pool": 3}},
-    {"key": "tray/tray.py", "counts": {"unwatched-loop": 2}}
-  ]
+  "entries": []
 }

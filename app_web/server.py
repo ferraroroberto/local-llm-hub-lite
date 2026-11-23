@@ -24,10 +24,11 @@ from typing import Dict
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
-from starlette.types import Scope
+from starlette.types import Receive, Scope, Send
 
 from src.auth_middleware import BearerTokenMiddleware, require_authenticated
 from src.login_lockout import LoginLockout
+from src.request_timing import RequestTimingMiddleware
 from src.runtime_data import runtime_data_dir, runtime_db_path
 from src.self_restart import TRAY_RESTART, RestartTarget, restart_router
 from src.static_versioning import (
@@ -100,6 +101,26 @@ class _VersionedStatic(StaticFiles):
         return response
 
 
+# Calls that stay open on purpose (an event stream) or wait on a model (a playground
+# send): timing them would log a "slow request" on every normal close.
+_UNTIMED_SUFFIXES = (
+    "/api/hub/log/tail",
+    "/api/hub/requests/stream",
+    "/api/playground/send",
+    "/api/playground/transcribe",
+)
+
+
+class _AdminTimingMiddleware(RequestTimingMiddleware):
+    """Request timing for the admin API's short calls, where the polling lands."""
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and str(scope.get("path", "")).endswith(_UNTIMED_SUFFIXES):
+            await self.app(scope, receive, send)
+            return
+        await super().__call__(scope, receive, send)
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     yield
@@ -124,6 +145,9 @@ def create_app() -> FastAPI:
     # The same token source as the parent hub (one auth boundary): re-read when
     # the config file changes, so a rotation reaches /admin without a restart.
     app.add_middleware(BearerTokenMiddleware, get_token=current_auth_token)
+    # Added last so it is outermost and times the whole admin stack. The sub-app is
+    # mounted at /admin and the scope path keeps that prefix.
+    app.add_middleware(_AdminTimingMiddleware, timed_prefix="/admin/api/")
 
     app.state.webapp_config = webapp_cfg
     app.state.login_lockout = LoginLockout(

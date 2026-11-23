@@ -177,8 +177,9 @@ baseline = ".dead-code-ratchet-baseline.json"
 # a directory scan in a request handler, a submit to the shared default pool, and a web
 # app without RequestTimingMiddleware. Whole tree, never routed. This hub's handlers
 # live in app_web/routers, so scan-per-request reads them. src/request_timing.py and
-# the poll helper are vendored and not yet wired in: moving callers onto them is the
-# burn-down, not this baseline. Exit 3 (git unusable, a file that cannot be read or
+# the poll helper are vendored and wired in: the admin app mounts the timing middleware,
+# the page polls through startPoll, and blocking calls run on the named pools in
+# src/request_pools.py. The baseline is empty. Exit 3 (git unusable, a file that cannot be read or
 # closed) fails the gate as NOT CONFIRMED. Procedure + limits: project-scaffolding
 # docs/request-budget-ratchet.md; the rules and why: docs/polling-budget.md.
 [request_budget_ratchet]
@@ -201,6 +202,24 @@ path       = "tray/tray.py"
 function   = "TrayApp._color_loop"
 interval_s = 2
 why        = "keeps the tray icon colour true to the hub's state, which is shown with no page open"
+
+[[request_budget.loops]]
+path       = "src/on_demand.py"
+function   = "ensure_ready"
+interval_s = 1
+why        = "a request is parked on a cold on-demand backend and must answer the moment it is up; the wait ends at the load deadline"
+
+[[request_budget.loops]]
+path       = "tray/tray.py"
+function   = "HubProcess.wait_ready"
+interval_s = 0.5
+why        = "the tray waits for the hub it just started so the next menu action sees it; the wait ends at its timeout"
+
+[[request_budget.loops]]
+path       = "tray/tray.py"
+function   = "TrayApp._wait_model_ready_worker"
+interval_s = 1
+why        = "tells the user the moment a backend they started is ready; the wait ends at MODEL_READY_WAIT_S"
 
 
 # [conventions_ratchet] -- the scaffold's baseline-and-ratchet check of fleet conventions

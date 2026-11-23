@@ -31,6 +31,7 @@ from src.process.server_process import (
     snapshot_listening_pids,
 )
 from src.process.serving_state import LOAD_DEADLINE_S
+from src.request_pools import HEAVY_READ, HOT_POLL, run_in_pool
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -99,7 +100,7 @@ async def list_models_for_admin() -> Dict[str, Any]:
     # psutil gives us every listening port in ~2 ms — use it both for
     # ownership *and* as a cheap reachability gate so we never fire an
     # HTTP probe at a port that isn't bound.
-    listening = await asyncio.to_thread(snapshot_listening_pids)
+    listening = await run_in_pool(HOT_POLL, snapshot_listening_pids)
     listening_known = snapshot_is_known(listening)
 
     async def _probe_reach(m: Model) -> Optional[bool]:
@@ -111,7 +112,7 @@ async def list_models_for_admin() -> Dict[str, Any]:
             # snapshot nothing is known to be unbound, so probe anyway.
             return False
         try:
-            return await asyncio.to_thread(bp.is_reachable, m, _READINESS_PROBE_TIMEOUT_S)
+            return await run_in_pool(HOT_POLL, bp.is_reachable, m, _READINESS_PROBE_TIMEOUT_S)
         except Exception as exc:  # noqa: BLE001 — an unrun probe is unknown, not "down"
             logger.warning("⚠️ readiness probe for %s could not be run: %s", m.id, exc)
             return None
@@ -207,7 +208,7 @@ async def model_log(model_id: str, limit: int = 400) -> Dict[str, Any]:
             detail=f"backend {target.backend!r} has no managed process",
         )
     limit = max(1, min(limit, bp.LOG_TAIL_LINES * 10))
-    lines = await asyncio.to_thread(bp.log_lines, model_id, limit)
+    lines = await run_in_pool(HEAVY_READ, bp.log_lines, model_id, limit)
     return {
         "id": model_id,
         "lines": lines,

@@ -15,7 +15,6 @@ Plus /admin/api/install/{status,fix-all} for the install flow.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import time
@@ -28,6 +27,7 @@ from fastapi.responses import StreamingResponse
 from src.hub_log import HUB_LOG
 from src.hub_observability import OBS
 from src.process.server_process import lan_ip
+from src.request_pools import HEAVY_READ, HOT_POLL, USER_ACTION, run_in_pool
 
 from ._helpers import maybe_json, sse_stream
 
@@ -118,7 +118,7 @@ async def stats() -> Dict[str, Any]:
 
     ram = system_stats.ram_stats()
     cpu = system_stats.cpu_stats()
-    gpus = await asyncio.to_thread(system_stats.gpu_stats)
+    gpus = await run_in_pool(HOT_POLL, system_stats.gpu_stats)
     history = OBS.stats_snapshot()
     return {"ram": ram, "cpu": cpu, "gpus": gpus, "history": history}
 
@@ -133,7 +133,7 @@ async def install_status() -> Dict[str, Any]:
     uvicorn worker for seconds while other admin requests queue up."""
     from src import install
 
-    report = await asyncio.to_thread(install.run_all_checks)
+    report = await run_in_pool(HEAVY_READ, install.run_all_checks)
     return {
         "worst_status": report.worst_status,
         "ok": report.ok,
@@ -156,7 +156,7 @@ async def install_fix(request: Request) -> Dict[str, Any]:
     fix_id = (body or {}).get("fix_id")
     if not fix_id:
         raise HTTPException(status_code=400, detail="fix_id is required")
-    report = await asyncio.to_thread(install.run_all_checks, use_cache=True)
+    report = await run_in_pool(HEAVY_READ, install.run_all_checks, use_cache=True)
     target = next((c for c in report.checks if c.fix_id == fix_id), None)
     if target is None:
         raise HTTPException(status_code=404, detail=f"no fixable check with fix_id={fix_id!r}")
@@ -164,7 +164,7 @@ async def install_fix(request: Request) -> Dict[str, Any]:
     if fn is None:
         raise HTTPException(status_code=400, detail=f"no fix function for {fix_id!r}")
     try:
-        await asyncio.to_thread(fn)
+        await run_in_pool(USER_ACTION, fn)
     except Exception as exc:  # noqa: BLE001 — surface the failure to the UI
         raise HTTPException(status_code=500, detail=f"fix {fix_id!r} failed: {exc}")
     return {"ok": True, "fix_id": fix_id}
@@ -176,7 +176,7 @@ async def install_fix_all() -> Dict[str, Any]:
     as install_fix() — see its docstring."""
     from src import install
 
-    report = await asyncio.to_thread(install.run_all_checks, use_cache=True)
+    report = await run_in_pool(HEAVY_READ, install.run_all_checks, use_cache=True)
     ran: List[Dict[str, Any]] = []
     for c in report.checks:
         if c.status not in ("missing", "error"):
@@ -185,7 +185,7 @@ async def install_fix_all() -> Dict[str, Any]:
         if fn is None:
             continue
         try:
-            await asyncio.to_thread(fn)
+            await run_in_pool(USER_ACTION, fn)
             ran.append({"fix_id": c.fix_id, "ok": True})
         except Exception as exc:  # noqa: BLE001
             ran.append({"fix_id": c.fix_id, "ok": False, "error": str(exc)})
