@@ -20,6 +20,7 @@ import time
 from .hub_log import HUB_LOG
 from .hub_observability import OBS
 from .process.outcomes import Outcome
+from .request_pools import BACKEND_LIFECYCLE, SAMPLER, run_in_pool
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ async def wire_observatory_loop() -> None:
     # surviving model backends as "adopted" rather than "running".
     try:
         from .process import backend_process as bp
-        inherited = await asyncio.to_thread(bp.inherit_running_backends)
+        inherited = await run_in_pool(BACKEND_LIFECYCLE, bp.inherit_running_backends)
         if inherited:
             logger.info("📎 Inherited %d running backend(s) from a previous hub", inherited)
     except Exception as exc:  # noqa: BLE001
@@ -113,7 +114,7 @@ async def _autostart_configured_backends() -> None:
     logger.info("autostart: configured backend set: %s", model_ids)
     for model_id in model_ids:
         try:
-            result = await asyncio.to_thread(bp.start, model_id)
+            result = await run_in_pool(BACKEND_LIFECYCLE, bp.start, model_id)
         except Exception as exc:  # noqa: BLE001
             logger.warning("autostart: %s raised: %s", model_id, exc)
             continue
@@ -160,7 +161,7 @@ async def _resource_sampler() -> None:
 
     while True:
         try:
-            ram, cpu, gpus = await asyncio.to_thread(_sample_sync)
+            ram, cpu, gpus = await run_in_pool(SAMPLER, _sample_sync)
             gpu0_vram = None
             gpu0_util = None
             if gpus:

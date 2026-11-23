@@ -21,6 +21,7 @@ from fastapi.responses import Response
 
 from ..http_client import get_async_client
 from ..model_registry import Model
+from ..request_pools import BACKEND_READY, run_in_pool
 from ..server_common import ensure_backend_ready_or_503
 from .server_audio_common import (
     HEADER_REQUESTED_MODEL,
@@ -215,8 +216,7 @@ async def _dispatch_audio(
     # backend is spawned here and the request blocks until it answers
     # (distinct 503 on load failure). No-op for eager rows. Off-loop —
     # ensure_ready blocks polling readiness.
-    import asyncio as _asyncio
-    await _asyncio.to_thread(ensure_backend_ready_or_503, target)
+    await run_in_pool(BACKEND_READY, ensure_backend_ready_or_503, target)
 
     fwd_headers = {
         k: v for k, v in request.headers.items()

@@ -186,8 +186,8 @@ def ensure_ready(model: Model, deadline_s: float = READY_DEADLINE_S) -> None:
     """Make sure an on-demand local backend is up before a request hits it.
 
     No-op for eager rows and virtual aliases. For a cold local on-demand
-    backend this spawns it and blocks (the caller runs in a worker thread /
-    ``to_thread``) polling ``is_reachable`` until it answers or
+    backend this spawns it and blocks (the caller runs in a worker thread,
+    off the event loop) polling ``is_reachable`` until it answers or
     ``deadline_s`` expires — raising :class:`OnDemandNotReady` so the route
     can surface a distinct 503.
     """
@@ -291,10 +291,12 @@ async def idle_unload_loop() -> None:
     :func:`idle_unload_pass`, off-loop (``bp`` calls shell out / probe)."""
     import asyncio
 
+    from .request_pools import BACKEND_LIFECYCLE, run_in_pool
+
     while True:
         await asyncio.sleep(IDLE_CHECK_INTERVAL_S)
         try:
-            await asyncio.to_thread(idle_unload_pass)
+            await run_in_pool(BACKEND_LIFECYCLE, idle_unload_pass)
         except Exception as exc:  # noqa: BLE001 — watchdog must not die
             logger.warning("on-demand idle sweep raised: %s", exc)
 

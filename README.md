@@ -85,6 +85,8 @@ All four are CORS-exposed to browser callers (`src/cors_policy.py`).
 
 Status pill + uptime, the **install checks** card (with Fix buttons), **live requests** (SSE stream of every `/v1/*` call with latency and status), per-model **counters**, recent **errors**, the **hub log** tail, and **sparkline tiles for CPU, GPU utilization, RAM and VRAM** sampled every 2 s (`GET /admin/api/hub/stats`; GPU figures via `nvidia-smi` when present).
 
+The admin page's polls pause while the tab is hidden, and every `/admin/api/*` answer carries a `Server-Timing` header (`queue`, `worker`, `app`) naming the thread pool its blocking work ran on (`hot-poll`, `heavy-read`, `user-action`, `backend-lifecycle`, `backend-ready`, `sampler`; `src/request_pools.py`). A request slower than 3 s is logged with where its time went.
+
 ### Models
 
 One card per registry row: backend, port, PID, serving state (`stopped`, `loading`, `ready`, `adopted`, `failed` with its reason, `unknown` when the port lookup fails or the port holder is not this model's server binary; see [docs/serving-state.md](docs/serving-state.md)), startup policy (`eager` / `on-demand · loaded` / `on-demand · idle-unloaded`), start/stop/force-stop, and a ping button. The SPA has no per-model log drawer — a managed backend's log tails to `data/logs/backend-<id>.log` (also readable via `GET /admin/api/models/{id}/log`), while the Hub tab's own log stream covers hub-level activity. The **roles card** shows which model currently fills each role (`agentic_light`, `agentic_heavy`, `audio.transcribe`).
