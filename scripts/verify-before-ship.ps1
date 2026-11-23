@@ -60,6 +60,12 @@
 #      app_web/static beyond .ux-surface-ratchet-baseline.json. Whole tree, never
 #      routed. Any non-zero exit fails, so exit 3 (a file that cannot be read or
 #      closed) is NOT CONFIRMED and never a pass.
+#   9e. request budget ratchet: no rise in a fixed-rate browser poll that reaches the
+#      server, poll under 2 s, undeclared fast server loop, directory scan in a request
+#      handler, submit to the shared default pool, or a web app without the request-timing
+#      middleware, beyond .request-budget-ratchet-baseline.json. Whole tree, never
+#      routed. Any non-zero exit fails, so exit 3 (a file that cannot be read or closed)
+#      is NOT CONFIRMED and never a pass.
 #  10. `pytest -q` (unit tests, no GPU / no real CLIs); stages 10-11 run inside
 #      the runtime write probe (--snapshot before, --probe after), which fails on
 #      any untracked or ignored file they leave under a code folder.
@@ -239,6 +245,13 @@ Step "ux surface ratchet" {
     # exit, so exit 3 (a file that cannot be read, or JS that never closes) stops
     # the gate like a finding does.
     & $Python scripts\ux_surface_ratchet.py
+}
+
+Step "request budget ratchet" {
+    # Called directly, like the ux surface ratchet: Step fails on any non-zero
+    # exit, so exit 3 (a file that cannot be read, or JS that never closes) stops
+    # the gate like a finding does.
+    & $Python scripts\request_budget_ratchet.py
 }
 
 # Runtime write probe, first half: what already sits untracked or ignored under

@@ -71,6 +71,10 @@ sign-in     = { src = "app/webapp/static/_vendored/sign-in", sha = "7577aece617a
 toast = { src = "app/webapp/static/_vendored/toast", sha = "e56c8330f8500b83635773033a09de6fc3cba342", dest = "app_web/static/_vendored/toast" }
 build-watch = { src = "app/webapp/static/_vendored/build-watch", sha = "2d871dd5a6a3ee6fe12a3c5c6439d2c53a93c2c4", dest = "app_web/static/_vendored/build-watch" }
 icon-button = { src = "app/webapp/static/_vendored/icon-button", sha = "241d2fde53645497376a19c073bb2b6c4e540f86", dest = "app_web/static/_vendored/icon-button" }
+request_budget_ratchet = { src = "scripts/request_budget_ratchet.py", sha = "2e2a4cca9d3180980db6f8cd7f03a6f12737b7db", dest = "scripts/request_budget_ratchet.py", requires = ["request_budget_scan"] }
+request_budget_scan = { src = "scripts/request_budget_scan.py", sha = "2e2a4cca9d3180980db6f8cd7f03a6f12737b7db", dest = "scripts/request_budget_scan.py" }
+request_timing = { src = "src/request_timing.py", sha = "2e2a4cca9d3180980db6f8cd7f03a6f12737b7db", dest = "src/request_timing.py" }
+poll = { src = "app/webapp/static/_vendored/poll", sha = "2e2a4cca9d3180980db6f8cd7f03a6f12737b7db", dest = "app_web/static/_vendored/poll" }
 
 # [static_ratchet] -- the scaffold's baseline-and-ratchet static analysis. The gate
 # (scripts/verify-before-ship.ps1) runs scripts/static_ratchet.py, which fails on a
@@ -163,6 +167,39 @@ allow_refs = [":8021", ":8022"]
 [dead_code_ratchet]
 enabled  = true
 baseline = ".dead-code-ratchet-baseline.json"
+
+# [request_budget_ratchet] -- the scaffold's baseline-and-ratchet check of the request
+# budget. The gate runs scripts/request_budget_ratchet.py: a file whose count for a
+# rule rises above .request-budget-ratchet-baseline.json fails. Rules read: a fixed-rate
+# browser poll that reaches the server, a poll under 2 s, a fast or unfixed server loop,
+# a directory scan in a request handler, a submit to the shared default pool, and a web
+# app without RequestTimingMiddleware. Whole tree, never routed. This hub's handlers
+# live in app_web/routers, so scan-per-request reads them. src/request_timing.py and
+# the poll helper are vendored and not yet wired in: moving callers onto them is the
+# burn-down, not this baseline. Exit 3 (git unusable, a file that cannot be read or
+# closed) fails the gate as NOT CONFIRMED. Procedure + limits: project-scaffolding
+# docs/request-budget-ratchet.md; the rules and why: docs/polling-budget.md.
+[request_budget_ratchet]
+enabled       = true
+baseline      = ".request-budget-ratchet-baseline.json"
+browser_paths = ["app_web/static/**"]
+server_paths  = ["src/**", "app_web/**", "tray/**"]
+handler_dirs  = ["app_web/routers"]
+
+# Background loops that run while nobody is viewing the admin page, each with its reason
+# (request_budget_ratchet's unwatched-loop rule).
+[[request_budget.loops]]
+path       = "src/server_lifecycle.py"
+function   = "_resource_sampler"
+interval_s = 2
+why        = "records the RAM, CPU and GPU history the Hub tab charts on open, so the history exists before anyone looks"
+
+[[request_budget.loops]]
+path       = "tray/tray.py"
+function   = "TrayApp._color_loop"
+interval_s = 2
+why        = "keeps the tray icon colour true to the hub's state, which is shown with no page open"
+
 
 # [conventions_ratchet] -- the scaffold's baseline-and-ratchet check of fleet conventions
 # as ast rules. The gate runs scripts/conventions_ratchet.py: a file whose count for an
