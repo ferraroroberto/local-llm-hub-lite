@@ -17,6 +17,7 @@
 /app_web/static/_vendored/toast
 /app_web/static/_vendored/usage-log
 /scripts/classify_e2e.py
+/scripts/clean_tree_ratchet.py
 /scripts/comment_ratchet.py
 /scripts/conventions_ratchet.py
 /scripts/conventions_readers.py
@@ -27,6 +28,7 @@
 /scripts/instruction_frontmatter.py
 /scripts/instruction_ratchet.py
 /scripts/instruction_repeats.py
+/scripts/port_host_ratchet.py
 /scripts/ratchet_baseline.py
 /scripts/request_budget_ratchet.py
 /scripts/request_budget_scan.py
