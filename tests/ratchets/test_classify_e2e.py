@@ -171,12 +171,12 @@ def test_real_rules_route_representative_paths() -> None:
     assert tier("launchers/openai_console.py") == "skip"
     assert tier("README.md") == "skip"
     assert tier(".fleet.toml") == "skip"
-    assert tier(".static-ratchet-baseline.json") == "skip"
-    assert tier(".docs-ratchet-baseline.json") == "skip"
-    assert tier(".instruction-ratchet-baseline.json") == "skip"
-    assert tier(".doc-refs-ratchet-baseline.json") == "skip"
-    assert tier(".dead-code-ratchet-baseline.json") == "skip"
-    assert tier(".conventions-ratchet-baseline.json") == "skip"
+    assert tier(".ratchets/static.json") == "skip"
+    assert tier(".ratchets/docs.json") == "skip"
+    assert tier(".ratchets/instruction.json") == "skip"
+    assert tier(".ratchets/doc-refs.json") == "skip"
+    assert tier(".ratchets/dead-code.json") == "skip"
+    assert tier(".ratchets/conventions.json") == "skip"
 
     # Mixed real diff (static asset + backend) -> static; add a page -> full.
     assert tier("app_web/static/icon-192.png", "src/x.py") == "static"
