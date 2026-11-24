@@ -3,7 +3,7 @@
  * background event streams.
  */
 
-import { state, els, THEME_KEY, STATUS_POLL_MS, COUNTERS_POLL_MS, MODELS_POLL_MS } from './state.js';
+import { state, els, THEME_KEY, STATUS_POLL_MS, MODELS_POLL_MS } from './state.js';
 import { api, jsonApi, tokenFromUrl, writeToken, setSignInHandler, toast } from './api.js';
 import { initRestartSheet } from './_vendored/page-foot/restart-sheet.js';
 import { icon } from './_vendored/icons/icons.js';
@@ -13,7 +13,7 @@ import { initBuildWatch } from './_vendored/build-watch/build-watch.js';
 import { startPoll } from './_vendored/poll/poll.js';
 import { wireTabs, onTabChange } from './tabs.js';
 import { wireUsageLog } from './usage.js';
-import { wireHub, fetchHubStatus, fetchCounters, startHubStreams, stopHubStreams, fetchInstallStatus } from './hub.js';
+import { wireHub, fetchHubStatus, startHubStreams, stopHubStreams, fetchInstallStatus } from './hub.js';
 import { wireModels, fetchModels } from './models.js';
 import { wireRolesCard } from './roles_card.js';
 import { wirePlayground, fetchPlaygroundModels } from './playground.js';
@@ -96,7 +96,6 @@ async function boot() {
   await Promise.allSettled([
     fetchVersion(),
     fetchHubStatus(),
-    fetchCounters(),
     fetchModels(),
     fetchInstallStatus(),
     fetchPlaygroundModels(),
@@ -114,7 +113,6 @@ async function boot() {
   // Poll loops — light, no SSE for these
   // Self-scheduling, single-flight, paused while the page is hidden.
   startPoll(fetchHubStatus, STATUS_POLL_MS);
-  startPoll(fetchCounters, COUNTERS_POLL_MS);
   startPoll(function () {
     if (state.tab === 'models') return fetchModels();
   }, MODELS_POLL_MS);
@@ -126,7 +124,6 @@ async function resumeAfterLogin() {
   toast('Signed in.', 'good');
   await Promise.allSettled([
     fetchHubStatus(),
-    fetchCounters(),
     fetchModels(),
     fetchInstallStatus(),
     fetchPlaygroundModels(),

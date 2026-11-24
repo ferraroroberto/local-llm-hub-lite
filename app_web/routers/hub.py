@@ -61,6 +61,8 @@ async def hub_status(request: Request) -> Dict[str, Any]:
         "started_at": OBS.started_at(),
         "uptime_s": round(uptime_s, 1),
         "host": resolve_host().id,
+        # Rides along so the page's one 4 s poll refreshes both the pill and the counters.
+        "counters": OBS.counters_snapshot(),
     }
 
 
@@ -101,11 +103,6 @@ async def requests_stream(request: Request) -> StreamingResponse:
 @router.get("/api/hub/errors/recent")
 async def errors_recent(limit: int = 50) -> Dict[str, Any]:
     return {"errors": OBS.recent_errors(limit=max(1, min(limit, 50)))}
-
-
-@router.get("/api/hub/counters")
-async def counters() -> Dict[str, Any]:
-    return {"counters": OBS.counters_snapshot()}
 
 
 # ----------------------------------------------------------------- stats

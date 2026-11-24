@@ -17,15 +17,14 @@ export const TAB_KEY = 'llmhub.tab';
 export const MODELS_ACTIVE_ONLY_KEY = 'llmhub.models.activeOnly';
 
 export const STATUS_POLL_MS = 4000;
-export const COUNTERS_POLL_MS = 4000;
 export const MODELS_POLL_MS = 5000;
 export const STATS_POLL_MS = 2000;
 
 export const state = {
   tab: 'hub',
-  status: null,           // /admin/api/hub/status payload
+  status: null,           // /admin/api/hub/status payload (counters included)
   models: [],             // /admin/api/models payload
-  counters: [],           // rows from /admin/api/hub/counters
+  counters: [],           // counters rows of the /admin/api/hub/status payload
   liveRequests: [],       // ring synced from SSE stream
   recentErrors: [],
   logLines: [],
