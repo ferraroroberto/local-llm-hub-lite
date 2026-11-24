@@ -64,3 +64,15 @@ def test_the_route_refuses_when_the_middleware_is_missing(tmp_path: Path):
 def test_the_recipe_runs_the_repos_own_tray_bat():
     assert TRAY_RESTART[-2:] == (".\\tray.bat", "--restart")
     assert (ROOT / "tray.bat").is_file()
+
+
+def test_the_sheets_update_endpoints_are_wired_to_routes_the_admin_app_serves():
+    # The sheet defaults to /api/restart/{check,pull}; the SPA is mounted under /admin, so
+    # main.js must pass the prefixed paths or Check/Pull miss with a 404.
+    main_js = (ROOT / "app_web" / "static" / "main.js").read_text(encoding="utf-8")
+    client = _admin_client()
+    headers = {"Origin": "https://elsewhere.example", "Authorization": f"Bearer {TOKEN}"}
+    for option, route in (("checkEndpoint", "/api/restart/check"), ("pullEndpoint", "/api/restart/pull")):
+        assert f"{option}: '/admin{route}'" in main_js
+        # A cross-origin POST is refused (403) before any git runs; a 404 would mean no such route.
+        assert client.post(route, headers=headers).status_code == 403
