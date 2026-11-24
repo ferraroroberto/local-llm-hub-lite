@@ -13,6 +13,8 @@ export async function fetchHubStatus() {
   try {
     const body = await jsonApi('/admin/api/hub/status');
     state.status = body;
+    state.counters = body.counters || [];
+    renderCounters();
     if (els.hubPid) els.hubPid.textContent = body.pid || '—';
     if (els.hubUptime) els.hubUptime.textContent = fmtUptime(body.uptime_s);
     setHubLive('good', 'up');
@@ -39,14 +41,7 @@ function fmtUptime(seconds) {
 }
 
 // --------------------------------------------------------- counters
-export async function fetchCounters() {
-  try {
-    const body = await jsonApi('/admin/api/hub/counters');
-    state.counters = body.counters || [];
-    renderCounters();
-  } catch (_) { /* ignore */ }
-}
-
+// Fed by fetchHubStatus: the counters come in the status payload.
 function renderCounters() {
   renderCounterTable(els.countersTable, state.counters);
 }

@@ -99,7 +99,7 @@ A **chat card** (pick any enabled chat model, system prompt + message, response 
 
 ### `config/models.yaml` (committed — the registry)
 
-Single source of truth for models, ports, and roles. Structure:
+Single source of truth for models, ports, and roles. `hub.port` is the one place the hub's own port is written: the code, `tray.bat` and `run_hub.bat` all read it (`.\.venv\Scripts\python.exe -m src.host_profile` prints it), and a port-host ratchet in the gate fails any other script or code file that spells a port out. Structure:
 
 ```yaml
 hub:    { port: 8020, bind_host: "0.0.0.0" }

@@ -28,7 +28,6 @@ RING_MAX = 2000
 # live-request ring still reflects them when needed.
 _POLLING_NOISE_PATHS = (
     "/admin/api/hub/status",
-    "/admin/api/hub/counters",
     "/admin/api/hub/stats",
     "/admin/api/hub/requests/recent",
     "/admin/api/hub/errors/recent",

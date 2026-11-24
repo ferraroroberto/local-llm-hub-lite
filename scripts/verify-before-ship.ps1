@@ -71,6 +71,16 @@
 #      .windows-only-ratchet-baseline.json. Whole tree, never routed. Any non-zero
 #      exit fails, so exit 3 (a test module that cannot be read or parsed) is
 #      NOT CONFIRMED and never a pass.
+#   9g. port host ratchet: no port or machine-local host literal in a tracked script
+#      or code file outside the config resolver (src/host_profile.py), beyond
+#      .ratchets/port-host.json. Whole tree, never routed. Any non-zero exit fails,
+#      so exit 3 (git unusable, a file that cannot be read or parsed) is NOT
+#      CONFIRMED and never a pass.
+#   9h. clean tree ratchet: a disposable hub boot (scripts/smoke_hub.py, on a free port
+#      with a scratch models config, no backend) adds, changes or deletes no path in
+#      the work tree beyond .ratchets/clean-tree.json. Whole tree, never routed. Any
+#      non-zero exit fails, so exit 3 (the smoke failed to start, git unusable) is NOT
+#      CONFIRMED and never a pass.
 #  10. `pytest -q` (unit tests, no GPU / no real CLIs); stages 10-11 run inside
 #      the runtime write probe (--snapshot before, --probe after), which fails on
 #      any untracked or ignored file they leave under a code folder.
@@ -264,6 +274,20 @@ Step "windows-only ratchet" {
     # exit, so exit 3 (a test module that cannot be read or parsed) stops the gate
     # like a finding does.
     & $Python scripts\windows_only_ratchet.py
+}
+
+Step "port host ratchet" {
+    # Called directly, like the windows-only ratchet: Step fails on any non-zero
+    # exit, so exit 3 (git unusable, a file that cannot be read or parsed) stops
+    # the gate like a finding does.
+    & $Python scripts\port_host_ratchet.py
+}
+
+Step "clean tree ratchet" {
+    # Called directly, like the port host ratchet: Step fails on any non-zero
+    # exit, so exit 3 (the smoke hub did not start, git unusable) stops the gate
+    # like a finding does. It boots a scratch hub; the live :8020 hub is untouched.
+    & $Python scripts\clean_tree_ratchet.py
 }
 
 # Runtime write probe, first half: what already sits untracked or ignored under

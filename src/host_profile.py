@@ -12,6 +12,7 @@ admin roles router reads the raw ``roles:`` block through it.
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -78,3 +79,8 @@ def hub_port() -> int:
 def hub_bind_host() -> str:
     cfg = _load_config()
     return str((cfg.get("hub") or {}).get("bind_host", "0.0.0.0"))
+
+
+if __name__ == "__main__":
+    # The .bat launchers ask for the port here, so no script repeats the number.
+    sys.stdout.write(f"{hub_port()}\n")
