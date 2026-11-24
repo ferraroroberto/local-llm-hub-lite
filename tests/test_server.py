@@ -221,3 +221,14 @@ def test_unknown_model_request_lands_in_the_live_ring():
     assert row is not None, rows
     assert row["status"] == 400
     assert row["latency_ms"] >= 0
+
+
+def test_hub_status_carries_the_counters_the_page_polls_for():
+    """The page makes one 4 s read for the pill and the counters table, so the
+    counter rows ride in /admin/api/hub/status."""
+    client = TestClient(server_mod.app)
+    marker = "unit-status-counters-marker"
+    client.post("/v1/messages", json={"model": marker, "messages": [{"role": "user", "content": "hi"}]})
+    body = client.get("/admin/api/hub/status").json()
+    assert isinstance(body["counters"], list)
+    assert body["counters"], body

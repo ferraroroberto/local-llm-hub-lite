@@ -195,9 +195,9 @@ handler_dirs  = ["app_web/routers"]
 
 # [request_budget] -- the visible-minute ceiling for the runtime check
 # (tests/e2e/budget/test_request_budget.py, vendored probe; docs/polling-budget.md "The runtime
-# check"). The Hub tab on a fake clock reads about 53 times a minute (hub stats every 2 s, hub
-# status and counters every ~4.5 s, one usage-log flush); 60 leaves headroom for one more
-# poll's rounding without admitting a doubled cadence. Hidden must be zero.
+# check"). The Hub tab on a fake clock reads about 48 times a minute (hub stats every 2 s, hub
+# status, which carries the counters, every 4 s, the two streams and one usage-log flush); 60
+# leaves headroom for one more poll without admitting a doubled cadence. Hidden must be zero.
 [request_budget]
 visible_requests_per_minute = 60
 
