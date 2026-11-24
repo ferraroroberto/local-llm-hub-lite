@@ -97,9 +97,19 @@ if not exist "%TRAY_PS%" (
 REM === ADAPT (4/4): this tray's exclusively-owned ports as a comma list.
 REM     Exclude any mutex-shared port -- :8022 (whisper) and the llama-server
 REM     backend ports (8021, 8022) are NOT owned by this tray. ===
-set "OWNED_PORTS=8020"
+REM  The hub port comes from the one resolver (src.host_profile.hub_port, which reads
+REM  hub.port from config/models.yaml), so no script repeats the number. An empty answer
+REM  stops here: a blank -Ports would reclaim nothing and report a clean restart.
+set "HUB_PORT="
+for /f "usebackq delims=" %%p in (`"%TRAY_VENV%\Scripts\python.exe" -m src.host_profile`) do set "HUB_PORT=%%p"
+if not defined HUB_PORT (
+    echo ERROR: could not read the hub port from src.host_profile
+    echo        Fix: run .venv\Scripts\python.exe -m src.host_profile and read its error.
+    exit /b 1
+)
+set "OWNED_PORTS=%HUB_PORT%"
 REM This app's version endpoint is /admin/api/version, not the default /api/version.
-set "VERSION_URL=http://127.0.0.1:8020/admin/api/version"
+set "VERSION_URL=http://127.0.0.1:%HUB_PORT%/admin/api/version"
 
 set "RESTART_ARG="
 if defined WANT_RESTART set "RESTART_ARG=-Restart"
