@@ -31,7 +31,7 @@ ux_surface_ratchet = { src = "scripts/ux_surface_ratchet.py", sha = "7577aece617
 ux_surface_map = { src = "scripts/ux_surface_map.py", sha = "7577aece617ad366e7df8ef522d511184b445144", dest = "scripts/ux_surface_map.py" }
 classify_e2e = { src = "scripts/classify_e2e.py", sha = "3f15581f2188895a27f5a32083f7f7cdb7e93648", dest = "scripts/classify_e2e.py" }
 build_info = { src = "src/build_info.py", sha = "db08b78dabcd817616ca4fc2954035466d2435d7", dest = "src/build_info.py" }
-restart_check = { src = "src/restart_check.py", sha = "db08b78dabcd817616ca4fc2954035466d2435d7", dest = "src/restart_check.py" }
+restart_check = { src = "src/restart_check.py", sha = "48602060fffdacbcdcdde66b9886c6471d835ff3", dest = "src/restart_check.py" }
 static_ratchet = { src = "scripts/static_ratchet.py", sha = "fe8cc1bdbd038ed65947186248df13072eceb25a", dest = "scripts/static_ratchet.py" }
 docs_ratchet = { src = "scripts/docs_ratchet.py", sha = "78635aa74a92b9622326cb53992e0634fbaf6246", dest = "scripts/docs_ratchet.py" }
 structure_ratchet = { src = "scripts/structure_ratchet.py", sha = "4a06ca84fc9c5005d4be7fa505c9d0e7c0472dba", dest = "scripts/structure_ratchet.py" }
@@ -66,11 +66,11 @@ switch       = { src = "app/webapp/static/_vendored/switch", sha = "8f15c49560ad
 instruction_frontmatter = { src = "scripts/instruction_frontmatter.py", sha = "c5535ac326c398df8f44486f386ff0e0b6d4c61c", dest = "scripts/instruction_frontmatter.py" }
 instruction_repeats = { src = "scripts/instruction_repeats.py", sha = "c5535ac326c398df8f44486f386ff0e0b6d4c61c", dest = "scripts/instruction_repeats.py" }
 text-size    = { src = "app/webapp/static/_vendored/text-size", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/text-size" }
-page-foot = { src = "app/webapp/static/_vendored/page-foot", sha = "564864cb95a8b416c16d1a1e1e9f31b9d5b2ec8e", dest = "app_web/static/_vendored/page-foot" }
+page-foot = { src = "app/webapp/static/_vendored/page-foot", sha = "48602060fffdacbcdcdde66b9886c6471d835ff3", dest = "app_web/static/_vendored/page-foot" }
 select-native = { src = "app/webapp/static/_vendored/select-native", sha = "09fe2436b6bf3ee608d43fc8a26165e3e2400840", dest = "app_web/static/_vendored/select-native" }
 sign-in     = { src = "app/webapp/static/_vendored/sign-in", sha = "7577aece617ad366e7df8ef522d511184b445144", dest = "app_web/static/_vendored/sign-in" }
 toast = { src = "app/webapp/static/_vendored/toast", sha = "e56c8330f8500b83635773033a09de6fc3cba342", dest = "app_web/static/_vendored/toast" }
-build-watch = { src = "app/webapp/static/_vendored/build-watch", sha = "2d871dd5a6a3ee6fe12a3c5c6439d2c53a93c2c4", dest = "app_web/static/_vendored/build-watch" }
+build-watch = { src = "app/webapp/static/_vendored/build-watch", sha = "48602060fffdacbcdcdde66b9886c6471d835ff3", dest = "app_web/static/_vendored/build-watch" }
 icon-button = { src = "app/webapp/static/_vendored/icon-button", sha = "241d2fde53645497376a19c073bb2b6c4e540f86", dest = "app_web/static/_vendored/icon-button" }
 request_budget_ratchet = { src = "scripts/request_budget_ratchet.py", sha = "2e2a4cca9d3180980db6f8cd7f03a6f12737b7db", dest = "scripts/request_budget_ratchet.py", requires = ["request_budget_scan"] }
 request_budget_scan = { src = "scripts/request_budget_scan.py", sha = "2e2a4cca9d3180980db6f8cd7f03a6f12737b7db", dest = "scripts/request_budget_scan.py" }
@@ -86,7 +86,7 @@ windows_only_ratchet = { src = "scripts/windows_only_ratchet.py", sha = "5ba99b0
 # the gate's venv; a detector that cannot run exits 3, which fails the gate. Excluded:
 # vendored admin-SPA components (copies by design) and the gitignored vendor/ and
 # models/ trees. Procedure + limits: project-scaffolding docs/static-ratchet.md.
-self_restart = { src = "src/self_restart.py", sha = "564864cb95a8b416c16d1a1e1e9f31b9d5b2ec8e", dest = "src/self_restart.py" }
+self_restart = { src = "src/self_restart.py", sha = "48602060fffdacbcdcdde66b9886c6471d835ff3", dest = "src/self_restart.py" }
 [static_ratchet]
 enabled  = true
 baseline = ".static-ratchet-baseline.json"

@@ -104,6 +104,7 @@ async function boot() {
   initRestartSheet({
     fetchJson: jsonApi, postJson: postRestart,
     endpoint: '/admin/api/restart', versionEndpoint: '/admin/api/version',
+    checkEndpoint: '/admin/api/restart/check', pullEndpoint: '/admin/api/restart/pull',
   });
 
   // The vendored nav already restored the persisted tab (and its streams)
