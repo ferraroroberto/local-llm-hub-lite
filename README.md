@@ -184,6 +184,8 @@ The last stdout line of a gate run is `GATE-RESULT: PASS` or `GATE-RESULT: FAIL`
 
 The browser suite shares one context per engine and names a drained loopback port pool (`PORT POOL EXHAUSTED`) instead of a page defect: [`docs/e2e-loopback-ports.md`](docs/e2e-loopback-ports.md).
 
+A runtime request check (`tests/e2e/budget/`) loads `/admin/` on a fake clock and counts its `/admin/api/` requests: at most `[request_budget] visible_requests_per_minute` from `.fleet.toml` in a visible minute, none while hidden (bar one usage-log flush), one catch-up read per path on return; a missing budget key reports NOT CONFIRMED, never a pass.
+
 CI (`.github/workflows/e2e.yml`) runs the same three steps on every PR/push to `main` — advisory, the local gate is the contract.
 
 ## Scope & usage policy

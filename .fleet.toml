@@ -76,6 +76,7 @@ request_budget_ratchet = { src = "scripts/request_budget_ratchet.py", sha = "2e2
 request_budget_scan = { src = "scripts/request_budget_scan.py", sha = "2e2a4cca9d3180980db6f8cd7f03a6f12737b7db", dest = "scripts/request_budget_scan.py" }
 request_timing = { src = "src/request_timing.py", sha = "2e2a4cca9d3180980db6f8cd7f03a6f12737b7db", dest = "src/request_timing.py" }
 poll = { src = "app/webapp/static/_vendored/poll", sha = "2e2a4cca9d3180980db6f8cd7f03a6f12737b7db", dest = "app_web/static/_vendored/poll" }
+request_budget_probe = { src = "tests/e2e/budget/_request_budget.py", sha = "2a65b20ee0b426fa8246bfc7ac3dd28e019a39b3", dest = "tests/e2e/budget/_request_budget.py" }
 windows_only_ratchet = { src = "scripts/windows_only_ratchet.py", sha = "5ba99b0a04b1b5d7b3689f8f7a59bd3fe625a9bc", dest = "scripts/windows_only_ratchet.py" }
 
 # [static_ratchet] -- the scaffold's baseline-and-ratchet static analysis. The gate
@@ -188,6 +189,14 @@ baseline      = ".request-budget-ratchet-baseline.json"
 browser_paths = ["app_web/static/**"]
 server_paths  = ["src/**", "app_web/**", "tray/**"]
 handler_dirs  = ["app_web/routers"]
+
+# [request_budget] -- the visible-minute ceiling for the runtime check
+# (tests/e2e/budget/test_request_budget.py, vendored probe; docs/polling-budget.md "The runtime
+# check"). The Hub tab on a fake clock reads about 53 times a minute (hub stats every 2 s, hub
+# status and counters every ~4.5 s, one usage-log flush); 60 leaves headroom for one more
+# poll's rounding without admitting a doubled cadence. Hidden must be zero.
+[request_budget]
+visible_requests_per_minute = 60
 
 # Background loops that run while nobody is viewing the admin page, each with its reason
 # (request_budget_ratchet's unwatched-loop rule).
