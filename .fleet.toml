@@ -55,7 +55,7 @@ notify = { src = "src/notify", sha = "fe8cc1bdbd038ed65947186248df13072eceb25a",
 single_instance = { src = "app/tray/single_instance.py", sha = "fe8cc1bdbd038ed65947186248df13072eceb25a", dest = "tray/single_instance.py" }
 # Admin-SPA components, byte-identical to project-scaffolding at the recorded sha. icons/ is not
 # listed: its sprite is trimmed to the glyphs this app uses, so it is not a verbatim copy.
-button       = { src = "app/webapp/static/_vendored/button", sha = "a04abc7b3af872cbac974401dd0945587eac6cef", dest = "app_web/static/_vendored/button" }
+button       = { src = "app/webapp/static/_vendored/button", sha = "7a1a7561331edded3dc91128a42076fb3b0262f8", dest = "app_web/static/_vendored/button" }
 card         = { src = "app/webapp/static/_vendored/card", sha = "8f15c49560adbc076d24a8a63dd671868ffa7a4e", dest = "app_web/static/_vendored/card" }
 disclosure   = { src = "app/webapp/static/_vendored/disclosure", sha = "5d460bd1d9d44eed955c5357d1c9f622f2550ad8", dest = "app_web/static/_vendored/disclosure" }
 empty-state  = { src = "app/webapp/static/_vendored/empty-state", sha = "a04abc7b3af872cbac974401dd0945587eac6cef", dest = "app_web/static/_vendored/empty-state" }
