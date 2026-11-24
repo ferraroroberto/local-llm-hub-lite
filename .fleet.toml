@@ -78,6 +78,9 @@ request_timing = { src = "src/request_timing.py", sha = "2e2a4cca9d3180980db6f8c
 poll = { src = "app/webapp/static/_vendored/poll", sha = "2e2a4cca9d3180980db6f8cd7f03a6f12737b7db", dest = "app_web/static/_vendored/poll" }
 request_budget_probe = { src = "tests/e2e/budget/_request_budget.py", sha = "2a65b20ee0b426fa8246bfc7ac3dd28e019a39b3", dest = "tests/e2e/budget/_request_budget.py" }
 windows_only_ratchet = { src = "scripts/windows_only_ratchet.py", sha = "5ba99b0a04b1b5d7b3689f8f7a59bd3fe625a9bc", dest = "scripts/windows_only_ratchet.py" }
+port_host_ratchet = { src = "scripts/port_host_ratchet.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/port_host_ratchet.py" }
+clean_tree_ratchet = { src = "scripts/clean_tree_ratchet.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/clean_tree_ratchet.py" }
+ratchet_baseline = { src = "scripts/ratchet_baseline.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/ratchet_baseline.py" }
 
 # [static_ratchet] -- the scaffold's baseline-and-ratchet static analysis. The gate
 # (scripts/verify-before-ship.ps1) runs scripts/static_ratchet.py, which fails on a
@@ -358,6 +361,9 @@ path = ".runtime-write-ratchet-baseline.json"
 tier = "none"
 path = ".windows-only-ratchet-baseline.json"
 [[e2e.rule]]
+tier   = "none"
+prefix = ".ratchets/"
+[[e2e.rule]]
 tier = "none"
 path = ".usage-track-ratchet-baseline.json"
 [[e2e.rule]]
@@ -431,6 +437,26 @@ paths    = ["app_web/static/**"]
 [windows_only_ratchet]
 enabled  = true
 baseline = ".windows-only-ratchet-baseline.json"
+
+# [port_host_ratchet] -- scripts/port_host_ratchet.py fails when a tracked script or code file
+# writes a port or a machine-local host literal outside the config resolver, beyond
+# .ratchets/port-host.json. src/host_profile.py is the resolver: hub_port() reads hub.port from
+# config/models.yaml, and tray.bat and run_hub.bat ask it for the port instead of repeating it.
+# Exit 3 is "not confirmed", never clean. Mechanism: project-scaffolding docs/port-host-ratchet.md.
+[port_host_ratchet]
+enabled   = true
+resolvers = ["src/host_profile.py"]
+
+# [clean_tree_ratchet] -- scripts/clean_tree_ratchet.py runs the smoke below once and fails when
+# it adds, changes or deletes a path in the work tree beyond .ratchets/clean-tree.json. The
+# smoke boots only the hub, on a free port and a scratch models config with no backend rows
+# (scripts/smoke_hub.py), so it never touches the live hub or a model backend. Exit 3 is
+# "not confirmed", never clean. Mechanism: project-scaffolding docs/clean-tree-ratchet.md.
+[clean_tree_ratchet]
+enabled      = true
+smoke        = ["{python}", "-m", "scripts.smoke_hub", "{port}", "{data_dir}"]
+ready_path   = "/health"
+data_dir_env = "LOCAL_LLM_HUB_LITE_DATA_DIR"
 
 # Accepted design-drift exceptions (schema: fleet-config architecture/README.md).
 [[design.accepted]]
