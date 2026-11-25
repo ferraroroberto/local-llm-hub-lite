@@ -85,7 +85,7 @@ windows_only_ratchet = { src = "scripts/windows_only_ratchet.py", sha = "48db213
 port_host_ratchet = { src = "scripts/port_host_ratchet.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/port_host_ratchet.py" }
 clean_tree_ratchet = { src = "scripts/clean_tree_ratchet.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/clean_tree_ratchet.py" }
 ratchet_baseline = { src = "scripts/ratchet_baseline.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/ratchet_baseline.py" }
-installer = { src = "src/installer.py", sha = "c23c5bf575a3f375a4ddbfb99a31763a80c6bee5", dest = "src/installer.py" }
+installer = { src = "src/installer.py", sha = "bafa9446b907dcb7fc6d833c1edfb1a069b7ca38", dest = "src/installer.py" }
 
 # [static_ratchet] -- the scaffold's baseline-and-ratchet static analysis. The gate
 # (scripts/verify-before-ship.ps1) runs scripts/static_ratchet.py, which fails on a
