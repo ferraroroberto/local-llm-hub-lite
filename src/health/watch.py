@@ -63,10 +63,10 @@ class HealthWatch:
         except probes.Unsupported as exc:
             return {"state": "unsupported", "reason": str(exc), "value": None}
         except probes.Warming as exc:
-            return {"state": "warming", "reason": str(exc), "value": None}
+            return {"state": "warming", "reason": str(exc), "value": None}  # state-literal-exempt: one probe's reading this tick (ok, failed, unsupported, warming, overrun), re-read every tick, never a lifecycle
         except Exception as exc:  # noqa: BLE001 — any failed read is an unknown reading, never a crash
             logger.info("ℹ️ machine health: %s reading failed: %r", name, exc)
-            return {"state": "failed", "reason": str(exc) or type(exc).__name__, "value": None}
+            return {"state": "failed", "reason": str(exc) or type(exc).__name__, "value": None}  # state-literal-exempt: one probe's reading this tick (ok, failed, unsupported, warming, overrun), re-read every tick, never a lifecycle
         took_ms = (self._clock() - start) * 1000.0
         if took_ms > self._budget_ms:
             logger.warning("⚠️ machine health: %s reading took %.0f ms, over its %.0f ms budget",
