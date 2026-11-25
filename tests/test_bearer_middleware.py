@@ -115,3 +115,18 @@ def test_parent_exempt_path_bypasses_even_without_token(monkeypatch):
     client = TestClient(server_mod.app)
     r = client.get("/health", headers=_PROXY_HEADERS)
     assert r.status_code == 200
+
+
+def test_parent_healthz_is_open_and_version_stays_gated(monkeypatch):
+    """The vendored health routes: /healthz answers any caller, /api/version
+    keeps the parent gate (loopback bypasses) and serves the build identity."""
+    _patch_parent_token(monkeypatch, "parentsecret")
+    client = TestClient(server_mod.app)
+    r = client.get("/healthz", headers=_PROXY_HEADERS)
+    assert r.status_code == 200
+    assert r.json() == {"ok": True, "service": "local-llm-hub-lite"}
+    assert client.get("/api/version", headers=_PROXY_HEADERS).status_code == 401
+    r = client.get("/api/version")
+    assert r.status_code == 200
+    assert set(r.json()) == {"git_sha", "built_at"}
+    assert client.get("/health", headers=_PROXY_HEADERS).status_code == 200
