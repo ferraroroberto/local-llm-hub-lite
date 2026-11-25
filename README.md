@@ -21,12 +21,12 @@ Models can be `startup: eager` (autostart with the hub) or `startup: on_demand` 
 ```bat
 git clone https://github.com/ferraroroberto/local-llm-hub-lite
 cd local-llm-hub-lite
-scripts\setup.bat                              REM .venv + requirements + install report
+setup.bat                                      REM .venv + requirements + configs + checklist
 .venv\Scripts\python.exe -m src.install --fix  REM download llama.cpp + whisper.cpp + weights
 tray.bat                                       REM tray icon -> hub on :8020
 ```
 
-`python -m src.install` reports what's missing (venv, deps, GPU, vendored binaries, model weights, free ports); `--fix` downloads the platform llama.cpp/whisper.cpp release binaries into `vendor/` and the GGUF/BIN weights into `models/` (several GB — grab a coffee). Everything is idempotent; run it again any time. The same checks live in the admin Hub tab with per-item **Fix** buttons.
+`python -m src.install` reports what's missing (venv, deps, GPU, vendored binaries, model weights, free ports); `--fix` downloads the platform llama.cpp/whisper.cpp release binaries into `vendor/` and the GGUF/BIN weights into `models/` (several GB — grab a coffee). Everything is idempotent; run it again any time. Moving to another PC, updating, migrating an existing copy and uninstalling are in [docs/install.md](docs/install.md). The same checks live in the admin Hub tab with per-item **Fix** buttons.
 
 Open the admin at <http://127.0.0.1:8020/admin/>. `GET /health` and `GET /healthz` return 200 once the hub is up (`GET /api/version` serves the build identity, `git_sha` and `built_at`; `/healthz` is open to every caller, `/api/version` needs the token off loopback); `GET /v1/audio/health` preflights the whisper backend specifically — 200 `ok` when reachable, 503 `degraded`/`none` when it is down or disabled, so a caller can branch on the status code alone before sending a clip.
 
@@ -159,6 +159,7 @@ src/               hub: FastAPI app, model registry, backend process manager,
                    system stats, machine health (src/health), installer
 app_web/           /admin sub-app: routers + static vanilla-JS SPA (3 tabs, PWA)
 config/            models.yaml (registry) + webapp_config.sample.json
+setup.bat          clone-and-setup installer launcher (src/installer.py, docs/install.md)
 scripts/           installers (llama.cpp / whisper.cpp / weights), smoke test,
                    verify-before-ship gate, vendored tray_lifecycle.ps1
 launchers/         run_model.bat/.sh <id>, run_all.bat/.sh (registry-driven)

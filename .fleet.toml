@@ -12,6 +12,8 @@ description  = "Single-machine lite fork of local-llm-hub: local models and whis
 # config/, launchers/ and assets/, so no extra_roots are needed. docs/layout.md gives
 # each folder a line.
 shape        = "service"
+# setup.bat is the one-shot installer launcher (docs/install.md); the service shape does not list it.
+extra_root_files = ["setup.bat"]
 
 # Diff-proportionate e2e routing (project-scaffolding#180). scripts/verify-
 # before-ship.ps1's browser phase classifies the branch's changed files
@@ -83,6 +85,7 @@ windows_only_ratchet = { src = "scripts/windows_only_ratchet.py", sha = "48db213
 port_host_ratchet = { src = "scripts/port_host_ratchet.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/port_host_ratchet.py" }
 clean_tree_ratchet = { src = "scripts/clean_tree_ratchet.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/clean_tree_ratchet.py" }
 ratchet_baseline = { src = "scripts/ratchet_baseline.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/ratchet_baseline.py" }
+installer = { src = "src/installer.py", sha = "c23c5bf575a3f375a4ddbfb99a31763a80c6bee5", dest = "src/installer.py" }
 
 # [static_ratchet] -- the scaffold's baseline-and-ratchet static analysis. The gate
 # (scripts/verify-before-ship.ps1) runs scripts/static_ratchet.py, which fails on a
@@ -93,6 +96,27 @@ ratchet_baseline = { src = "scripts/ratchet_baseline.py", sha = "48db2132dab2dfc
 # vendored admin-SPA components (copies by design) and the gitignored vendor/ and
 # models/ trees. Procedure + limits: project-scaffolding docs/static-ratchet.md.
 self_restart = { src = "src/self_restart.py", sha = "48602060fffdacbcdcdde66b9886c6471d835ff3", dest = "src/self_restart.py" }
+
+# [install] -- what setup.bat (src/installer.py, vendored) needs from this app; the playbook is
+# docs/install.md. config/models.yaml is tracked, so it is not an install config: the registry
+# travels with git and a local edit of it is carried by hand (docs/install.md).
+[install]
+requirements = "requirements.txt"
+samples      = ["config"]
+settings     = ["config/webapp_config.json"]
+
+# The admin sign-in hash is set by the owner (python -m src.password set) and has no sample, so the
+# checklist looks for the file. The hub itself needs no password on loopback.
+[[install.check]]
+name  = "Admin sign-in password (non-loopback callers)"
+paths = ["config/app_password.json"]
+hint  = "set one with: .venv\\Scripts\\python.exe -m src.password set"
+
+# src.install exits 1 while a backend binary or a model weight is missing; a busy port is only a warning.
+[[install.check]]
+name    = "llama.cpp / whisper.cpp binaries and model weights"
+command = ["{python}", "-m", "src.install"]
+hint    = "download them with: .venv\\Scripts\\python.exe -m src.install --fix"
 
 [static_ratchet]
 enabled  = true

@@ -1,0 +1,125 @@
+"""This app's wiring of the vendored installer (`setup.bat` -> `src/installer.py`).
+
+The installer's own behaviour is the scaffold's to test; these tests drive it with this repo's real
+`.fleet.toml` `[install]` table and config sample in a throwaway copy, with a fake runner in place of
+`subprocess.run` (no venv is created, nothing is installed), and pin the playbook to the files the
+app actually reads.
+"""
+
+from __future__ import annotations
+
+import datetime
+import json
+import shutil
+import subprocess
+from pathlib import Path
+from typing import Any
+
+from src import installer
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+FIXED_NOW = datetime.datetime(2026, 1, 2, 3, 4, 5)
+SAMPLE = "config/webapp_config.sample.json"
+TARGET = "config/webapp_config.json"
+
+
+class FakeRunner:
+    """Stands in for `subprocess.run`: plays the venv appearing and answers every probe with exit 0."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self.calls: list[list[str]] = []
+
+    def __call__(self, command: list[str], **_: Any) -> subprocess.CompletedProcess[str]:
+        self.calls.append(list(command))
+        if command[1:3] == ["-m", "venv"]:
+            python = installer.venv_python(self.root)
+            python.parent.mkdir(parents=True, exist_ok=True)
+            python.write_text("", encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0)
+
+
+def _clone(tmp_path: Path) -> Path:
+    """A fresh checkout's tracked inputs: the real manifest, requirements, sample and registry."""
+    root = tmp_path / "app"
+    (root / "config").mkdir(parents=True)
+    for name in (".fleet.toml", "requirements.txt", SAMPLE, "config/models.yaml"):
+        shutil.copyfile(REPO_ROOT / name, root / name)
+    return root
+
+
+def _snapshot(root: Path) -> dict[str, bytes]:
+    return {p.relative_to(root).as_posix(): p.read_bytes() for p in sorted(root.rglob("*")) if p.is_file()}
+
+
+def _run(root: Path, what_if: bool = False) -> tuple[installer.Report, FakeRunner]:
+    runner = FakeRunner(root)
+    return installer.run(root, runner=runner, now=lambda: FIXED_NOW, what_if=what_if), runner
+
+
+def test_manifest_declares_this_apps_config_pair_and_settings() -> None:
+    plan = installer.load_plan(REPO_ROOT)
+    assert installer.config_pairs(REPO_ROOT, plan) == [(SAMPLE, TARGET)]
+    assert TARGET in plan.settings
+
+
+def test_fresh_clone_creates_the_config_and_second_run_is_unchanged(tmp_path: Path) -> None:
+    root = _clone(tmp_path)
+    report, _ = _run(root)
+    assert not report.failed
+    assert (root / TARGET).read_bytes() == (root / SAMPLE).read_bytes()
+    before = _snapshot(root)
+    again, runner = _run(root)
+    assert again.changes == []
+    assert runner.calls == [[str(installer.venv_python(root)), "-m", "src.install"]]  # the checklist probe only
+    assert _snapshot(root) == before
+
+
+def test_what_if_on_a_fresh_clone_writes_nothing(tmp_path: Path) -> None:
+    root = _clone(tmp_path)
+    before = _snapshot(root)
+    report, runner = _run(root, what_if=True)
+    assert runner.calls == []
+    assert _snapshot(root) == before
+    assert installer.render(report).startswith("What-if: nothing below is changed.")
+
+
+def test_existing_config_keeps_values_and_gains_only_missing_keys_after_a_backup(tmp_path: Path) -> None:
+    root = _clone(tmp_path)
+    _run(root)
+    target = root / TARGET
+    older = {"auth_token": "kept-token", "extra_allowlist": ["10.1.2.3"]}
+    target.write_text(json.dumps(older), encoding="utf-8")
+    sample_keys = set(json.loads((root / SAMPLE).read_text(encoding="utf-8")))
+
+    report, _ = _run(root)
+
+    updated = json.loads(target.read_text(encoding="utf-8"))
+    assert updated["auth_token"] == "kept-token"
+    assert updated["extra_allowlist"] == ["10.1.2.3"]
+    assert set(updated) == sample_keys | set(older)
+    backup = root / "config" / "webapp_config.json.bak-20260102-030405"
+    assert json.loads(backup.read_text(encoding="utf-8")) == older
+    added = [line for line in report.lines if line[0] == "added"]
+    assert len(added) == 1
+    assert "kept-token" not in added[0][2]
+
+
+def test_the_model_registry_is_left_as_the_owner_edited_it(tmp_path: Path) -> None:
+    root = _clone(tmp_path)
+    registry = root / "config" / "models.yaml"
+    registry.write_text("hub: {port: 9000}\n", encoding="utf-8")
+    _run(root)
+    assert registry.read_text(encoding="utf-8") == "hub: {port: 9000}\n"
+    assert not list((root / "config").glob("models.yaml*bak*"))
+
+
+def test_playbook_names_this_apps_carry_over_files_and_the_readme_links_it() -> None:
+    playbook = (REPO_ROOT / "docs" / "install.md").read_text(encoding="utf-8")
+    for heading in ("## Fresh PC", "## Update", "## Migrate from an existing install", "## Uninstall"):
+        assert heading in playbook
+    migrate = playbook.split("## Migrate from an existing install")[1].split("\n## ")[0]
+    for carried in ("config/webapp_config.json", "config/app_password.json", "config/models.yaml",
+                    "usage.sqlite3", "vendor/", "models/"):
+        assert carried in migrate
+    assert "docs/install.md" in (REPO_ROOT / "README.md").read_text(encoding="utf-8")
