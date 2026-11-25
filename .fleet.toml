@@ -235,6 +235,12 @@ function   = "TrayApp._wait_model_ready_worker"
 interval_s = 1
 why        = "tells the user the moment a backend they started is ready; the wait ends at MODEL_READY_WAIT_S"
 
+[[request_budget.loops]]
+path       = "src/health/watch.py"
+function   = "run_loop"
+interval_s = 30
+why        = "fills the machine health verdict a launcher reads over loopback with no page open; each tick is one in-process read of ports, commit and disk counters"
+
 
 # [conventions_ratchet] -- the scaffold's baseline-and-ratchet check of fleet conventions
 # as ast rules. The gate runs scripts/conventions_ratchet.py: a file whose count for an
