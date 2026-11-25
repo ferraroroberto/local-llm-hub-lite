@@ -45,6 +45,7 @@
 /scripts/ux_surface_ratchet.py
 /scripts/windows_only_ratchet.py
 /src/build_info.py
+/src/health_routes.py
 /src/login_alert.py
 /src/login_lockout.py
 /src/no_window.py
