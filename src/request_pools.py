@@ -32,6 +32,8 @@ BACKEND_LIFECYCLE = TimedExecutor("backend-lifecycle", 4)
 BACKEND_READY = TimedExecutor("backend-ready", 8)
 # The 2 s resource sampler runs with nobody watching and has no request to charge.
 SAMPLER = TimedExecutor("sampler", 1)
+# The machine health tick: its own lane so a slow nvidia-smi on SAMPLER never delays it.
+HEALTH = TimedExecutor("health", 1)
 
 
 async def run_in_pool(pool: TimedExecutor, fn: Callable[..., T], /, *args: Any, **kwargs: Any) -> T:

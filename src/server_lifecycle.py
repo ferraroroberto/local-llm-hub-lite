@@ -81,6 +81,9 @@ async def wire_observatory_loop() -> None:
     HUB_LOG.attach_loop(loop)
     # Start the resource sampler. 2s tick × 150 samples = 5 min ring.
     _BACKGROUND_TASKS.append(loop.create_task(_resource_sampler()))
+    # Machine health: one cheap tick every 30 s behind /admin/api/machines/health.
+    from .health import watch as health_watch
+    _BACKGROUND_TASKS.append(loop.create_task(health_watch.run_loop()))
 
     # Inherit any backend process left running on one of our ports by a
     # previous hub instance. Without this, every hub restart shows the

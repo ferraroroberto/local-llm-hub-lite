@@ -1,0 +1,121 @@
+{
+ "host_id": "host-a",
+ "verdict": "watch",
+ "reason": "Commit charge 88% of limit",
+ "fix": "Reboot: no single process holds most of the commit charge",
+ "findings": [
+  {
+   "level": "watch",
+   "kind": "system",
+   "metric": "commit_percent",
+   "value": 88.0,
+   "process": null,
+   "reason": "Commit charge 88% of limit",
+   "fix": "Reboot: no single process holds most of the commit charge"
+  }
+ ],
+ "offenders": {
+  "ports": [
+   {
+    "name": "app.exe",
+    "pid": 101,
+    "value": 40,
+    "tcp": 30,
+    "udp": 10,
+    "rate_per_hour": null
+   }
+  ]
+ },
+ "system": {
+  "commit_gb": 106.1,
+  "commit_limit_gb": 135.1,
+  "commit_percent": 78.6,
+  "paged_pool_mb": 16854,
+  "paged_pool_percent": 12.95,
+  "nonpaged_pool_mb": 5949,
+  "nonpaged_pool_percent": 4.57,
+  "total_handles": 491253,
+  "ram_available_gb": 47.5,
+  "ram_available_percent": 37.4,
+  "tcp_time_wait": 906,
+  "ephemeral_ports_used": 965,
+  "ephemeral_ports_total": 16384,
+  "ephemeral_ports_percent": 5.9,
+  "disk_free_gb": 398.4,
+  "disk_free_percent": 21.4,
+  "uptime_seconds": 287331
+ },
+ "coverage": {
+  "processes": "ok",
+  "performance": "ok",
+  "memory": "ok",
+  "tcp": "ok",
+  "disk": "ok"
+ },
+ "sampled_at": 1795589478.5992584,
+ "sample_ms": 29.0,
+ "ports": {
+  "sampled_at": 1795589654.4146607,
+  "sample_ms": 13.0,
+  "cpu_ms": 15.6,
+  "interval_s": 30,
+  "samples": 2880,
+  "stale": false,
+  "coverage": {
+   "tcp": "ok",
+   "udp": "ok",
+   "port_events": "ok"
+  },
+  "tcp": {
+   "percent": 6.4,
+   "used": 1041,
+   "total": 16384,
+   "range": [
+    49152,
+    65535
+   ],
+   "worst_hour_percent": 18.7,
+   "worst_hour_at": 1795588814.2035618,
+   "time_wait": 837,
+   "worst_hour_time_wait": 3174.0
+  },
+  "udp": {
+   "percent": 0.8,
+   "used": 127,
+   "total": 16384,
+   "range": [
+    49152,
+    65535
+   ],
+   "worst_hour_percent": 0.9,
+   "worst_hour_at": 1795589264.3211625
+  },
+  "top_holders": [
+   {
+    "name": "app.exe",
+    "pid": 101,
+    "value": 40,
+    "tcp": 30,
+    "udp": 10,
+    "rate_per_hour": null
+   }
+  ]
+ },
+ "disks": [
+  {
+   "disk": "PhysicalDrive2",
+   "drives": [
+    "C:"
+   ],
+   "state": "ok",
+   "busy_percent": 12.9,
+   "queue": 0.0,
+   "read_ms": 0.106,
+   "write_ms": 0.04
+  }
+ ],
+ "enabled": true,
+ "interval_s": 600,
+ "samples": 4,
+ "alerts": []
+}
