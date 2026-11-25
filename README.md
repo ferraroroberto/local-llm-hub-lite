@@ -28,7 +28,7 @@ tray.bat                                       REM tray icon -> hub on :8020
 
 `python -m src.install` reports what's missing (venv, deps, GPU, vendored binaries, model weights, free ports); `--fix` downloads the platform llama.cpp/whisper.cpp release binaries into `vendor/` and the GGUF/BIN weights into `models/` (several GB — grab a coffee). Everything is idempotent; run it again any time. The same checks live in the admin Hub tab with per-item **Fix** buttons.
 
-Open the admin at <http://127.0.0.1:8020/admin/>. `GET /health` returns 200 once the hub is up; `GET /v1/audio/health` preflights the whisper backend specifically — 200 `ok` when reachable, 503 `degraded`/`none` when it is down or disabled, so a caller can branch on the status code alone before sending a clip.
+Open the admin at <http://127.0.0.1:8020/admin/>. `GET /health` and `GET /healthz` return 200 once the hub is up (`GET /api/version` serves the build identity, `git_sha` and `built_at`; `/healthz` is open to every caller, `/api/version` needs the token off loopback); `GET /v1/audio/health` preflights the whisper backend specifically — 200 `ok` when reachable, 503 `degraded`/`none` when it is down or disabled, so a caller can branch on the status code alone before sending a clip.
 
 ## Calling it
 
@@ -172,7 +172,7 @@ Where new code goes, and the structure ratchet that enforces it: [`docs/layout.m
 
 ## Restart & verify
 
-The canonical restart is **`.\.venv\Scripts\python.exe -m src.restart_check restart --port 8020 --version-path /admin/api/version`**, which runs `tray.bat --restart` by absolute path and exits non-zero unless a different process serves `HEAD` — an orphan-proof reclaim-then-start (kills the tray subtree, reclaims `:8020` by repo-scoped PID via the vendored `scripts\tray_lifecycle.ps1`, starts fresh, verifies the new build's `git_sha`). It never touches the model backend ports. Confirm with `GET /health` (the `/admin/api/version` payload carries `git_sha`).
+The canonical restart is **`.\.venv\Scripts\python.exe -m src.restart_check restart --port 8020 --version-path /admin/api/version`**, which runs `tray.bat --restart` by absolute path and exits non-zero unless a different process serves `HEAD` — an orphan-proof reclaim-then-start (kills the tray subtree, reclaims `:8020` by repo-scoped PID via the vendored `scripts\tray_lifecycle.ps1`, starts fresh, verifies the new build's `git_sha`). It never touches the model backend ports. Confirm with `GET /health` and `GET /healthz` (the `/admin/api/version` and `/api/version` payloads carry `git_sha`).
 
 Before shipping a change, run the local gate:
 

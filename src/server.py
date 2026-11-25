@@ -8,6 +8,7 @@ Two shapes exposed:
   * POST /v1/messages          - Anthropic shape (drop-in for the SDK)
   * POST /v1/chat/completions  - OpenAI shape (passthrough/translation)
   * GET  /v1/models            - union of enabled names (both shapes)
+  * GET  /healthz, /api/version - liveness + build identity (`health_routes.py`)
 
 Caveats: local llama-server backends are text-only and 400 on image
 input. Streaming: ``/v1/chat/completions`` proxies upstream SSE through
@@ -34,6 +35,7 @@ from .audio.server_audio_asr import router as _audio_router
 from .auth_middleware import ParentBearerTokenMiddleware
 from .chat_translation import MessagesRequest, _run_openai_backend
 from .cors_policy import install_cors
+from .health_routes import health_router
 from .host_profile import hub_bind_host, hub_port
 from .hub_log import install_root_handler
 from .hub_observability import ObservatoryMiddleware
@@ -156,6 +158,8 @@ def info() -> Dict[str, Any]:
         "description": "Local hub: Anthropic-shape + OpenAI-shape over llama-server backends.",
         "endpoints": {
             "health": "GET /health",
+            "healthz": "GET /healthz",
+            "version": "GET /api/version",
             "audio_health": "GET /v1/audio/health",
             "messages": "POST /v1/messages",
             "chat_completions": "POST /v1/chat/completions",
@@ -174,6 +178,12 @@ def favicon() -> Response:
 @app.get("/health")
 def health() -> Dict[str, str]:
     return {"status": "ok"}
+
+
+# The fleet's standard liveness and build-identity routes; /health stays for its
+# current callers. /healthz is exempt from the parent bearer gate, /api/version
+# keeps it (loopback bypasses), so a remote caller needs the token for the build.
+app.include_router(health_router(service="local-llm-hub-lite"))
 
 
 @app.get("/v1/models")
