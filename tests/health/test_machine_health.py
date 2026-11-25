@@ -14,7 +14,7 @@ from src.health.watch import HealthWatch
 
 from ._fakes import FakeClock, Fixed, disk, healthy_probes, memory, ports
 
-FIXTURE = Path(__file__).parent / "fixtures" / "upstream_machine_health.json"
+FIXTURE = Path(__file__).parent.parent / "fixtures" / "upstream_machine_health.json"
 
 
 def _watch(clock: FakeClock, probe_map, **kw) -> HealthWatch:

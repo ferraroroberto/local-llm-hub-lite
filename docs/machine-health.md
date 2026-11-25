@@ -1,6 +1,6 @@
 # Machine health
 
-`GET /admin/api/machines/health` answers whether this computer is under pressure: `ok`, `watch`, `act`, or `unknown`, with a one-line reason, a suggested fix and the rows behind it. A launcher on the same computer reads it over loopback the way app-launcher reads local-llm-hub's endpoint of the same name, so the response keeps that shape (`tests/health/fixtures/upstream_machine_health.json` is the contract). It is read-only: nothing here kills, restarts or closes anything.
+`GET /admin/api/machines/health` answers whether this computer is under pressure: `ok`, `watch`, `act`, or `unknown`, with a one-line reason, a suggested fix and the rows behind it. A launcher on the same computer reads it over loopback the way app-launcher reads local-llm-hub's endpoint of the same name, so the response keeps that shape (`tests/fixtures/upstream_machine_health.json` is the contract). It is read-only: nothing here kills, restarts or closes anything.
 
 ## What it measures
 
