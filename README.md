@@ -64,6 +64,8 @@ curl -F file=@clip.wav http://127.0.0.1:8020/v1/audio/transcriptions
 
 `GET /v1/models` lists every enabled model. Local requests never leave the machine.
 
+`GET /admin/api/machines/health` is this machine's health verdict (`ok` / `watch` / `act` / `unknown`) with rows for ports in use, commit charge and per-disk load, in the same shape as local-llm-hub's endpoint; a cheap 30 s in-process tick fills it and the endpoint answers from memory. What it measures and how an unmeasured reading shows: [docs/machine-health.md](docs/machine-health.md).
+
 **Limitations (by design of the lite fork):** local backends are text-only — image/document content blocks are rejected with a 400; no `stream=true` on `/v1/messages` (use the OpenAI shape for streaming); Anthropic-shape tool-use is not implemented for llama backends (OpenAI-shape tool calling works via llama.cpp's `--jinja`).
 
 ### Response headers
@@ -85,7 +87,7 @@ All four are CORS-exposed to browser callers (`src/cors_policy.py`).
 
 Status pill + uptime, the **install checks** card (with Fix buttons), **live requests** (SSE stream of every `/v1/*` call with latency and status), per-model **counters**, recent **errors**, the **hub log** tail, and **sparkline tiles for CPU, GPU utilization, RAM and VRAM** sampled every 2 s (`GET /admin/api/hub/stats`; GPU figures via `nvidia-smi` when present).
 
-The admin page's polls pause while the tab is hidden, and every `/admin/api/*` answer carries a `Server-Timing` header (`queue`, `worker`, `app`) naming the thread pool its blocking work ran on (`hot-poll`, `heavy-read`, `user-action`, `backend-lifecycle`, `backend-ready`, `sampler`; `src/request_pools.py`). A request slower than 3 s is logged with where its time went.
+The admin page's polls pause while the tab is hidden, and every `/admin/api/*` answer carries a `Server-Timing` header (`queue`, `worker`, `app`) naming the thread pool its blocking work ran on (`hot-poll`, `heavy-read`, `user-action`, `backend-lifecycle`, `backend-ready`, `sampler`, `health`; `src/request_pools.py`). A request slower than 3 s is logged with where its time went.
 
 ### Models
 
@@ -154,7 +156,7 @@ To add a model: add a row, list its id in `hosts.local.enabled`, run `python -m 
 ```
 src/               hub: FastAPI app, model registry, backend process manager,
                    anthropic<->openai translation, audio proxy, observability ring,
-                   system stats, installer
+                   system stats, machine health (src/health), installer
 app_web/           /admin sub-app: routers + static vanilla-JS SPA (3 tabs, PWA)
 config/            models.yaml (registry) + webapp_config.sample.json
 scripts/           installers (llama.cpp / whisper.cpp / weights), smoke test,

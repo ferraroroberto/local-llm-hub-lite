@@ -1,7 +1,8 @@
 """Unit tests for src/server_lifecycle.py's background-task lifecycle (#416).
 
-``wire_observatory_loop`` spawns 3 perpetual/one-shot tasks on the running
-loop (resource sampler, backend autostart, on-demand idle watchdog).
+``wire_observatory_loop`` spawns 4 perpetual/one-shot tasks on the running
+loop (resource sampler, machine health tick, backend autostart, on-demand
+idle watchdog).
 Before this fix nothing cancelled them on shutdown, so a torn-down ASGI
 lifespan (every ``with TestClient(app) as c:`` exit in the test suite)
 left them running against a dead loop — the order-dependent full-suite
@@ -29,7 +30,7 @@ def test_wire_observatory_loop_tracks_its_tasks(monkeypatch):
 
     async def _run():
         await sl.wire_observatory_loop()
-        assert len(sl._BACKGROUND_TASKS) == 3
+        assert len(sl._BACKGROUND_TASKS) == 4
         await sl.stop_background_tasks()
 
     asyncio.run(_run())

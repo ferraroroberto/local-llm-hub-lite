@@ -40,7 +40,7 @@ from src.usage_log import usage_router
 from src.webapp_config import current_auth_token, load_webapp_config
 
 from .login_alert import make_alert_owner
-from .routers import auth, hub, misc, models, playground, roles, version
+from .routers import auth, hub, machines, misc, models, playground, roles, version
 from .routers._helpers import STATIC_DIR
 
 _log = logging.getLogger(__name__)
@@ -175,6 +175,7 @@ def create_app() -> FastAPI:
     app.include_router(version.router)
     app.include_router(auth.router)
     app.include_router(hub.router)
+    app.include_router(machines.router)
     app.include_router(models.router)
     app.include_router(roles.router)
     app.include_router(playground.router)

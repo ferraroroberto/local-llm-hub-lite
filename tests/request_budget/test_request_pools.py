@@ -40,6 +40,7 @@ def test_each_class_of_work_has_its_own_pool():
         request_pools.BACKEND_LIFECYCLE,
         request_pools.BACKEND_READY,
         request_pools.SAMPLER,
+        request_pools.HEALTH,
     ]
     assert len({p.pool_name for p in pools}) == len(pools)
     assert all(isinstance(p, TimedExecutor) for p in pools)
