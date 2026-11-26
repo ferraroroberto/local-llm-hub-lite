@@ -31,6 +31,9 @@ tmp_server.log
 vendor/
 models/
 
+# This PC's model-registry overlay (config/models.yaml documents it)
+config/models.local.yaml
+
 # Env
 .env
 .env.local

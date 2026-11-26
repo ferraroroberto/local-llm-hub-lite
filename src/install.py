@@ -30,7 +30,13 @@ log = logging.getLogger(__name__)
 
 from .host_profile import hub_port
 from .host_profile import resolve as resolve_host
-from .model_registry import enabled_models, is_launchable, is_spawnable
+from .model_registry import (
+    ENGINE_FOUNDRY,
+    enabled_models,
+    is_launchable,
+    is_spawnable,
+    registry_problems,
+)
 from .no_window import NO_WINDOW
 from .process.backend_process import llama_server_binary, whisper_server_binary
 
@@ -244,6 +250,43 @@ def _check_whisper_cpp() -> Check:
     )
 
 
+def _check_foundry() -> List[Check]:
+    """Foundry Local: optional unless an enabled row runs on it.
+
+    Without such a row a missing SDK is only a ``warn`` naming the opt-in
+    step. With one, the SDK and each row's exact cached variant are required.
+    """
+    from .foundry import runtime
+
+    label = "Foundry Local runtime (optional: Nemotron ASR)"
+    sdk_state, detail = runtime.sdk_status()
+    rows = [m for m in enabled_models() if m.engine == ENGINE_FOUNDRY]
+    if not rows:
+        if sdk_state == "missing":
+            return [Check("foundry", label, "warn", f"{detail}; not enabled on this PC")]
+        return [Check("foundry", label, "ok", f"{detail}; no foundry-local row enabled")]
+    fix = dict(fix_id="foundry", fix_label="install requirements-foundry.txt and fetch the exact variant")
+    if sdk_state == "missing":
+        return [Check("foundry", label, "missing", detail, **fix)]
+    checks = [Check("foundry", label, sdk_state, detail)]
+    for m in rows:
+        item = f"Foundry variant cached: {m.runtime_model}"
+        try:
+            cached = runtime.is_cached(m.runtime_model or "")
+        except runtime.FoundryError as exc:
+            checks.append(Check(f"foundry_{m.id}", item, "error", str(exc)))
+            continue
+        checks.append(Check(f"foundry_{m.id}", item, "ok" if cached else "missing",
+                            "cached" if cached else "not in the Foundry Local cache",
+                            **({} if cached else fix)))
+    return checks
+
+
+def _check_registry() -> List[Check]:
+    return [Check(f"registry_{mid}", f"Registry row serves as declared: {mid}", "error", reason)
+            for mid, reason in registry_problems().items()]
+
+
 def _port_in_use(port: int) -> bool:
     # Probe by connecting, not binding: on Windows a bind to 127.0.0.1
     # succeeds even while another process listens on the same port's
@@ -307,6 +350,8 @@ def run_all_checks(*, use_cache: bool = False) -> Report:
     ]
     if _whisper_enabled():
         checks.append(_check_whisper_cpp())
+    checks.extend(_check_registry())
+    checks.extend(_check_foundry())
     checks.extend(_check_models())
     checks.extend(_check_ports())
     report = Report(checks=checks)
@@ -352,6 +397,12 @@ def _fix_download(model_id: str) -> Callable[[], None]:
     return _fix
 
 
+def _fix_foundry() -> None:
+    from .foundry.__main__ import prepare
+
+    prepare()
+
+
 def fix_fn_for(check: Check) -> Optional[FixFn]:
     if check.fix_id == "deps":
         return _fix_deps
@@ -359,6 +410,8 @@ def fix_fn_for(check: Check) -> Optional[FixFn]:
         return _fix_llama_cpp
     if check.fix_id == "whisper_cpp":
         return _fix_whisper_cpp
+    if check.fix_id == "foundry":
+        return _fix_foundry
     if check.fix_id and check.fix_id.startswith("download_"):
         return _fix_download(check.fix_id[len("download_"):])
     return None

@@ -120,6 +120,13 @@ name    = "llama.cpp / whisper.cpp binaries and model weights"
 command = ["{python}", "-m", "src.install"]
 hint    = "download them with: .venv\\Scripts\\python.exe -m src.install --fix"
 
+# Optional: ok once a foundry-local row (Nemotron ASR) is enabled, its SDK installed and its exact
+# variant cached; missing on a PC that has not opted in, which keeps Qwen and Whisper.
+[[install.check]]
+name    = "Foundry Local runtime (optional: Nemotron chat and ASR)"
+command = ["{python}", "-m", "src.foundry", "status"]
+hint    = "optional; opt in with: .venv\\Scripts\\python.exe -m src.foundry setup"
+
 [static_ratchet]
 enabled  = true
 baseline = ".ratchets/static.json"
@@ -188,7 +195,7 @@ claude_md_max_lines = 120
 enabled    = true
 trees    = true
 baseline   = ".ratchets/doc-refs.json"
-allow_refs = [":8021", ":8022"]
+allow_refs = [":8021", ":8022", ":8023", ":8090"]
 
 # [dead_code_ratchet] -- the scaffold's baseline-and-ratchet check for a function,
 # class or method that nothing in the tracked Python tree refers to. The gate runs

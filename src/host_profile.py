@@ -7,7 +7,8 @@ its optional ``vram_mb`` is the on-demand overcommit ceiling.
 ``_load_config()`` below is also the single cached YAML loader for
 ``config/models.yaml`` — ``src/model_registry.py`` imports it directly
 rather than keeping its own parallel cache of the same file, and the
-admin roles router reads the raw ``roles:`` block through it.
+admin roles router reads the raw ``roles:`` block through it. A
+machine-local ``config/models.local.yaml`` beside it is deep-merged on top.
 """
 
 from __future__ import annotations
@@ -21,6 +22,26 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = PROJECT_ROOT / "config" / "models.yaml"
+# Machine-local overlay beside ``CONFIG_PATH`` (gitignored): this PC's own
+# choices (enabled list, role targets, a row's startup) without editing the
+# tracked registry, so a pull never conflicts with them.
+LOCAL_OVERLAY_NAME = "models.local.yaml"
+
+
+def local_overlay_path() -> Path:
+    """The overlay that sits beside the active ``CONFIG_PATH``."""
+    return CONFIG_PATH.with_name(LOCAL_OVERLAY_NAME)
+
+
+def merge_overlay(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, Any]:
+    """Deep-merge ``overlay`` into a copy of ``base``: mappings merge, anything else replaces."""
+    out = dict(base)
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = merge_overlay(out[key], value)
+        else:
+            out[key] = value
+    return out
 
 
 @dataclass(frozen=True)
@@ -50,6 +71,12 @@ def _load_config() -> Dict[str, Any]:
     if not CONFIG_PATH.exists():
         raise FileNotFoundError(f"config file missing: {CONFIG_PATH}")
     data = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8")) or {}
+    overlay_path = local_overlay_path()
+    if overlay_path.is_file():
+        overlay = yaml.safe_load(overlay_path.read_text(encoding="utf-8")) or {}
+        if not isinstance(overlay, dict):
+            raise ValueError(f"{overlay_path} must be a YAML mapping")
+        data = merge_overlay(data, overlay)
     _CONFIG_CACHE[key] = data
     return data
 

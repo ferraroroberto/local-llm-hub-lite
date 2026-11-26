@@ -1,7 +1,8 @@
-"""Whisper ASR proxy routes (``/v1/audio/transcriptions``, ``/health``).
+"""ASR proxy routes (``/v1/audio/transcriptions``, ``/v1/audio/health``).
 
-Lite fork: one local whisper-server, no role chains, no failover, no
-glossary. The whisper-server already speaks the OpenAI ``/v1/audio/*``
+Lite fork: one transcription backend per request (whisper-server, or a
+Foundry Local worker when the role names one), no role chains, no
+failover, no glossary. Both backends speak the OpenAI ``/v1/audio/*``
 shape, so the hub mostly forwards bytes — the point of routing through
 here (rather than hitting the backend port directly) is that the
 observability middleware records the request in the live ring.
@@ -52,14 +53,40 @@ _UPSTREAM_WRITE_TIMEOUT_S = 60.0
 _UPSTREAM_POOL_TIMEOUT_S = 10.0
 
 
-def _local_whisper() -> Optional[Model]:
-    """The single locally-enabled whisper backend, or ``None``."""
-    from ..model_registry import enabled_models
+def _local_asr() -> Optional[Model]:
+    """The ASR backend the transcription role addresses on this host, or ``None``.
 
-    for m in enabled_models():
-        if m.backend == "whisper" and m.port:
+    The ``roles.audio.transcribe`` target wins when this host serves it.
+    Otherwise a Foundry Local row (Nemotron ASR) comes before the generic
+    whisper.cpp route, then registry order. A role target this host enables
+    but the registry refused (an alias standing in for a runtime model) is
+    a 503 naming the reason, never a silent fall back to another model.
+    """
+    from ..model_registry import (
+        ENGINE_FOUNDRY,
+        enabled_models,
+        registry_problems,
+        transcribe_role_target,
+    )
+
+    asr = [m for m in enabled_models() if m.backend == "whisper" and m.port]
+    target = transcribe_role_target()
+    for m in asr:
+        if m.id == target:
             return m
-    return None
+    if target:
+        refused = registry_problems().get(target)
+        if refused and target in _host_enabled_ids():
+            logger.error("❌ transcription role target refused: %s", refused)
+            raise HTTPException(status_code=503, detail=f"transcription role target refused: {refused}")
+    asr.sort(key=lambda m: m.engine != ENGINE_FOUNDRY)
+    return asr[0] if asr else None
+
+
+def _host_enabled_ids() -> set:
+    from ..host_profile import resolve as _resolve_host
+
+    return set(_resolve_host().enabled)
 
 
 def _whisper_model_for_request(model_name: str) -> Model:
@@ -67,7 +94,8 @@ def _whisper_model_for_request(model_name: str) -> Model:
 
     * No ``model=``, a role alias (``audio_transcribe``), or a name the
       registry has never heard of (OpenAI clients must send something, and
-      the SDK's default is ``whisper-1``) → the single local whisper model.
+      the SDK's default is ``whisper-1``) → this host's transcription
+      backend (:func:`_local_asr`).
     * An explicit **known** model id/alias (matched case-insensitively)
       must actually be the whisper model — a known id this hub cannot
       serve gets a distinct 400/503 rather than being silently answered by
@@ -80,7 +108,7 @@ def _whisper_model_for_request(model_name: str) -> Model:
     from ..model_registry import resolve as _resolve_model
     from ..model_registry import resolve_any
 
-    local = _local_whisper()
+    local = _local_asr()
 
     if model_name and model_name.strip().lower() not in _ROLE_ALIASES:
         known = resolve_any(model_name)
@@ -121,7 +149,7 @@ def _whisper_model_for_request(model_name: str) -> Model:
         # request: fall through to the single local backend.
 
     if local is None:
-        raise HTTPException(status_code=503, detail="no whisper backend enabled on this host")
+        raise HTTPException(status_code=503, detail="no transcription backend enabled on this host")
     return local
 
 
@@ -235,7 +263,7 @@ async def _dispatch_audio(
             url, content=body, headers=fwd_headers or None, timeout=timeout,
         )
     except _httpx.HTTPError as exc:
-        raise _audio_upstream_error(exc, backend="whisper-server", port=target.port)
+        raise _audio_upstream_error(exc, backend=target.engine or "whisper-server", port=target.port)
 
     # Who served: the single local backend, on the active host.
     served_model = target.id
@@ -282,12 +310,14 @@ def audio_health() -> Response:
     """Probe-only liveness of the audio backend — lets a consumer preflight
     instead of discovering an outage one failed transcription at a time.
 
-    Reports the enabled whisper backend with its port, whether it is
+    Reports the transcription backend with its port, ``engine`` and
+    ``model`` (a Foundry row's exact catalog variant), whether it is
     currently reachable (a cheap GET to the backend, never a transcription)
     and its serving ``state`` / ``reason`` (``loading`` and ``failed`` tell a
     consumer why a down backend is down).
-    ``status`` is ``ok`` when it answers, ``degraded`` when it is down, and
-    ``none`` when no whisper backend is enabled on this host. A degraded/none
+    ``status`` is ``ok`` when it answers, ``degraded`` when it is down,
+    ``none`` when no transcription backend is enabled on this host, and
+    ``refused`` (with ``detail``) when the role's target was refused. A degraded/none
     result returns HTTP 503 so a consumer can branch on the status code
     alone; ``ok`` returns 200.
 
@@ -300,7 +330,11 @@ def audio_health() -> Response:
     from ..process.server_process import snapshot_is_known, snapshot_listening_pids
 
     backends = []
-    target = _local_whisper()
+    try:
+        target = _local_asr()
+        refused = ""
+    except HTTPException as exc:
+        target, refused = None, str(exc.detail)
     if target is not None:
         reachable = is_reachable(target, timeout=1.0)
         listening = snapshot_listening_pids()
@@ -308,13 +342,17 @@ def audio_health() -> Response:
         backends.append({
             "id": target.id,
             "backend": target.backend,
+            "engine": target.engine,
+            "model": target.runtime_model or target.display_name,
             "port": target.port,
             "reachable": reachable,
             "state": verdict.state.value,
             "reason": verdict.reason,
         })
 
-    if not backends:
+    if refused:
+        status, code = "refused", 503
+    elif not backends:
         status, code = "none", 503
     elif all(b["reachable"] for b in backends):
         status, code = "ok", 200
@@ -322,7 +360,8 @@ def audio_health() -> Response:
         status, code = "degraded", 503
 
     return Response(
-        content=_json.dumps({"status": status, "backends": backends}),
+        content=_json.dumps({"status": status, "backends": backends,
+                             **({"detail": refused} if refused else {})}),
         status_code=code,
         media_type="application/json",
     )

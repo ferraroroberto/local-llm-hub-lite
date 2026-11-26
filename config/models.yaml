@@ -4,11 +4,21 @@
 # Single-machine edition (local-llm-hub-lite): one host row, local backends
 # only. Every model listed in `hosts.local.enabled` runs on this machine.
 #
+# This PC's own choices (another enabled list, a role target, a row's
+# startup) go in the gitignored `config/models.local.yaml`, deep-merged on top
+# of this file (mappings merge, lists and values replace), so a pull never
+# conflicts with them. `config/models.foundry.yaml` is the overlay for the
+# Nemotron roster; `python -m src.foundry setup` installs it (docs/foundry-local.md).
+#
 # Field reference (models rows):
 #   display_name   the id clients send in the `model` field (defaults to key)
 #   aliases        extra ids that resolve to this row (role aliases live here)
 #   backend        openai (llama-server chat) | whisper (ASR)
 #   engine         llama-server | whisper-server (which vendored binary spawns)
+#                  | foundry-local (an ASR row run by the optional Foundry
+#                  Local SDK in a Python worker, src/foundry/worker.py)
+#   runtime_model  foundry-local only: the exact catalog variant id
+#                  (name:version) the worker loads and reports on /health
 #   port           loopback port the backend listens on
 #   model_path     weights file, relative to the repo root
 #   hf_repo/hf_pattern  where scripts/download_models.py fetches the weights
@@ -20,7 +30,9 @@
 #                  auto-unload after N idle minutes)
 #   args           extra CLI args appended to the backend command line
 #   virtual        true = an alias of another backend, sharing its port;
-#                  never launched or downloaded, routes via inject_extra only
+#                  never launched or downloaded, routes via inject_extra only.
+#                  A row cannot be both virtual and runtime-backed: the hub
+#                  refuses it rather than serve one model under another's id
 #   inject_extra   server-side defaults folded into the upstream OpenAI
 #                  payload on every /v1/chat/completions call for this id
 #                  (caller-sent fields win) — the mechanism behind a
@@ -122,6 +134,49 @@ models:
       - "--suppress-nst"
       - "--inference-path"
       - "/v1/audio/transcriptions"
+
+  # --- chat: NVIDIA Nemotron 3 Nano 4B on llama-server -------------------
+  # Opt-in (config/models.foundry.yaml enables it); no role alias, so it is
+  # addressed by its own id. Same <think> delimiters as Qwen, so the hub's
+  # think-tag scrub applies unchanged. Q4_K_M + 64 K KV ≈ 3.7 GB VRAM peak.
+  nemotron4b:
+    display_name: nemotron-3-nano-4b
+    backend: openai
+    engine: llama-server
+    port: 8023
+    est_vram_mb: 3700
+    hf_repo: "nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF"
+    hf_pattern: "NVIDIA-Nemotron3-Nano-4B-Q4_K_M.gguf"
+    model_path: "models/NVIDIA-Nemotron3-Nano-4B-Q4_K_M.gguf"
+    startup: eager
+    args:
+      - "--jinja"
+      - "-ngl"
+      - "99"
+      - "-c"
+      - "65536"
+      - "--flash-attn"
+      - "on"
+      - "--parallel"
+      - "1"
+      - "--alias"
+      - "nemotron-3-nano-4b"
+      - "--reasoning-format"
+      - "none"
+
+  # --- audio_transcribe (opt-in): Nemotron 3.5 ASR on Foundry Local -------
+  # Streaming 0.6 B ASR on CPU, run in-process by the Foundry Local SDK
+  # (requirements-foundry.txt). The worker loads exactly `runtime_model` and
+  # reports it on :8090/health, the port Voice Transcriber checks before it
+  # adopts the hub's ASR. CPU-only, so no VRAM.
+  nemotron_asr:
+    display_name: nemotron-3.5-asr
+    backend: whisper
+    engine: foundry-local
+    runtime_model: "nemotron-3.5-asr-streaming-0.6b-generic-cpu:3"
+    port: 8090
+    est_vram_mb: 0
+    startup: eager
 
 # Role → model mapping (display card in the admin Models tab). Routing uses
 # the `aliases:` on each model row; keep the two in sync when swapping models.

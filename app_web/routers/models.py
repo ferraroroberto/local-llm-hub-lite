@@ -135,6 +135,7 @@ async def list_models_for_admin() -> Dict[str, Any]:
             "display_name": m.display_name,
             "backend": m.backend,
             "engine": m.engine,
+            "runtime_model": m.runtime_model,
             "port": m.port,
             "url": m.url,
             "aliases": list(m.aliases or []),

@@ -37,6 +37,8 @@ def _echo_cmd(token: str) -> list[str]:
 class _FakeModel:
     """Minimal stand-in for a registry row on the spawn path."""
     port = None
+    engine = None
+    backend = "openai"
 
 
 def _patch_spawn(monkeypatch, tmp_path, token: str) -> None:

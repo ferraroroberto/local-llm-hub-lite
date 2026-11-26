@@ -138,6 +138,9 @@ function fillItem(li, m) {
   // on a phone.
   meta.textContent =
     m.backend +
+    // Engine and runtime identity for a non-default engine (Foundry Local):
+    // the display name alone does not say which variant answers.
+    (m.runtime_model ? ' · ' + m.engine + ' ' + m.runtime_model : '') +
     (m.port ? ' · :' + m.port : '') +
     (m.pid && adopted ? ' · PID ' + m.pid : '') +
     // Why a tile reads failed or unknown (exit code, missed deadline, failed

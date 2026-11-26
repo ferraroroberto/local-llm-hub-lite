@@ -45,6 +45,29 @@ def write_config(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_live_registry_overlay(monkeypatch):
+    """Keep this PC's own ``config/models.local.yaml`` out of the suite.
+
+    Tests that read the shipped registry assert its defaults; a PC that opted
+    into another roster must not change them. A test that points
+    ``CONFIG_PATH`` elsewhere (``write_config``) still gets the overlay beside
+    its own file, so overlay behaviour stays testable.
+    """
+    from src import host_profile
+
+    shipped = host_profile.CONFIG_PATH
+    beside = host_profile.local_overlay_path
+    monkeypatch.setattr(
+        host_profile, "local_overlay_path",
+        lambda: shipped.with_name("models.local.absent-in-tests.yaml")
+        if host_profile.CONFIG_PATH == shipped else beside(),
+    )
+    host_profile._CONFIG_CACHE.clear()
+    yield
+    host_profile._CONFIG_CACHE.clear()
+
+
+@pytest.fixture(autouse=True)
 def _reset_shared_http_clients():
     """Reset the hub's shared httpx client singletons around every test.
 
