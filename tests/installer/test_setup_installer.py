@@ -76,7 +76,7 @@ def test_fresh_clone_creates_the_config_and_second_run_is_unchanged(tmp_path: Pa
     assert again.changes == []
     python = str(installer.venv_python(root))
     assert [call[:3] for call in runner.calls] == [  # the checklist probes only
-        [python, "-m", "src.password"], [python, "-m", "src.install"]]
+        [python, "-m", "src.password"], [python, "-m", "src.install"], [python, "-m", "src.foundry"]]
     assert _snapshot(root) == before
 
 

@@ -8,11 +8,14 @@ and tail their output without global-state entanglement. The log file is
 written by the child (not a hub-owned pipe), so it stays readable across a
 hub restart and an inherited backend never writes into a closed pipe.
 
-Two engine families share this manager:
+Three engine families share this manager:
   - `llama-server` for chat/completion GGUF models
   - `whisper-server` for whisper.cpp ASR (OpenAI-compatible /v1/audio/*)
+  - `foundry-local` for an ASR variant run by the optional Foundry Local
+    SDK in a Python worker (`src.foundry.worker`)
 The shape differences (binary location, -m vs --model flag, health
-endpoint) are absorbed in `build_command` and `is_reachable`.
+endpoint, how a holder is recognised) are absorbed in `build_command`,
+`is_reachable` and `_holder_matches`.
 
 ``start(model_id)`` adopts an already-reachable backend on the model's
 port instead of spawning a duplicate, but only once the listener is
@@ -34,7 +37,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Mapping, Optional
 
 from ..http_client import get_sync_client
-from ..model_registry import Model, enabled_models, is_spawnable
+from ..model_registry import ENGINE_FOUNDRY, ENGINE_WHISPER, Model, enabled_models, is_spawnable
 from ..runtime_files import checked_write_path
 from .outcomes import Outcome, Result
 from .server_process import (
@@ -108,12 +111,49 @@ def whisper_server_binary() -> Path:
     return VENDOR_WHISPER / name
 
 
+def _is_foundry(model: Model) -> bool:
+    return model.engine == ENGINE_FOUNDRY
+
+
 def _is_whisper(model: Model) -> bool:
-    return model.engine == "whisper-server" or model.backend == "whisper"
+    """whisper.cpp's server: the engine named, or an ASR row that names none."""
+    return model.engine == ENGINE_WHISPER or (model.backend == "whisper" and not model.engine)
 
 
 def vendor_dir_for(model: Model) -> Path:
     return VENDOR_WHISPER if _is_whisper(model) else VENDOR_LLAMA
+
+
+# The module a foundry-local row runs; its cmdline is the worker's identity.
+FOUNDRY_WORKER_MODULE = "src.foundry.worker"
+
+
+def _worker_python() -> tuple[str, Dict[str, str]]:
+    """Interpreter for a Python worker, plus the env it needs.
+
+    On Windows a venv's ``python.exe`` is a launcher that runs the base
+    interpreter as a child, so the PID ``Popen`` returns would not be the
+    process holding the port. Spawning the base interpreter with
+    ``__PYVENV_LAUNCHER__`` (what ``multiprocessing`` does) keeps the venv's
+    packages and makes the spawned PID the listener.
+    """
+    base = getattr(sys, "_base_executable", "") or sys.executable
+    if sys.platform == "win32" and sys.prefix != sys.base_prefix and base != sys.executable:
+        return base, {"__PYVENV_LAUNCHER__": sys.executable}
+    return sys.executable, {}
+
+
+def backend_env(model: Model) -> Dict[str, str]:
+    """The environment a backend for ``model`` is launched with."""
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
+    if _is_foundry(model):
+        env.update(_worker_python()[1])
+    elif sys.platform == "win32":
+        # Help the server find the cudart DLLs shipped next to its binary.
+        env["PATH"] = str(vendor_dir_for(model)) + os.pathsep + env.get("PATH", "")
+    return env
 
 
 class _BackendState:
@@ -223,7 +263,7 @@ def is_reachable(model: Model, timeout: float = 1.5) -> bool:
     # takes a set of chars, so `"...:8071/v1".rstrip("/v1")` eats the port's
     # trailing "1" too and yields ":807" — a dead port. removesuffix is exact.
     base = model.url.removesuffix("/v1").rstrip("/")
-    if model.engine == "whisper-server":
+    if model.engine == ENGINE_WHISPER:
         # whisper.cpp server has no /health; GET / returns 200 once loaded.
         try:
             r = get_sync_client().get(f"{base}/", timeout=timeout)
@@ -256,12 +296,9 @@ def holder_confirmed(model: Model, holder_pid: Optional[int]) -> Optional[bool]:
     try:
         import psutil
 
-        exe = psutil.Process(holder_pid).exe()
+        return _holder_matches(psutil.Process(holder_pid), model)
     except Exception:  # noqa: BLE001 — NoSuchProcess / AccessDenied / OSError all mean "unreadable"
         return None
-    if not exe:
-        return None
-    return _looks_like_backend_binary(exe, model)
 
 
 def serving(
@@ -330,6 +367,16 @@ def log_lines(model_id: str, limit: int = LOG_TAIL_LINES) -> list[str]:
 
 
 def build_command(model: Model) -> list[str]:
+    if _is_foundry(model):
+        from ..foundry import runtime
+
+        if runtime.sdk_version() is None:
+            raise RuntimeError(runtime.NOT_INSTALLED)
+        from .. import host_profile
+
+        # The worker reads the same registry file this process loaded.
+        return [_worker_python()[0], "-m", FOUNDRY_WORKER_MODULE, model.id,
+                "--config", str(host_profile.CONFIG_PATH)]
     if not model.model_path:
         raise RuntimeError(f"model {model.id} has no model_path")
     model_path = (PROJECT_ROOT / model.model_path).resolve()
@@ -401,12 +448,7 @@ def start(model_id: str) -> Result:
     except Exception as e:
         return Result(Outcome.NOT_LAUNCHABLE, str(e))
 
-    env = os.environ.copy()
-    env["PYTHONIOENCODING"] = "utf-8"
-    env["PYTHONUTF8"] = "1"
-    # Help the server find the cudart DLLs shipped next to its binary.
-    if sys.platform == "win32":
-        env["PATH"] = str(vendor_dir_for(model)) + os.pathsep + env.get("PATH", "")
+    env = backend_env(model)
 
     # Redirect stdout/stderr to a child-owned log file instead of a hub-owned
     # pipe. The child keeps its own fd, so the log survives a hub restart and
@@ -513,9 +555,10 @@ def inherit_running_backends() -> int:
         try:
             proc = psutil.Process(candidate)
             identity = _process_identity(proc)
+            matches = _holder_matches(proc, m)
         except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
             continue
-        if _looks_like_backend_binary(identity[1], m):
+        if matches:
             state = _state_for(m.id)
             state.inherited_pid = candidate
             state.inherited_identity = identity
@@ -526,6 +569,24 @@ def inherit_running_backends() -> int:
                 m.id, m.port, candidate, _log_path(m.id),
             )
     return count
+
+
+def _holder_matches(proc: "psutil.Process", model: "Model") -> Optional[bool]:
+    """Is ``proc`` the backend we would spawn for ``model``? ``None`` when unreadable.
+
+    A foundry-local worker runs under the generic Python interpreter, so
+    its exe proves nothing: its cmdline must name the worker module and this
+    row's id. The other engines are recognised by their binary.
+    """
+    if _is_foundry(model):
+        args = [str(a) for a in (proc.cmdline() or [])]
+        if not args:
+            return None
+        return FOUNDRY_WORKER_MODULE in args and model.id in args
+    exe = proc.exe()
+    if not exe:
+        return None
+    return _looks_like_backend_binary(exe, model)
 
 
 def _looks_like_backend_binary(exe: str, model: "Model") -> bool:

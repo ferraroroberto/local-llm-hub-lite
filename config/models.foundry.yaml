@@ -1,0 +1,26 @@
+# config/models.foundry.yaml — the Nemotron roster, as a machine-local overlay.
+#
+# `python -m src.foundry setup` copies this file to the gitignored
+# config/models.local.yaml once the Foundry Local SDK and the exact ASR
+# variant are installed and verified; it never overwrites an existing
+# overlay. The hub deep-merges the overlay over config/models.yaml
+# (mappings merge, lists and values replace). A PC without Foundry Local
+# never gets it, so it keeps the shipped Qwen + Whisper defaults.
+#
+# Whisper stays enabled as the fallback ASR model, addressable by its id.
+
+hosts:
+  local:
+    enabled: [qwen35_4b, nemotron4b, nemotron_asr, whisper]
+
+models:
+  # The role alias follows the role target; one row carries it at a time.
+  whisper:
+    aliases: []
+  nemotron_asr:
+    aliases: ["audio_transcribe"]
+
+roles:
+  audio:
+    transcribe:
+      model_id: nemotron_asr

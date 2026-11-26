@@ -1,0 +1,7 @@
+# Optional extra: Microsoft Foundry Local, the runtime behind `engine: foundry-local`
+# rows (Nemotron ASR). Installed by `python -m src.foundry setup`, never by
+# setup.bat, so a PC without it still installs and serves Qwen and Whisper.
+#
+# Pinned to the 1.x in-process API the worker is written against
+# (src/foundry/runtime.py; docs/foundry-local.md says why not 2.x).
+foundry-local-sdk==1.2.4

@@ -14,6 +14,13 @@ Default model lineup (edit `config/models.yaml` to change it):
 | `agentic_light` / `agentic_heavy` | `qwen3.5-4b` (Q4_K_M, ~2.1 GB VRAM) | `llama-server` | `:8021` |
 | `audio_transcribe` | `whisper-large-v3-turbo` (~2 GB VRAM) | `whisper-server` | `:8022` |
 
+Optional Nemotron roster, for a PC that opts in with `.venv\Scripts\python.exe -m src.foundry setup` (Microsoft Foundry Local SDK, an optional extra; a PC without it keeps the table above). It is enabled by a machine-local overlay and turns Whisper into the fallback: [docs/foundry-local.md](docs/foundry-local.md).
+
+| Role | Model | Backend | Port |
+|---|---|---|---|
+| chat, by id | `nemotron-3-nano-4b` (Q4_K_M, ~3.7 GB VRAM) | `llama-server` | `:8023` |
+| `audio_transcribe` | `nemotron-3.5-asr` (exact variant `nemotron-3.5-asr-streaming-0.6b-generic-cpu:3`, CPU) | `foundry-local` | `:8090` |
+
 Models can be `startup: eager` (autostart with the hub) or `startup: on_demand` (first request spawns the backend; optional `idle_unload_minutes` frees the VRAM again).
 
 ## Quick start
@@ -28,7 +35,7 @@ tray.bat                                       REM tray icon -> hub on :8020
 
 `python -m src.install` reports what's missing (venv, deps, GPU, vendored binaries, model weights, free ports); `--fix` downloads the platform llama.cpp/whisper.cpp release binaries into `vendor/` and the GGUF/BIN weights into `models/` (several GB — grab a coffee). Everything is idempotent; run it again any time. Moving to another PC, updating, migrating an existing copy and uninstalling are in [docs/install.md](docs/install.md). The same checks live in the admin Hub tab with per-item **Fix** buttons.
 
-Open the admin at <http://127.0.0.1:8020/admin/>. `GET /health` and `GET /healthz` return 200 once the hub is up (`GET /api/version` serves the build identity, `git_sha` and `built_at`; `/healthz` is open to every caller, `/api/version` needs the token off loopback); `GET /v1/audio/health` preflights the whisper backend specifically — 200 `ok` when reachable, 503 `degraded`/`none` when it is down or disabled, so a caller can branch on the status code alone before sending a clip.
+Open the admin at <http://127.0.0.1:8020/admin/>. `GET /health` and `GET /healthz` return 200 once the hub is up (`GET /api/version` serves the build identity, `git_sha` and `built_at`; `/healthz` is open to every caller, `/api/version` needs the token off loopback); `GET /v1/audio/health` preflights the transcription backend specifically (its `engine` and `model` included) — 200 `ok` when reachable, 503 `degraded`/`none`/`refused` when it is down, disabled or refused by the registry, so a caller can branch on the status code alone before sending a clip.
 
 ## Calling it
 
@@ -117,7 +124,9 @@ models:
     display_name: qwen3.5-4b        # the id clients send
     aliases: ["agentic_light"]      # extra ids that resolve here
     backend: openai                 # openai (chat) | whisper (ASR)
-    engine: llama-server            # llama-server | whisper-server
+    engine: llama-server            # llama-server | whisper-server | foundry-local
+                                     # (foundry-local also takes runtime_model:,
+                                     # an exact catalog variant id name:version)
     port: 8021
     model_path: "models/Qwen3.5-4B-Q4_K_M.gguf"
     hf_repo: "unsloth/Qwen3.5-4B-GGUF"   # where --fix downloads from
@@ -136,6 +145,8 @@ models:
       chat_template_kwargs: { enable_thinking: false }   # /v1/chat/completions call (caller wins)
 roles:  { ... }                     # display card in the Models tab
 ```
+
+This PC's own choices go in the gitignored `config/models.local.yaml`, deep-merged over the registry (mappings merge, lists and values replace), so a pull never conflicts with them. A row that is both `virtual` and runtime-backed is refused (logged, left out of `/v1/models`, an error row in `src.install`) rather than served under the wrong id.
 
 To add a model: add a row, list its id in `hosts.local.enabled`, run `python -m src.install --fix` (or hit Fix in the admin), start it from the Models tab or `launchers\run_model.bat <id>`.
 
@@ -156,9 +167,11 @@ To add a model: add a row, list its id in `hosts.local.enabled`, run `python -m 
 ```
 src/               hub: FastAPI app, model registry, backend process manager,
                    anthropic<->openai translation, audio proxy, observability ring,
-                   system stats, machine health (src/health), installer
+                   system stats, machine health (src/health), installer,
+                   Foundry Local runtime + ASR worker (src/foundry)
 app_web/           /admin sub-app: routers + static vanilla-JS SPA (3 tabs, PWA)
-config/            models.yaml (registry) + webapp_config.sample.json
+config/            models.yaml (registry), models.foundry.yaml (opt-in overlay)
+                   + webapp_config.sample.json
 setup.bat          clone-and-setup installer launcher (src/installer.py, docs/install.md)
 scripts/           installers (llama.cpp / whisper.cpp / weights), smoke test,
                    verify-before-ship gate, vendored tray_lifecycle.ps1

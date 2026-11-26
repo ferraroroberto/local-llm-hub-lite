@@ -9,15 +9,28 @@ Single-host: the ``hosts:`` block in the YAML holds exactly one row with an
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from .host_profile import HostProfile, _load_config
 from .host_profile import resolve as resolve_host
 
+logger = logging.getLogger(__name__)
+
 # ``startup:`` policy values — see the field docstring on ``Model``.
 STARTUP_EAGER = "eager"
 STARTUP_ON_DEMAND = "on_demand"
+
+# ``engine:`` values. Foundry Local rows run an in-process SDK worker
+# (``src.foundry.worker``) instead of a vendored binary.
+ENGINE_LLAMA = "llama-server"
+ENGINE_WHISPER = "whisper-server"
+ENGINE_FOUNDRY = "foundry-local"
+
+
+class RegistryError(ValueError):
+    """A models.yaml row that cannot be served as declared."""
 
 
 @dataclass(frozen=True)
@@ -59,6 +72,10 @@ class Model:
     # after which the idle watchdog unloads the backend. ``None`` disables
     # idle unload (the model stays up once demanded until stopped by hand).
     idle_unload_minutes: Optional[int] = None
+    # Exact runtime catalog variant a ``foundry-local`` row serves
+    # (``name:version``, e.g. ``nemotron-3.5-asr-streaming-0.6b-generic-cpu:3``).
+    # The worker loads exactly this id and reports it on ``/health``.
+    runtime_model: Optional[str] = None
 
     @property
     def all_names(self) -> List[str]:
@@ -89,7 +106,36 @@ def _parse_startup(row: Dict) -> str:
     return STARTUP_ON_DEMAND if raw == STARTUP_ON_DEMAND else STARTUP_EAGER
 
 
+def _validate_row(model_id: str, row: Dict) -> None:
+    """Refuse a row whose declared kind would serve something other than it names.
+
+    A virtual alias routes to another backend's port, so a row that is both
+    ``virtual`` and runtime-backed would answer ``/v1/models`` with this id
+    while a different model runs. Aliases and runtime-backed models are
+    separate classes; a Foundry row must also name an exact catalog variant.
+    """
+    engine = row.get("engine")
+    runtime_model = row.get("runtime_model")
+    if row.get("virtual") and (runtime_model or engine == ENGINE_FOUNDRY):
+        raise RegistryError(
+            f"model {model_id!r} is declared virtual (an alias of another backend) "
+            f"but names runtime model {runtime_model or engine!r}; an alias cannot "
+            f"stand in for a runtime-backed model"
+        )
+    if engine == ENGINE_FOUNDRY:
+        if row.get("backend") != "whisper":
+            raise RegistryError(
+                f"model {model_id!r}: engine {ENGINE_FOUNDRY} serves ASR rows only (backend: whisper)"
+            )
+        if not runtime_model or ":" not in str(runtime_model):
+            raise RegistryError(
+                f"model {model_id!r}: engine {ENGINE_FOUNDRY} needs runtime_model set to an exact "
+                f"catalog variant id (name:version), got {runtime_model!r}"
+            )
+
+
 def _row_to_model(model_id: str, row: Dict) -> Model:
+    _validate_row(model_id, row)
     return Model(
         id=model_id,
         display_name=str(row.get("display_name") or model_id),
@@ -109,14 +155,45 @@ def _row_to_model(model_id: str, row: Dict) -> Model:
             int(row["idle_unload_minutes"])
             if row.get("idle_unload_minutes") is not None else None
         ),
+        runtime_model=str(row["runtime_model"]) if row.get("runtime_model") else None,
     )
 
 
+def registry_problems() -> Dict[str, str]:
+    """``{model_id: reason}`` for every row :func:`all_models` refuses to serve."""
+    rows: Dict = _load_config().get("models") or {}
+    problems: Dict[str, str] = {}
+    for mid, row in rows.items():
+        try:
+            _validate_row(mid, row or {})
+        except RegistryError as exc:
+            problems[mid] = str(exc)
+    return problems
+
+
 def all_models() -> List[Model]:
-    """Every configured row, exactly as declared in YAML."""
+    """Every configured row that can be served as declared.
+
+    A refused row (see :func:`_validate_row`) is left out and logged, so it
+    is never listed or routed to; :func:`registry_problems` names it.
+    """
     cfg = _load_config()
     rows: Dict = cfg.get("models") or {}
-    return [_row_to_model(mid, row) for mid, row in rows.items()]
+    out: List[Model] = []
+    for mid, row in rows.items():
+        try:
+            out.append(_row_to_model(mid, row or {}))
+        except RegistryError as exc:
+            logger.error("❌ registry row refused: %s", exc)
+    return out
+
+
+def transcribe_role_target() -> Optional[str]:
+    """Registry id the ``roles.audio.transcribe`` card names, or ``None``."""
+    roles = _load_config().get("roles") or {}
+    audio = roles.get("audio") or {}
+    target = (audio.get("transcribe") or {}).get("model_id")
+    return str(target) if target else None
 
 
 def enabled_models(host: Optional[HostProfile] = None) -> List[Model]:

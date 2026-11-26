@@ -15,7 +15,6 @@ there is exactly one place a model's port/name can come from.
 from __future__ import annotations
 
 import logging
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -25,9 +24,9 @@ log = logging.getLogger(__name__)
 from .host_profile import resolve as resolve_host
 from .model_registry import enabled_models, is_spawnable, launchable_local_ids
 from .process.backend_process import (
+    backend_env,
     build_command,
     resolve_model_by_id,
-    vendor_dir_for,
 )
 from .process.backend_process import (
     external_pid as backend_external_pid,
@@ -83,11 +82,7 @@ def _run_backend(model_id: str) -> int:
         return 0
 
     cmd = build_command(model)
-    env = os.environ.copy()
-    env["PYTHONIOENCODING"] = "utf-8"
-    env["PYTHONUTF8"] = "1"
-    if sys.platform == "win32":
-        env["PATH"] = str(vendor_dir_for(model)) + os.pathsep + env.get("PATH", "")
+    env = backend_env(model)
     log.info("-> %s", " ".join(cmd))
     # Foreground execution so Ctrl+C works.
     # no-window-exempt: runs in the launcher's own visible console; hiding it would swallow the server output
@@ -111,7 +106,7 @@ def _banner_lines(model_id: str) -> list[str]:
     model = resolve_model_by_id(model_id)
     if model is None:
         return [f"Local LLM Hub - {model_id}", f"{model_id}: not enabled on this host"]
-    kind = _BANNER_KIND.get(model.backend, model.backend)
+    kind = model.engine or _BANNER_KIND.get(model.backend, model.backend)
     if model.port is None:
         url = "(no port configured)"
     elif model.backend == "openai":

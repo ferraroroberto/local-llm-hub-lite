@@ -376,7 +376,7 @@ surfaces:
       - the display name
       - a state pill, one of stopped, loading, running, adopted, failed or unknown, or the backend name for an alias with no process of its own
       - Start, Stop and Ping glyph buttons, and Force stop on an adopted tile
-      - a meta line with the backend, the port, the process id when adopted, the failure reason, the aliases and the estimated memory
+      - a meta line with the backend, the engine and exact runtime model for a Foundry Local row, the port, the process id when adopted, the failure reason, the aliases and the estimated memory
       - a startup badge, eager or on-demand with its live word
     does:
       - Start launches the backend and toasts, Stop ends it, Ping probes it and toasts the status and latency
