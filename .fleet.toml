@@ -195,7 +195,7 @@ claude_md_max_lines = 120
 enabled    = true
 trees    = true
 baseline   = ".ratchets/doc-refs.json"
-allow_refs = [":8021", ":8022"]
+allow_refs = [":8021", ":8022", ":8023", ":8090"]
 
 # [dead_code_ratchet] -- the scaffold's baseline-and-ratchet check for a function,
 # class or method that nothing in the tracked Python tree refers to. The gate runs
