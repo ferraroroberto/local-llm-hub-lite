@@ -96,6 +96,7 @@ installer = { src = "src/installer.py", sha = "bafa9446b907dcb7fc6d833c1edfb1a06
 # vendored admin-SPA components (copies by design) and the gitignored vendor/ and
 # models/ trees. Procedure + limits: project-scaffolding docs/static-ratchet.md.
 self_restart = { src = "src/self_restart.py", sha = "48602060fffdacbcdcdde66b9886c6471d835ff3", dest = "src/self_restart.py" }
+ps_script = { src = "src/ps_script.py", sha = "2d786d295c9b8d545aaf35703889638096f251ad", dest = "src/ps_script.py" }
 
 # [install] -- what setup.bat (src/installer.py, vendored) needs from this app; the playbook is
 # docs/install.md. config/models.yaml is tracked, so it is not an install config: the registry
