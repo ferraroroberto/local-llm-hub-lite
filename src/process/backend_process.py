@@ -37,7 +37,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Mapping, Optional
 
 from ..http_client import get_sync_client
-from ..model_registry import ENGINE_FOUNDRY, ENGINE_WHISPER, Model, enabled_models, is_spawnable
+from ..model_registry import (
+    ENGINE_FOUNDRY,
+    ENGINE_WHISPER,
+    Model,
+    enabled_models,
+    is_spawnable,
+)
 from ..runtime_files import checked_write_path
 from .outcomes import Outcome, Result
 from .server_process import (
