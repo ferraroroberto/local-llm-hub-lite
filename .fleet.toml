@@ -105,12 +105,14 @@ requirements = "requirements.txt"
 samples      = ["config"]
 settings     = ["config/webapp_config.json"]
 
-# The admin sign-in hash is set by the owner (python -m src.password set) and has no sample, so the
-# checklist looks for the file. The hub itself needs no password on loopback.
+# The admin sign-in hash is set by the owner (python -m src.password set) and has no sample. The
+# probe reads what is stored, not whether a file exists: ok for a usable hash or the old
+# auth_password the login route still accepts, missing for neither, unknown for an unreadable file.
+# The hub itself needs no password on loopback.
 [[install.check]]
-name  = "Admin sign-in password (non-loopback callers)"
-paths = ["config/app_password.json"]
-hint  = "set one with: .venv\\Scripts\\python.exe -m src.password set"
+name    = "Admin sign-in password (non-loopback callers)"
+command = ["{python}", "-m", "src.password", "status", "--legacy", "config/webapp_config.json", "auth_password"]
+hint    = "set one with: .venv\\Scripts\\python.exe -m src.password set"
 
 # src.install exits 1 while a backend binary or a model weight is missing; a busy port is only a warning.
 [[install.check]]

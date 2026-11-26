@@ -29,7 +29,7 @@ cd local-llm-hub-lite
 The checklist names what still needs you:
 
 - **llama.cpp / whisper.cpp binaries and model weights:** `.\.venv\Scripts\python.exe -m src.install --fix` downloads them. It is `unknown` on a first `-WhatIf` run because the venv does not exist yet.
-- **Admin sign-in password:** optional, only for callers that are not on this PC. Set it with `.\.venv\Scripts\python.exe -m src.password set` (it prompts twice and stores a salted hash in `config/app_password.json`).
+- **Admin sign-in password:** optional, only for callers that are not on this PC. Set it with `.\.venv\Scripts\python.exe -m src.password set` (it prompts twice and stores a salted hash in `config/app_password.json`). The item is `ok` when a usable hash is stored or the old `auth_password` in `config/webapp_config.json` is set, `missing` when there is neither (an empty or corrupt password file included), and `unknown` when a file it needs cannot be read or the venv does not exist yet.
 - The bearer token for non-loopback callers is minted in `config/webapp_config.json` the first time the tray boots; nothing to do.
 
 `.\setup.bat -WhatIf` lists every change it would make and makes none. This app has no log-on autostart of its own, so `-Startup` does nothing here; to start the hub at log on, put a shortcut to `tray.bat` in the Startup folder (`shell:startup`).

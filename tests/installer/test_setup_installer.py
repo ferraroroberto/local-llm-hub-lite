@@ -12,10 +12,13 @@ import datetime
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
-from src import installer
+import pytest
+
+from src import installer, password
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXED_NOW = datetime.datetime(2026, 1, 2, 3, 4, 5)
@@ -71,7 +74,9 @@ def test_fresh_clone_creates_the_config_and_second_run_is_unchanged(tmp_path: Pa
     before = _snapshot(root)
     again, runner = _run(root)
     assert again.changes == []
-    assert runner.calls == [[str(installer.venv_python(root)), "-m", "src.install"]]  # the checklist probe only
+    python = str(installer.venv_python(root))
+    assert [call[:3] for call in runner.calls] == [  # the checklist probes only
+        [python, "-m", "src.password"], [python, "-m", "src.install"]]
     assert _snapshot(root) == before
 
 
@@ -112,6 +117,59 @@ def test_the_model_registry_is_left_as_the_owner_edited_it(tmp_path: Path) -> No
     _run(root)
     assert registry.read_text(encoding="utf-8") == "hub: {port: 9000}\n"
     assert not list((root / "config").glob("models.yaml*bak*"))
+
+
+def _password_state(root: Path) -> str:
+    """The sign-in password item as this app declares it, probed by a real `src.password` process."""
+
+    def runner(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[Any]:
+        if "src.password" in command:
+            return subprocess.run([sys.executable, *command[1:]], **kwargs)
+        return subprocess.CompletedProcess(command, 0)
+
+    report = installer.Report(what_if=False)
+    installer.build_checklist(root, installer.load_plan(root), report, runner)
+    return next(state for state, item, _ in report.checklist if "sign-in password" in item)
+
+
+@pytest.fixture
+def password_clone(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A set-up checkout (venv, config, the password module) whose password file is a temp path."""
+    root = _clone(tmp_path)
+    shutil.copyfile(REPO_ROOT / SAMPLE, root / TARGET)
+    (root / "src").mkdir()
+    shutil.copyfile(REPO_ROOT / "src" / "password.py", root / "src" / "password.py")
+    interpreter = installer.venv_python(root)
+    interpreter.parent.mkdir(parents=True)
+    interpreter.write_text("", encoding="utf-8")
+    monkeypatch.setenv(password.ENV_VAR, str(root / "config" / "app_password.json"))
+    return root
+
+
+@pytest.mark.parametrize(
+    "content",
+    [None, b"", b"{not json", b'{"password_hash": ""}', b'{"password_hash": "plain"}'],
+    ids=["no-file", "empty", "corrupt", "no-hash", "not-a-hash"],
+)
+def test_password_item_is_missing_without_a_usable_hash(password_clone: Path, content: bytes | None) -> None:
+    if content is not None:
+        (password_clone / "config" / "app_password.json").write_bytes(content)
+    assert _password_state(password_clone) == installer.MISSING
+
+
+def test_password_item_is_unknown_when_the_file_cannot_be_read(password_clone: Path) -> None:
+    (password_clone / "config" / "app_password.json").mkdir()  # reading a directory fails on every OS
+    assert _password_state(password_clone) == installer.UNKNOWN
+
+
+def test_password_item_is_ok_with_a_stored_hash(password_clone: Path) -> None:
+    password.set_password("4321", path=password_clone / "config" / "app_password.json")
+    assert _password_state(password_clone) == installer.OK
+
+
+def test_password_item_counts_the_old_password_the_sign_in_still_accepts(password_clone: Path) -> None:
+    (password_clone / TARGET).write_text(json.dumps({"auth_password": "4321"}), encoding="utf-8")
+    assert _password_state(password_clone) == installer.OK
 
 
 def test_playbook_names_this_apps_carry_over_files_and_the_readme_links_it() -> None:
