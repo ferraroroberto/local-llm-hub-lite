@@ -354,6 +354,11 @@ extensions = ["py"]
 tier       = "none"
 prefix     = "tests/"
 extensions = ["py"]
+# Recorded data the unit tests read; the browser suite opens none of it.
+[[e2e.rule]]
+tier       = "none"
+prefix     = "tests/fixtures/"
+extensions = ["json"]
 [[e2e.rule]]
 tier   = "none"
 prefix = "scripts/"

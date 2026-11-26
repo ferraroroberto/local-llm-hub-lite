@@ -166,6 +166,7 @@ def test_real_rules_route_representative_paths() -> None:
     # Backend / tooling / docs -> skip.
     assert tier("src/model_registry.py") == "skip"
     assert tier("tests/test_config.py") == "skip"
+    assert tier("tests/fixtures/llama_cpp_releases.json") == "skip"
     assert tier("scripts/download_models.py") == "skip"
     assert tier("config/models.yaml") == "skip"
     assert tier("launchers/openai_console.py") == "skip"
