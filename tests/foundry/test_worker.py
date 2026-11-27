@@ -4,13 +4,20 @@ from __future__ import annotations
 
 import io
 import wave
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from src.foundry import worker
-from src.model_registry import ENGINE_FOUNDRY, Model
-from tests.foundry._fake_sdk import ASR_VARIANT, FakeVariant, Part, Result
+from src.model_registry import ASR_OFFLINE, ENGINE_FOUNDRY, Model
+from tests.foundry._fake_sdk import (
+    ASR_VARIANT,
+    OFFLINE_VARIANT,
+    FakeVariant,
+    Part,
+    Result,
+)
 
 ASR_ROW = Model(id="nemotron_asr", display_name="nemotron-3.5-asr", backend="whisper",
                 engine=ENGINE_FOUNDRY, port=18090, runtime_model=ASR_VARIANT)
@@ -77,6 +84,23 @@ def test_translate_task_is_refused(client_and_variant) -> None:
     r = client.post("/v1/audio/transcriptions", files={"file": ("a.wav", _wav(), "audio/wav")},
                     data={"task": "translate"})
     assert r.status_code == 400
+
+
+def test_offline_row_transcribes_the_whole_file_without_a_live_session() -> None:
+    row = Model(id="parakeet_asr", display_name="parakeet-tdt-0.6b-v2", backend="whisper",
+                engine=ENGINE_FOUNDRY, port=18024, runtime_model=OFFLINE_VARIANT, asr_mode=ASR_OFFLINE)
+    variant = FakeVariant(OFFLINE_VARIANT, is_loaded=True)
+    client = TestClient(worker.build_app(row, variant))
+    wav = _wav()
+    r = client.post("/v1/audio/transcriptions", files={"file": ("a.wav", wav, "audio/wav")},
+                    data={"language": "en"})
+    assert r.json() == {"text": f"read {len(wav)} bytes"}
+    [(path, data, language)] = variant.files
+    assert (data, language, variant.sessions) == (wav, "en", [])
+    assert not Path(path).exists()  # the temp copy does not outlive the request
+    health = client.get("/health").json()
+    assert (health["model"], health["model_id"]) == (OFFLINE_VARIANT, "parakeet_asr")
+    assert "state" in health["model_cache"]
 
 
 def test_join_results_falls_back_to_partials_without_a_final() -> None:

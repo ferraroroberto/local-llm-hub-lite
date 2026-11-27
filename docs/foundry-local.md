@@ -12,13 +12,42 @@ An optional model roster for a PC that opts in: **Nemotron 3 Nano 4B** for chat 
 `setup` does, in order:
 
 1. installs `requirements-foundry.txt` (the pinned SDK below) into `.venv`, skipped when that version is already there;
-2. downloads every `engine: foundry-local` row's exact `runtime_model` into the [model cache](#model-cache-folder) (skipped when it is already there) and checks that exact variant is cached;
+2. downloads the exact `runtime_model` of each `engine: foundry-local` row that the roster or this PC's overlay enables into the [model cache](#model-cache-folder) (skipped when it is already there) and checks that exact variant is cached;
 3. copies `config/models.foundry.yaml` to the machine-local overlay `config/models.local.yaml`, unless one already exists (then it is left alone and the roster is merged by hand);
 4. runs `python -m src.install --fix`, which downloads the Nemotron chat GGUF and anything else the roster lacks.
 
 `setup --no-enable` does steps 1, 2 and 4 without enabling the roster. `python -m src.foundry status` exits 0 when a `foundry-local` row is enabled, the SDK installed and its variant cached, and 1 otherwise. `setup.bat`'s checklist runs it, so a PC that has not opted in reads `off` with the opt-in hint.
 
 The overlay enables `qwen35_4b`, `nemotron4b`, `nemotron_asr` and `whisper`, points the `audio_transcribe` role (and its alias) at `nemotron_asr`, and leaves every other row as shipped. Edit `config/models.local.yaml` for this PC's own changes (a row's `startup: on_demand` on a small GPU, say); `config/models.yaml` stays as pulled.
+
+## Parakeet TDT (offline, not streaming)
+
+The registry also lists `parakeet_asr`: `parakeet-tdt-0.6b-v2-generic-cpu:1` (display name `parakeet-tdt-0.6b-v2`, 692 MB, English, `CPUExecutionProvider`) on `:8024`. It is an **offline** recognizer, not a streaming one: it takes a whole file and answers once. Nemotron stays the roster's transcription model and Whisper the explicit fallback; neither the shipped defaults nor the roster enable Parakeet, so it runs only where the machine overlay names it.
+
+To transcribe with it, opt in as above, then set these keys in `config/models.local.yaml` (keep its other settings, such as `foundry.model_cache_dir`):
+
+```yaml
+hosts:
+  local:
+    enabled: [qwen35_4b, nemotron4b, nemotron_asr, parakeet_asr, whisper]
+
+models:
+  whisper:
+    aliases: []
+  nemotron_asr:
+    aliases: []
+  parakeet_asr:
+    aliases: ["audio_transcribe"]
+
+roles:
+  audio:
+    transcribe:
+      model_id: parakeet_asr
+```
+
+Then run `python -m src.install --fix`, which downloads the variant, and restart the hub. Leave `nemotron_asr` out of `enabled` to save its memory when no client asks for it by id.
+
+A client that checks `:8090/health` (Voice Transcriber, below) does not find Parakeet on `:8024`. To serve it on that port, drop `nemotron_asr` from `enabled` and set `models.parakeet_asr.port: 8090`; two rows cannot share a port.
 
 ## Model cache folder
 
@@ -49,21 +78,28 @@ Nothing in the hub imports the SDK at load. On a PC without it:
 - `python -m src.install` and the admin Hub tab show `Foundry Local runtime (optional: Nemotron ASR)` as a warning, `Foundry Local not installed`, naming the opt-in command;
 - a `foundry-local` row enabled anyway fails to start with that same message (the Models tile shows it), and its install row is `missing` with a fix that installs the SDK and fetches the variant.
 
-## How the ASR row runs
+## How an ASR row runs
 
-`nemotron_asr` is `backend: whisper` (the OpenAI audio shape), `engine: foundry-local` and `runtime_model: nemotron-3.5-asr-streaming-0.6b-generic-cpu:3`. The hub's process manager spawns `python -m src.foundry.worker nemotron_asr` like any backend: same per-backend log, start, stop, adoption across a hub restart. The worker:
+Both rows are `backend: whisper` (the OpenAI audio shape) and `engine: foundry-local`, each with its exact `runtime_model`. The hub's process manager spawns `python -m src.foundry.worker <row id>` like any backend: same per-backend log, start, stop, adoption across a hub restart. The worker:
 
 - resolves exactly that catalog variant: an alias (no `:version`), an unknown id or a catalog that hands back another variant is refused, with a message naming what was asked and what it resolved to;
 - loads it (reusing it when already loaded, downloading it when missing) before it opens the port, so a reachable port means ready;
 - serves `GET /health` with `engine` (`foundry-local`), `model` (the exact variant), `model_id`, `sdk_version`, `pid` and [`model_cache`](#model-cache-folder); `GET /v1/models`; and `POST /v1/audio/transcriptions` taking 16-bit PCM WAV and answering `{"text": ...}` (`response_format` `json`, `text` or `verbose_json`; `task=translate` is refused).
 
-The streaming Nemotron variants reject the SDK's file transcription ("not a registered multi-modal model type"), so the worker feeds the WAV through the SDK's live transcription session as PCM chunks and returns the final segments.
+The row's `asr_mode` picks the SDK call, because each kind of recognizer rejects the other's:
+
+| `asr_mode` | Row | How the WAV is transcribed |
+| --- | --- | --- |
+| `streaming` (default) | `nemotron_asr` | Fed through the SDK's live transcription session as PCM chunks; the final segments are returned. File transcription is rejected ("not a registered multi-modal model type"). |
+| `offline` | `parakeet_asr` | Written to a temporary file and transcribed whole in one call; the file is removed afterwards. A live session is rejected ("requires a nemotron_speech model type"). |
+
+Any other value refuses the row.
 
 The worker runs under the generic Python interpreter, so the hub recognises it by its command line (the worker module and the row id), not its exe. On Windows it is spawned as the base interpreter with `__PYVENV_LAUNCHER__` set to the venv, so the PID the hub records is the process holding the port rather than the venv launcher's.
 
 ## Routing
 
-`POST /v1/audio/transcriptions` with no `model`, the role alias `audio_transcribe` or a name the registry does not know (OpenAI's `whisper-1`) goes to the `roles.audio.transcribe` target when this PC serves it; failing that a `foundry-local` row comes before `whisper-server`. An explicit known id is still served by exactly that row, so `model=whisper` reaches Whisper beside Nemotron. `GET /v1/audio/health` reports the target's `engine` and `model`.
+`POST /v1/audio/transcriptions` with no `model`, the role alias `audio_transcribe` or a name the registry does not know (OpenAI's `whisper-1`) goes to the `roles.audio.transcribe` target when this PC serves it; failing that a `foundry-local` row comes before `whisper-server`. An explicit known id is still served by exactly that row, so `model=whisper` reaches Whisper beside Nemotron. `GET /v1/audio/health` reports the target's `engine` and `model`. Parakeet is reached by its id, or by the role once the overlay names it as the target.
 
 A row declared both `virtual` (an alias of another backend's port) and runtime-backed is refused: the registry leaves it out, so `/v1/models` never lists a name a different model answers, `src.install` shows an error row, and a transcription role pointing at it answers 503 `refused` with the reason instead of falling back to another model.
 
@@ -79,4 +115,4 @@ Voice Transcriber can run its own whisper.cpp on `:8090`. When the hub's Nemotro
 | Foundry Local CLI | not required | The SDK runs the model in-process. The `Microsoft.FoundryLocal` winget package (0.14.0) currently fails to download its installer (404), and the hub does not need it. |
 | `foundry-local-sdk` 2.x | not used | 2.x is a different in-process API on a different native runtime (`FoundryLocalManager.get_catalog()` in place of `.catalog`, a cffi binding to the C++ SDK). Nothing shows it reads the 1.x model cache or serves this variant the same way, so moving to it is a separate change with its own live proof. |
 
-Verified on a Windows 11 PC with an RTX 5060 Ti: `foundry-local-sdk 1.2.4` on Python 3.14 resolved and downloaded `nemotron-3.5-asr-streaming-0.6b-generic-cpu:3` (756 MB, CPU) and transcribed a 6 s 16 kHz WAV in about 1 s through the worker.
+Verified on a Windows 11 PC with an RTX 5060 Ti: `foundry-local-sdk 1.2.4` on Python 3.14 resolved and downloaded `nemotron-3.5-asr-streaming-0.6b-generic-cpu:3` (756 MB, CPU) and transcribed a 6 s 16 kHz WAV in about 1 s through the worker. The same SDK resolved and downloaded `parakeet-tdt-0.6b-v2-generic-cpu:1` (692 MB, CPU) and transcribed 16 kHz mono and 48 kHz stereo WAVs.

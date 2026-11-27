@@ -19,6 +19,8 @@
 #                  Local SDK in a Python worker, src/foundry/worker.py)
 #   runtime_model  foundry-local only: the exact catalog variant id
 #                  (name:version) the worker loads and reports on /health
+#   asr_mode       foundry-local only: streaming (default, a live session fed
+#                  PCM chunks) | offline (the whole file in one call)
 #   port           loopback port the backend listens on
 #   model_path     weights file, relative to the repo root
 #   hf_repo/hf_pattern  where scripts/download_models.py fetches the weights
@@ -181,6 +183,21 @@ models:
     engine: foundry-local
     runtime_model: "nemotron-3.5-asr-streaming-0.6b-generic-cpu:3"
     port: 8090
+    est_vram_mb: 0
+    startup: eager
+
+  # --- audio_transcribe (opt-in): Parakeet TDT on Foundry Local -----------
+  # An OFFLINE recognizer, not a streaming one: the worker transcribes the
+  # whole file in one call. 0.6 B, 692 MB, English, CPU-only. Nothing enables
+  # it: this PC's overlay has to name it (docs/foundry-local.md). It has its
+  # own port, so it can run beside the Nemotron row.
+  parakeet_asr:
+    display_name: parakeet-tdt-0.6b-v2
+    backend: whisper
+    engine: foundry-local
+    runtime_model: "parakeet-tdt-0.6b-v2-generic-cpu:1"
+    asr_mode: offline
+    port: 8024
     est_vram_mb: 0
     startup: eager
 

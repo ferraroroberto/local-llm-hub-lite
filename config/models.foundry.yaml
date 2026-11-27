@@ -8,6 +8,12 @@
 # never gets it, so it keeps the shipped Qwen + Whisper defaults.
 #
 # Whisper stays enabled as the fallback ASR model, addressable by its id.
+#
+# `parakeet_asr` (Parakeet TDT, an offline recognizer, not a streaming one) is
+# not part of this roster. To transcribe with it instead of Nemotron, edit
+# config/models.local.yaml: add `parakeet_asr` to `enabled`, move the
+# `audio_transcribe` alias to it (`nemotron_asr` gets `aliases: []`) and set
+# `roles.audio.transcribe.model_id: parakeet_asr` (docs/foundry-local.md).
 
 # Optional: the Foundry Local model cache folder. Unset, it is Lite's own
 # (~/.local-llm-hub-lite/cache/models). Set it to reuse a cache that already

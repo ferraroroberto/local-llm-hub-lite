@@ -5,8 +5,9 @@
                                    # enable the roster, then download what it needs
 
 ``setup`` is the installer's opt-in step (``setup.bat`` never runs it): it
-pip-installs ``requirements-foundry.txt``, downloads every ``foundry-local``
-row's exact ``runtime_model`` and checks it is cached, copies
+pip-installs ``requirements-foundry.txt``, downloads the exact
+``runtime_model`` of each ``foundry-local`` row the roster or this PC enables
+and checks it is cached, copies
 ``config/models.foundry.yaml`` to the machine-local overlay
 ``config/models.local.yaml`` (never over an existing one), then runs
 ``src.install --fix`` so the roster's GGUF weights are downloaded too.
@@ -20,6 +21,8 @@ import shutil
 import subprocess
 import sys
 from typing import List, Optional
+
+import yaml
 
 from .. import host_profile
 from ..model_registry import ENGINE_FOUNDRY, all_models, enabled_models
@@ -38,6 +41,18 @@ PIP_INSTALL_TIMEOUT_S = 900
 
 def _foundry_rows(models) -> list:
     return [m for m in models if m.engine == ENGINE_FOUNDRY]
+
+
+def _rows_to_fetch() -> list:
+    """Foundry rows the roster template or this PC enables.
+
+    A row neither one names is not opted into, so its weights are not
+    downloaded here.
+    """
+    template = host_profile.local_overlay_path().with_name(ROSTER_TEMPLATE_NAME)
+    roster = yaml.safe_load(template.read_text(encoding="utf-8"))
+    wanted = set(roster["hosts"]["local"]["enabled"]) | set(host_profile.resolve().enabled)
+    return [m for m in _foundry_rows(all_models()) if m.id in wanted]
 
 
 def status() -> int:
@@ -96,13 +111,13 @@ def _enable_roster() -> bool:
 
 
 def prepare() -> None:
-    """Install the pinned SDK and fetch every foundry-local row's exact variant.
+    """Install the pinned SDK and fetch the variants :func:`_rows_to_fetch` names.
 
     Raises :class:`runtime.FoundryError`. This is also ``src.install --fix``'s
     repair for a missing SDK or variant, so it must not call back into it.
     """
     _install_sdk()
-    for m in _foundry_rows(all_models()):
+    for m in _rows_to_fetch():
         runtime.download(m.runtime_model or "")
 
 

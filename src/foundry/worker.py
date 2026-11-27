@@ -12,8 +12,10 @@ already loaded), then serves on the row's loopback port:
 - ``POST /v1/audio/transcriptions``: the OpenAI multipart shape, 16-bit PCM
   WAV in, ``{"text": ...}`` out.
 
-The streaming Nemotron ASR variants reject the SDK's file transcription, so
-the WAV is fed through a live transcription session as PCM chunks.
+The row's ``asr_mode`` picks the SDK call. The streaming Nemotron ASR
+variants reject file transcription, so their WAV is fed through a live
+transcription session as PCM chunks. An ``offline`` recognizer (Parakeet)
+rejects that session and transcribes the whole file in one call.
 
 The hub spawns this module like any backend (``backend_process``); the
 model loads before the port opens, so a reachable ``/health`` means ready.
@@ -26,14 +28,16 @@ import io
 import logging
 import os
 import sys
+import tempfile
 import threading
 import wave
+from pathlib import Path
 from typing import Any, Iterable, List, Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
-from ..model_registry import ENGINE_FOUNDRY, Model
+from ..model_registry import ASR_OFFLINE, ENGINE_FOUNDRY, Model
 from . import runtime
 
 logger = logging.getLogger(__name__)
@@ -103,10 +107,23 @@ def transcribe_pcm(
     return join_results(results)
 
 
+def transcribe_file(variant: Any, wav: bytes, *, language: Optional[str]) -> str:
+    """Hand the whole ``wav`` to an offline recognizer and return its text."""
+    client = variant.get_audio_client()
+    if language:
+        client.settings.language = language
+    # The SDK takes a path, not bytes, so the upload lives in a temp folder
+    # for the length of the call.
+    with tempfile.TemporaryDirectory(prefix="foundry-asr-") as scratch:
+        path = Path(scratch) / "upload.wav"
+        path.write_bytes(wav)  # runtime-write-exempt: temp folder, removed with the request
+        return client.transcribe(str(path)).text.strip()
+
+
 def build_app(model: Model, variant: Any) -> FastAPI:
     """The worker's HTTP surface for ``model`` served by the loaded ``variant``."""
     app = FastAPI(title=f"foundry-local worker: {model.id}")
-    # One live session at a time: the variant is a single in-process model.
+    # One transcription at a time: the variant is a single in-process model.
     lock = threading.Lock()
     # Fixed at SDK initialisation, so read once; only the folder state is live.
     cache = runtime.model_cache()
@@ -145,11 +162,17 @@ def build_app(model: Model, variant: Any) -> FastAPI:
                 400, f"response_format {response_format!r} not supported; use one of {_RESPONSE_FORMATS}"
             )
         try:
-            pcm, rate, channels = wav_to_pcm(file.file.read())
+            wav = file.file.read()
+            pcm, rate, channels = wav_to_pcm(wav)
         except ValueError as exc:
             raise HTTPException(415, str(exc)) from exc
         with lock:
-            text = transcribe_pcm(variant, pcm, sample_rate=rate, channels=channels, language=language)
+            if model.asr_mode == ASR_OFFLINE:
+                text = transcribe_file(variant, wav, language=language)
+            else:
+                text = transcribe_pcm(
+                    variant, pcm, sample_rate=rate, channels=channels, language=language
+                )
         if response_format == "text":
             return PlainTextResponse(text)
         body: dict = {"text": text}
@@ -168,8 +191,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--config", help="models.yaml the spawning hub loaded (its overlay beside it)")
     args = parser.parse_args(argv)
     if args.config:
-        from pathlib import Path
-
         from .. import host_profile
 
         host_profile.CONFIG_PATH = Path(args.config)

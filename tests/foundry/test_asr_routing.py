@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import io
 import json
+import wave
 
+import httpx
 import pytest
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
+from fastapi.testclient import TestClient
 
 from src import model_registry
 from src.audio import server_audio_asr
-from tests.foundry._fake_sdk import ASR_VARIANT
+from src.audio.server_audio_common import HEADER_SERVED_MODEL
+from src.foundry import worker
+from tests.foundry._fake_sdk import ASR_VARIANT, OFFLINE_VARIANT, FakeVariant
 
 WHISPER = {"display_name": "whisper-large-v3-turbo", "backend": "whisper",
            "engine": "whisper-server", "port": 18022}
@@ -87,6 +93,43 @@ def test_audio_health_reports_engine_and_exact_model(write_config, monkeypatch) 
     body = json.loads(resp.body)
     assert resp.status_code == 200
     assert body["backends"][0].items() >= {"id": "nemotron_asr", "engine": "foundry-local", "model": ASR_VARIANT}.items()
+
+
+PARAKEET = {"display_name": "parakeet-tdt-0.6b-v2", "backend": "whisper", "engine": "foundry-local",
+            "runtime_model": OFFLINE_VARIANT, "asr_mode": "offline", "port": 18024}
+
+
+def test_unknown_asr_mode_refuses_the_row(write_config) -> None:
+    _config(write_config, enabled=["nemotron_asr"], nemotron={**NEMOTRON, "asr_mode": "ofline"})
+    assert "asr_mode" in model_registry.registry_problems()["nemotron_asr"]
+
+
+def test_role_target_parakeet_receives_the_posted_clip(write_config, monkeypatch) -> None:
+    """The whole hub path: role -> Parakeet row -> its worker -> the transcript."""
+    write_config({
+        "hosts": {"local": {"enabled": ["whisper", "nemotron_asr", "parakeet_asr"]}},
+        "models": {"whisper": WHISPER, "nemotron_asr": NEMOTRON, "parakeet_asr": PARAKEET},
+        "roles": {"audio": {"transcribe": {"model_id": "parakeet_asr"}}},
+    })
+    row = next(m for m in model_registry.enabled_models() if m.id == "parakeet_asr")
+    variant = FakeVariant(OFFLINE_VARIANT, is_loaded=True)
+    upstream = httpx.AsyncClient(transport=httpx.ASGITransport(app=worker.build_app(row, variant)))
+    monkeypatch.setattr(server_audio_asr, "get_async_client", lambda: upstream)
+    monkeypatch.setattr(server_audio_asr, "ensure_backend_ready_or_503", lambda target: None)
+    app = FastAPI()
+    app.include_router(server_audio_asr.router)
+    wav = io.BytesIO()
+    with wave.open(wav, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(16000)
+        w.writeframes(bytes(3200))
+
+    r = TestClient(app).post("/v1/audio/transcriptions",
+                             files={"file": ("a.wav", wav.getvalue(), "audio/wav")})
+
+    assert r.json() == {"text": f"read {len(wav.getvalue())} bytes"}
+    assert r.headers[HEADER_SERVED_MODEL] == "parakeet_asr"
 
 
 def test_audio_health_names_a_refused_role_target(write_config) -> None:

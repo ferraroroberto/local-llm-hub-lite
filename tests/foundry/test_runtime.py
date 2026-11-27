@@ -6,7 +6,12 @@ import pytest
 
 from src.foundry import runtime
 from tests.foundry import _fake_sdk as fake
-from tests.foundry._fake_sdk import ASR_VARIANT, FakeCatalog, FakeVariant
+from tests.foundry._fake_sdk import (
+    ASR_VARIANT,
+    OFFLINE_VARIANT,
+    FakeCatalog,
+    FakeVariant,
+)
 
 
 def _catalog(monkeypatch, **variant_kw) -> FakeVariant:
@@ -41,6 +46,14 @@ def test_catalog_handing_back_another_variant_is_refused(monkeypatch) -> None:
     fake.install(monkeypatch, FakeCatalog({other: FakeVariant(other)}, redirect={ASR_VARIANT: other}))
     with pytest.raises(runtime.FoundryError, match="refusing a different variant"):
         runtime.resolve_variant(runtime.open_catalog(), ASR_VARIANT)
+
+
+def test_refusal_of_another_variant_names_both_ids(monkeypatch) -> None:
+    other = "parakeet-tdt-0.6b-v2-generic-cpu:2"
+    fake.install(monkeypatch, FakeCatalog({other: FakeVariant(other)}, redirect={OFFLINE_VARIANT: other}))
+    with pytest.raises(runtime.FoundryError) as exc:
+        runtime.resolve_variant(runtime.open_catalog(), OFFLINE_VARIANT)
+    assert OFFLINE_VARIANT in str(exc.value) and other in str(exc.value)
 
 
 def test_ensure_loaded_starts_then_reuses(monkeypatch) -> None:
