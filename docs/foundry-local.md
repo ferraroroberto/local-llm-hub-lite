@@ -16,7 +16,7 @@ An optional model roster for a PC that opts in: **Nemotron 3 Nano 4B** for chat 
 3. copies `config/models.foundry.yaml` to the machine-local overlay `config/models.local.yaml`, unless one already exists (then it is left alone and the roster is merged by hand);
 4. runs `python -m src.install --fix`, which downloads the Nemotron chat GGUF and anything else the roster lacks.
 
-`setup --no-enable` does steps 1, 2 and 4 without enabling the roster. `python -m src.foundry status` exits 0 when a `foundry-local` row is enabled, the SDK installed and its variant cached, and 1 otherwise. `setup.bat`'s checklist runs it, so a PC that has not opted in reads `missing` with the opt-in hint.
+`setup --no-enable` does steps 1, 2 and 4 without enabling the roster. `python -m src.foundry status` exits 0 when a `foundry-local` row is enabled, the SDK installed and its variant cached, and 1 otherwise. `setup.bat`'s checklist runs it, so a PC that has not opted in reads `off` with the opt-in hint.
 
 The overlay enables `qwen35_4b`, `nemotron4b`, `nemotron_asr` and `whisper`, points the `audio_transcribe` role (and its alias) at `nemotron_asr`, and leaves every other row as shipped. Edit `config/models.local.yaml` for this PC's own changes (a row's `startup: on_demand` on a small GPU, say); `config/models.yaml` stays as pulled.
 

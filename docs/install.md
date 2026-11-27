@@ -24,15 +24,15 @@ cd local-llm-hub-lite
 1. creates `.venv` when it is missing;
 2. installs `requirements.txt`, and later reinstalls only when that file changed (its hash is kept inside `.venv`);
 3. creates `config/webapp_config.json` from `config/webapp_config.sample.json` when it is missing;
-4. ends with a checklist that marks each item `ok`, `missing` or `unknown`.
+4. ends with two lists: the required items, each `ok`, `missing` or `unknown`, and the optional features, each `available`, `off` or `unknown` with what it unlocks.
 
-The checklist names what still needs you:
+Setup has succeeded when it ends with `Setup complete` and exits 0; an optional feature that is `off` never changes that. The optional features, each needed only for what it unlocks:
 
-- **llama.cpp / whisper.cpp binaries and model weights:** `.\.venv\Scripts\python.exe -m src.install --fix` downloads them. It is `unknown` on a first `-WhatIf` run because the venv does not exist yet.
-- **Admin sign-in password:** optional, only for callers that are not on this PC. Set it with `.\.venv\Scripts\python.exe -m src.password set` (it prompts twice and stores a salted hash in `config/app_password.json`). The item is `ok` when a usable hash is stored or the old `auth_password` in `config/webapp_config.json` is set, `missing` when there is neither (an empty or corrupt password file included), and `unknown` when a file it needs cannot be read or the venv does not exist yet.
+- **llama.cpp / whisper.cpp binaries and model weights:** `.\.venv\Scripts\python.exe -m src.install --fix` downloads them. It is `off` until they are there, and `unknown` on a first `-WhatIf` run because the venv does not exist yet.
+- **Admin sign-in password:** optional, only for callers that are not on this PC. Set it with `.\.venv\Scripts\python.exe -m src.password set` (it prompts twice and stores a salted hash in `config/app_password.json`). The item is `available` when a usable hash is stored or the old `auth_password` in `config/webapp_config.json` is set, `off` when there is neither (an empty or corrupt password file included), and `unknown` when a file it needs cannot be read or the venv does not exist yet.
 - The bearer token for non-loopback callers is minted in `config/webapp_config.json` the first time the tray boots; nothing to do.
 
-- **Foundry Local runtime (optional: Nemotron chat and ASR):** `missing` until this PC opts into the Nemotron roster with `.\.venv\Scripts\python.exe -m src.foundry setup` (installs the pinned SDK extra, fetches and verifies the exact ASR variant, writes the machine-local `config/models.local.yaml`); a PC that skips it keeps Qwen and Whisper. [foundry-local.md](foundry-local.md) has the details.
+- **Foundry Local runtime** (Nemotron chat and ASR): `off` until this PC opts into the Nemotron roster with `.\.venv\Scripts\python.exe -m src.foundry setup` (installs the pinned SDK extra, fetches and verifies the exact ASR variant, writes the machine-local `config/models.local.yaml`); a PC that skips it keeps Qwen and Whisper. [foundry-local.md](foundry-local.md) has the details.
 
 `.\setup.bat -WhatIf` lists every change it would make and makes none. This app has no log-on autostart of its own, so `-Startup` does nothing here; to start the hub at log on, put a shortcut to `tray.bat` in the Startup folder (`shell:startup`).
 
