@@ -303,6 +303,18 @@ function   = "run_loop"
 interval_s = 30
 why        = "fills the machine health verdict a launcher reads over loopback with no page open; each tick is one in-process read of ports, commit and disk counters"
 
+[[request_budget.loops]]
+path       = "src/audio/bench/measure.py"
+function   = "Sampler._run"
+interval_s = 0.25
+why        = "the speech-to-text benchmark samples the engine it is measuring, by hand from a terminal, only while that engine runs; a slower tick misses the peak RAM and VRAM"
+
+[[request_budget.loops]]
+path       = "src/audio/bench/sessions.py"
+function   = "HttpServerSession.wait_ready"
+interval_s = 0.5
+why        = "the benchmark's cold-load time is when the engine first answers /health, so the wait polls finely; it ends at the ready timeout"
+
 
 # [conventions_ratchet] -- the scaffold's baseline-and-ratchet check of fleet conventions
 # as ast rules. The gate runs scripts/conventions_ratchet.py: a file whose count for an
