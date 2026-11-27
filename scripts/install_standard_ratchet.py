@@ -10,8 +10,9 @@ does not already list.
 
 The rules (docs/install-standard-ratchet.md):
 
-  * `installer-vendored` -- one of the three installer modules
-    (`src/installer.py`, `src/installer_migrate.py`, `src/installer_inplace.py`)
+  * `installer-vendored` -- one of the four installer modules
+    (`src/installer.py`, `src/installer_migrate.py`, `src/installer_declaration.py`,
+    `src/installer_inplace.py`)
     is missing, is not declared under its manifest key in `[vendored]`, or its
     content is not the content this copy of the ratchet was released with,
     which is the scaffold's current one: the ratchet and the installer are
@@ -20,8 +21,8 @@ The rules (docs/install-standard-ratchet.md):
   * `migrate-table` -- `[install.migrate]` (with `[install.endpoint]`) is absent
     or does not parse. It is parsed by the repo's own `src/installer_migrate.py`,
     the code `setup.bat -MigrateFrom` runs, so the check and the installer can
-    never disagree; with that module missing the table cannot be parsed and is a
-    hit.
+    never disagree; with it or its `src/installer_declaration.py` missing the
+    table cannot be parsed and is a hit.
   * `playbook-sections` -- the playbook is missing, or lacks an `## Install`,
     `## Update` or `## Migrate` heading (outside code fences). Other sections
     (Uninstall, Execution policy) are allowed.
@@ -92,9 +93,11 @@ EXIT_PASS, EXIT_RISE, EXIT_CONFIG, EXIT_NOT_CONFIRMED = 0, 1, 2, 3
 INSTALLER: dict[str, tuple[str, str]] = {
     "installer": ("src/installer.py", "aca52564fcf71b7e377782b3fa527f80d11d328c7dda1a832efca695b5cee906"),
     "installer_migrate": ("src/installer_migrate.py",
-                          "cc6fa83c5fbbd7ba6293625fd7c78ca4f55fc2960ceab4d8a1cd9fee1c88e2d0"),
+                          "168e9e0921fb9d0c85c29d77cf3dc7eb3a6112a2fa64632f93ad785ade29e1f5"),
+    "installer_declaration": ("src/installer_declaration.py",
+                              "f8730c8d8020797d95f9ae2df9b777ab09207181cd74a1f52d1065992e0593fa"),
     "installer_inplace": ("src/installer_inplace.py",
-                          "e369219bb67fdff694cedb628a75d24dd8f1dc2d7ec8c33f7710b1e65bc0ec7d"),
+                          "0d1b606c21cd738470770a24fac838212f93ec386801b01931a10859f080678a"),
 }
 
 _CONFIG_KEYS = {"enabled", "baseline", "playbook"}
@@ -189,6 +192,8 @@ def _load_migrate(root: Path) -> ModuleType | None:
     if not path.is_file():
         return None
     name = "_install_standard_installer_migrate"
+    # It loads its sibling installer_declaration.py by this name: never reuse another repo's copy.
+    sibling = sys.modules.pop("installer_declaration", None)
     try:
         spec = importlib.util.spec_from_file_location(name, path)
         assert spec is not None and spec.loader is not None
@@ -198,7 +203,11 @@ def _load_migrate(root: Path) -> ModuleType | None:
             spec.loader.exec_module(module)
         finally:
             sys.modules.pop(name, None)
-    except Exception as exc:  # noqa: BLE001 -- any failure to load is "could not check", never a pass
+            sys.modules.pop("installer_declaration", None)
+            if sibling is not None:
+                sys.modules["installer_declaration"] = sibling
+    # A missing sibling module ends the load with SystemExit, its setup.bat message.
+    except (Exception, SystemExit) as exc:  # noqa: BLE001 -- any failure to load is "could not check", never a pass
         raise NotConfirmed(f"{path.name} does not load: {type(exc).__name__}: {exc}") from exc
     if not callable(getattr(module, "parse_migration", None)):
         raise NotConfirmed(f"{path.name} has no parse_migration")
@@ -207,6 +216,9 @@ def _load_migrate(root: Path) -> ModuleType | None:
 
 def check_migrate(root: Path, data: dict[str, Any]) -> dict[str, str]:
     """`migrate-table` hits: {hit key: why}."""
+    declaration = INSTALLER["installer_declaration"][0]
+    if not (root / declaration).is_file():
+        return {"migrate-table": f"{declaration} is missing, so [install.migrate] cannot be parsed"}
     module = _load_migrate(root)
     if module is None:
         return {"migrate-table": "src/installer_migrate.py is missing, so [install.migrate] cannot be parsed"}

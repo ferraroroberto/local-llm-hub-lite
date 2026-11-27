@@ -50,9 +50,11 @@ REM  imported before its requirements exist.
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" exit /b %RC%
 REM  The banner is for a plain run only: a migration has already started the app,
-REM  and its -Json report must stay the whole of stdout.
+REM  and a -Json report must stay the whole of stdout.
 for %%A in (%*) do if /i "%%~A"=="-MigrateFrom" exit /b 0
 for %%A in (%*) do if /i "%%~A"=="--migrate-from" exit /b 0
+for %%A in (%*) do if /i "%%~A"=="-Json" exit /b 0
+for %%A in (%*) do if /i "%%~A"=="--json" exit /b 0
 echo.
 echo Next steps (docs\install.md):
 echo   .venv\Scripts\python.exe -m src.install --fix   download llama.cpp, whisper.cpp and the model weights
@@ -62,14 +64,21 @@ exit /b 0
 :in_place
 REM  Windows will not rename a folder a process lives in, so the run moves out:
 REM  a temporary copy of the migration modules, the system python, and a current
-REM  folder outside the tree. The run and the exit share one line because once
-REM  the folder is renamed, the next line cmd.exe would read is the new clone's.
+REM  folder outside the tree. The run, the removal of the stage folder and the
+REM  exit share one line because once the folder is renamed, the next line
+REM  cmd.exe would read is the new clone's. The current folder is %TEMP%, not
+REM  the stage, so nothing holds the stage open when it is removed.
 set "STAGE=%TEMP%\setup-inplace-%RANDOM%%RANDOM%"
 mkdir "%STAGE%" || exit /b 1
-copy /y "%SCRIPT_DIR%src\installer_migrate.py" "%STAGE%\" >nul || exit /b 1
-copy /y "%SCRIPT_DIR%src\installer_inplace.py" "%STAGE%\" >nul || exit /b 1
-cd /d "%STAGE%"
-"%PY_EXE%" %PY_ARGS% -I "%STAGE%\installer_inplace.py" -Folder "%SCRIPT_DIR%." %* & call exit /b %%ERRORLEVEL%%
+copy /y "%SCRIPT_DIR%src\installer_migrate.py" "%STAGE%\" >nul || goto :stage_failed
+copy /y "%SCRIPT_DIR%src\installer_declaration.py" "%STAGE%\" >nul || goto :stage_failed
+copy /y "%SCRIPT_DIR%src\installer_inplace.py" "%STAGE%\" >nul || goto :stage_failed
+cd /d "%TEMP%"
+"%PY_EXE%" %PY_ARGS% -I "%STAGE%\installer_inplace.py" -Folder "%SCRIPT_DIR%." %* & call set "RC=%%ERRORLEVEL%%" & rmdir /s /q "%STAGE%" & call exit /b %%RC%%
+
+:stage_failed
+rmdir /s /q "%STAGE%"
+exit /b 1
 
 :no_python
 echo ERROR: no Python found. Install Python 3.11 or newer from python.org, then run setup.bat again.

@@ -75,15 +75,16 @@ What moves is declared in `[install.migrate]` of `.fleet.toml`. The installer do
 
 The usage database (`usage.sqlite3` in `C:\sqlite\local-llm-hub-lite\`) lives outside the repo folder and is shared: it stays where it is and the new copy finds it unchanged. Logs (`data/logs/`, `webapp/auth.log`, `tray-crash.log`) are history and are not copied.
 
-**Reinstall in the same folder (the usual case).** From a terminal whose current folder is outside the app:
+**Reinstall in the same folder (the usual case).** Run these in order in a PowerShell window whose current folder is the one above the app, never inside it:
 
 ```powershell
-cd <PARENT FOLDER>
-.\local-llm-hub-lite\setup.bat -InPlace -WhatIf    # read the backup name and every step; nothing changes
+cd <PARENT FOLDER>                                 # the folder that holds local-llm-hub-lite
+git -C local-llm-hub-lite pull --ff-only           # the next two commands run the installer in this folder
+.\local-llm-hub-lite\setup.bat -InPlace -WhatIf    # read the backup name, every step and every file; nothing changes
 .\local-llm-hub-lite\setup.bat -InPlace
 ```
 
-It stops the hub and its backends, keeps the replaced copy as `local-llm-hub-lite.bak-YYYYMMDD-N`, clones the remote's default branch into the original path and passes only when that clone serves its own commit. The path is unchanged, so a Startup shortcut to `tray.bat` needs no edit.
+It stops the hub and its backends, keeps the replaced copy as `local-llm-hub-lite.bak-YYYYMMDD-N`, clones the remote's default branch into the original path, copies the files above and passes only when that clone serves its own commit on the declared port (`port` in `.fleet.toml`), asking http first and https second. The path is unchanged, so a Startup shortcut to `tray.bat` needs no edit.
 
 **Beside it (another folder, or an old copy that is not a git clone):**
 
@@ -95,10 +96,30 @@ cd <NEW FOLDER>
 
 Only you can do these steps:
 
-- **Carry a registry edit.** `config/models.yaml` is tracked, so the new clone brings its own. If the old copy edited it, compare (`git diff --no-index <OLD OR BACKUP FOLDER>\config\models.yaml config\models.yaml`), carry over only this PC's own choices (the `hosts.local.enabled` list, `hub.port`, backend ports and `args`) and restart the hub. The installer's verify asks the top-level `port` of `.fleet.toml`, so on a PC whose old copy used another `hub.port` it can fail until the edit is carried.
-- **Reinstall Foundry Local**, on a PC that opted into Nemotron: the new `.venv` has no SDK extra, so run `.\.venv\Scripts\python.exe -m src.foundry setup`. It keeps the copied overlay.
+- **Carry a registry edit.** `config/models.yaml` is tracked, so the new clone brings its own. If the old copy edited it, compare the two from the folder above, carry over only this PC's own choices (the `hosts.local.enabled` list, `hub.port`, backend ports and `args`) and restart the hub. The installer's verify asks the top-level `port` of `.fleet.toml`, so on a PC whose old copy used another `hub.port` it can fail until the edit is carried.
+
+  ```powershell
+  git diff --no-index local-llm-hub-lite.bak-YYYYMMDD-N\config\models.yaml local-llm-hub-lite\config\models.yaml
+  .\local-llm-hub-lite\tray.bat --restart
+  ```
+
+- **Reinstall Foundry Local**, on a PC that opted into Nemotron: the new `.venv` has no SDK extra. It keeps the copied overlay.
+
+  ```powershell
+  cd local-llm-hub-lite
+  .\.venv\Scripts\python.exe -m src.foundry setup
+  cd ..
+  ```
+
 - **Move the usage history to another PC**, if you want it: the move above stays on one PC. With both hubs stopped, copy `usage.sqlite3` (with its `-wal` and `-shm` files) into the new PC's empty `C:\sqlite\local-llm-hub-lite\`. `FLEET_DATA_ROOT` or `LOCAL_LLM_HUB_LITE_DATA_DIR` moves that folder; use the same setting on both.
 - **Repoint** whatever stores the old path, after a `-MigrateFrom` into another folder, such as the Startup shortcut: the run lists what still points at it.
 - **Check a real client.** Send one request from a client that used the old hub; its bearer token must still be accepted, and the Models tab must start a backend.
-- **Fall back** if verify fails (the report names the step): stop the new copy, rename the new folder away and the backup to the original name, and start it; it is untouched.
+- **Fall back** if verify fails (the report names the step): quit the new copy from its tray icon, then, from the folder above, put the backup back under the original name and start it; it is untouched.
+
+  ```powershell
+  Rename-Item local-llm-hub-lite local-llm-hub-lite.failed
+  Rename-Item local-llm-hub-lite.bak-YYYYMMDD-N local-llm-hub-lite
+  .\local-llm-hub-lite\tray.bat
+  ```
+
 - **Retire the backup** once you are sure the new copy works, by deleting it yourself. An agent working through this playbook asks you before it deletes anything.
