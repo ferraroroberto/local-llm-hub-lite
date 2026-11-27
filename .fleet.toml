@@ -72,7 +72,7 @@ text-size    = { src = "app/webapp/static/_vendored/text-size", sha = "5d460bd1d
 page-foot = { src = "app/webapp/static/_vendored/page-foot", sha = "48602060fffdacbcdcdde66b9886c6471d835ff3", dest = "app_web/static/_vendored/page-foot" }
 select-native = { src = "app/webapp/static/_vendored/select-native", sha = "09fe2436b6bf3ee608d43fc8a26165e3e2400840", dest = "app_web/static/_vendored/select-native" }
 sign-in     = { src = "app/webapp/static/_vendored/sign-in", sha = "7577aece617ad366e7df8ef522d511184b445144", dest = "app_web/static/_vendored/sign-in" }
-toast = { src = "app/webapp/static/_vendored/toast", sha = "e56c8330f8500b83635773033a09de6fc3cba342", dest = "app_web/static/_vendored/toast" }
+toast = { src = "app/webapp/static/_vendored/toast", sha = "17bcbfc249abb63368f2d3113c4a18b54c26236e", dest = "app_web/static/_vendored/toast" }
 build-watch = { src = "app/webapp/static/_vendored/build-watch", sha = "48602060fffdacbcdcdde66b9886c6471d835ff3", dest = "app_web/static/_vendored/build-watch" }
 icon-button = { src = "app/webapp/static/_vendored/icon-button", sha = "241d2fde53645497376a19c073bb2b6c4e540f86", dest = "app_web/static/_vendored/icon-button" }
 request_budget_ratchet = { src = "scripts/request_budget_ratchet.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/request_budget_ratchet.py", requires = ["request_budget_scan"] }
