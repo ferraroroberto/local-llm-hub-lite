@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-from src.process.backend_process import (
-    STOP_GRACE_S,
-    STOP_KILL_WAIT_S,
-    STOP_TERMINATE_WAIT_S,
-)
+from src.process.backend_process import STOP_KILL_WAIT_S, STOP_TERMINATE_WAIT_S
 from src.process.serving_state import LOAD_DEADLINE_S
 from tray import tray
 
@@ -18,6 +14,6 @@ def test_model_wait_outlasts_the_hub_load_budget():
 
 
 def test_admin_call_outlasts_a_full_backend_stop():
-    """A model stop can run the whole CTRL_BREAK, terminate, kill sequence."""
-    worst_stop_s = STOP_GRACE_S + STOP_TERMINATE_WAIT_S + STOP_KILL_WAIT_S
+    """A model stop can run the whole terminate, kill sequence."""
+    worst_stop_s = STOP_TERMINATE_WAIT_S + STOP_KILL_WAIT_S
     assert tray.ADMIN_CALL_TIMEOUT_S > worst_stop_s
