@@ -9,6 +9,14 @@
 #
 # Whisper stays enabled as the fallback ASR model, addressable by its id.
 
+# Optional: the Foundry Local model cache folder. Unset, it is Lite's own
+# (~/.local-llm-hub-lite/cache/models). Set it to reuse a cache that already
+# holds the ASR variant; the env var LOCAL_LLM_HUB_LITE_FOUNDRY_CACHE_DIR
+# overrides it. A relative path is read from the repo root; `~` and
+# environment variables expand.
+# foundry:
+#   model_cache_dir: "~/my-foundry-cache"
+
 hosts:
   local:
     enabled: [qwen35_4b, nemotron4b, nemotron_asr, whisper]

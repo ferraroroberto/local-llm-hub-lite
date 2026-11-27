@@ -6,7 +6,8 @@ already loaded), then serves on the row's loopback port:
 
 - ``GET /health``: ``engine`` and ``model`` (the exact catalog variant), so a
   client sharing the port (Voice Transcriber) can confirm what answers
-  before adopting it, not only that something does.
+  before adopting it, not only that something does; ``model_cache`` names the
+  cache folder, which setting chose it and whether it is still there.
 - ``GET /v1/models``: the one variant served.
 - ``POST /v1/audio/transcriptions``: the OpenAI multipart shape, 16-bit PCM
   WAV in, ``{"text": ...}`` out.
@@ -107,6 +108,8 @@ def build_app(model: Model, variant: Any) -> FastAPI:
     app = FastAPI(title=f"foundry-local worker: {model.id}")
     # One live session at a time: the variant is a single in-process model.
     lock = threading.Lock()
+    # Fixed at SDK initialisation, so read once; only the folder state is live.
+    cache = runtime.model_cache()
     identity = {
         "engine": ENGINE_FOUNDRY,
         "model": model.runtime_model,
@@ -118,7 +121,8 @@ def build_app(model: Model, variant: Any) -> FastAPI:
 
     @app.get("/health")
     def health() -> dict:
-        return {"status": "ok", **identity}
+        model_cache = {"path": str(cache.path), "source": cache.source, "state": cache.state()}
+        return {"status": "ok", **identity, "model_cache": model_cache}
 
     @app.get("/v1/models")
     def models() -> dict:
