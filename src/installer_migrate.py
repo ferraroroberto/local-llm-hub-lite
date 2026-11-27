@@ -1,6 +1,7 @@
 """Move an installed app into a fresh clone, then prove the clone is the copy that serves.
 
-Vendored verbatim (manifest key ``installer_migrate``), beside ``src/installer.py``.
+Vendored verbatim (manifest key ``installer_migrate``), beside ``src/installer.py`` and
+``src/installer_declaration.py`` (the ``.fleet.toml`` declaration, loaded by path).
 Two entries, both stdlib only (schema: project-scaffolding ``docs/installer.md``):
 
 * ``setup.bat -MigrateFrom <old folder>`` runs in a fresh clone. ``installer.py``
@@ -14,11 +15,13 @@ Two entries, both stdlib only (schema: project-scaffolding ``docs/installer.md``
   an install at the same path: stop, rename to a backup, clone, then ``-MigrateFrom``
   the backup.
 
-Verify passes only when the declared endpoint serves this clone's ``HEAD`` and the
-process listening on the port runs from this clone, so an old copy still serving
-the port fails it. A fact a probe cannot establish is ``unknown`` and fails the run.
-No config or secret value is ever printed: files and keys are named, values never.
-``-WhatIf`` reports every step and changes nothing; ``-Json`` prints the report as JSON.
+Verify passes only when the endpoint serves this clone's ``HEAD`` and the process
+listening on the port runs from this clone, so an old copy still serving the port
+fails it. The port is the one this PC's config sets (``port_config``), the declared
+one as fallback, and the scheme is whichever of http and https answers. A fact a
+probe cannot establish is ``unknown`` and fails the run. No config or secret value
+is ever printed: files and keys are named, values never. ``-WhatIf`` reports every
+step and every file it would copy, and changes nothing; ``-Json`` prints the report as JSON.
 """
 
 from __future__ import annotations
@@ -26,6 +29,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import http.client
+import importlib.util
 import json
 import os
 import re
@@ -36,10 +40,10 @@ import sys
 import time
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 # A vendor-verbatim file keeps its own copy of the no-console flag: it cannot import the adopter's tree.
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -71,113 +75,47 @@ PYTHON_NAMES = ("python.exe", "pythonw.exe", "python", "pythonw", "py.exe")
 DB_SUFFIXES = (".sqlite", ".sqlite3", ".db")
 # Live SQLite sidecars: copying one beside a database another process writes corrupts the copy.
 DB_SIDECARS = ("-wal", "-shm", "-journal")
-DEFAULT_START = ["tray.bat", "--restart"]
 START_LOG = "migrate-start.log"
-DEFAULT_VERSION_PATH = "/api/version"
 DATA_ROOT_ENV = "FLEET_DATA_ROOT"
 # no-drive-path-exempt: the fleet-wide runtime-data root is one fixed, documented location (src/runtime_data.py)
 WINDOWS_DATA_ROOT = Path("C:/sqlite")
 # A path in free text ends at a separator, a quote, a space or the end; `app` must not match `app.bak-1`.
 PATH_END = r"(?=$|[\\/\"'\s;,])"
-SHARED_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 Runner = Callable[..., "subprocess.CompletedProcess[Any]"]
 
 
 # ---------------------------------------------------------------- the declaration
 
-@dataclass
-class Endpoint:
-    """Where the app answers ``{git_sha, built_at}``; always asked on loopback."""
-
-    scheme: str = "http"
-    port: int = 0
-    version_path: str = DEFAULT_VERSION_PATH
-    self_signed: bool = False  # accept any certificate, which is safe only because the host is 127.0.0.1
-
-
-@dataclass
-class Migration:
-    """``[install.migrate]`` and ``[install.endpoint]`` of a ``.fleet.toml``."""
-
-    copy: list[str] = field(default_factory=list)
-    secrets: list[str] = field(default_factory=list)
-    shared: list[str] = field(default_factory=list)
-    start: list[str] = field(default_factory=lambda: list(DEFAULT_START))
-    endpoint: Endpoint | None = None
+def _load_declaration() -> ModuleType:
+    """``installer_declaration.py`` from this file's folder, by path: ``-I`` keeps the folder off ``sys.path``."""
+    path = Path(__file__).with_name("installer_declaration.py")
+    spec = importlib.util.spec_from_file_location("installer_declaration", path)
+    if spec is None or spec.loader is None or not path.is_file():
+        raise SystemExit(f"setup.bat: {path.name} is missing beside {Path(__file__).name}; vendor it to migrate")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module  # dataclasses resolve their module by name
+    spec.loader.exec_module(module)
+    return module
 
 
-def _relative_list(table: dict[str, Any], key: str, where: str) -> list[str]:
-    value = table.get(key, [])
-    if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
-        raise ValueError(f"{where} {key} must be a list of non-empty strings")
-    for item in value:
-        parts = Path(item.replace("\\", "/")).parts
-        if Path(item).is_absolute() or ".." in parts or re.match(r"^[A-Za-z]:", item):
-            raise ValueError(f"{where} {key} entry {item!r} must be a path inside the repo")
-    return [item.replace("\\", "/").rstrip("/") for item in value]
-
-
-def _port(value: Any) -> int:
-    text = str(value).strip().lstrip(":")
-    if isinstance(value, bool) or not text.isdigit() or not 0 < int(text) < 65536:
-        raise ValueError("[install.endpoint] port must be a TCP port")
-    return int(text)
-
-
-def parse_endpoint(table: Any, top_port: Any) -> Endpoint | None:
-    """``[install.endpoint]``; its port falls back to the top-level ``port``. No table is None."""
-    if table is None:
-        return None
-    if not isinstance(table, dict):
-        raise ValueError("[install.endpoint] must be a table")
-    scheme = table.get("scheme", "http")
-    if scheme not in ("http", "https"):
-        raise ValueError('[install.endpoint] scheme must be "http" or "https"')
-    if "port" not in table and top_port is None:
-        raise ValueError("[install.endpoint] needs a port (or a top-level port)")
-    path = table.get("version_path", DEFAULT_VERSION_PATH)
-    if not isinstance(path, str) or not path.startswith("/"):
-        raise ValueError('[install.endpoint] version_path must start with "/"')
-    self_signed = table.get("self_signed", False)
-    if not isinstance(self_signed, bool):
-        raise ValueError("[install.endpoint] self_signed must be true or false")
-    return Endpoint(scheme=scheme, port=_port(table.get("port", top_port)), version_path=path,
-                    self_signed=self_signed)
-
-
-def parse_migration(data: dict[str, Any]) -> Migration:
-    """The migration declaration from a parsed ``.fleet.toml``; ValueError names the first bad key."""
-    install = data.get("install", {})
-    if not isinstance(install, dict):
-        raise ValueError("[install] must be a table")
-    table = install.get("migrate")
-    if not isinstance(table, dict):
-        raise ValueError("[install.migrate] is not declared")
-    where = "[install.migrate]"
-    mig = Migration(copy=_relative_list(table, "copy", where), secrets=_relative_list(table, "secrets", where))
-    shared = table.get("shared", [])
-    if not isinstance(shared, list) or not all(isinstance(n, str) and SHARED_NAME.fullmatch(n) for n in shared):
-        raise ValueError(f"{where} shared must be a list of runtime-data folder names, not paths")
-    mig.shared = list(shared)
-    start = table.get("start", DEFAULT_START)
-    if not isinstance(start, list) or not start or not all(isinstance(part, str) and part for part in start):
-        raise ValueError(f"{where} start must be a non-empty list of strings")
-    mig.start = list(start)
-    mig.endpoint = parse_endpoint(install.get("endpoint"), data.get("port"))
-    return mig
-
-
-def read_fleet_toml(root: Path) -> dict[str, Any]:
-    """``root/.fleet.toml`` parsed; ValueError when it is missing or does not parse."""
-    try:
-        import tomllib
-    except ModuleNotFoundError as exc:
-        raise ValueError("reading .fleet.toml needs Python 3.11 or newer") from exc
-    try:
-        return tomllib.loads((root / ".fleet.toml").read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
-        raise ValueError(f".fleet.toml cannot be read ({type(exc).__name__})") from exc
+if TYPE_CHECKING:
+    from src.installer_declaration import (
+        DEFAULT_START,
+        DEFAULT_VERSION_PATH,
+        Endpoint,
+        Migration,
+        local_port,
+        parse_endpoint,
+        parse_migration,
+        read_fleet_toml,
+    )
+else:
+    _d = sys.modules.get("installer_declaration") or _load_declaration()
+    Endpoint, Migration, parse_endpoint, parse_migration = (_d.Endpoint, _d.Migration, _d.parse_endpoint,
+                                                            _d.parse_migration)
+    local_port, read_fleet_toml = _d.local_port, _d.read_fleet_toml
+    DEFAULT_START, DEFAULT_VERSION_PATH = _d.DEFAULT_START, _d.DEFAULT_VERSION_PATH
 
 
 # ---------------------------------------------------------------- the report
@@ -538,15 +476,15 @@ def _wait_port_free(port: int, report: MigrationReport, snapshot_fn: Callable[[]
 
 # ---------------------------------------------------------------- copy, rebind, secrets, shared
 
-def _copy_file(src: Path, dst: Path, old_running: bool, what_if: bool) -> str:
+def _copy_file(src: Path, dst: Path | None, old_running: bool, what_if: bool) -> str:
     name = src.name.lower()
     if name.endswith(DB_SIDECARS):
         return "sidecar"
     if old_running and name.endswith(DB_SUFFIXES):
         return "held back"
-    if dst.exists():
+    if dst is not None and dst.exists():
         return "kept"
-    if what_if:
+    if what_if or dst is None:
         return "would copy"
     dst.parent.mkdir(parents=True, exist_ok=True)  # runtime-write-exempt: the clone's own ignored config folder
     shutil.copy2(src, dst)  # runtime-write-exempt: copies the owner's ignored config, state or certificate
@@ -557,8 +495,13 @@ COPY_NOTES = {"kept": "already here, never overwritten", "sidecar": "SQLite -wal
               "held back": "a database while the old copy runs; stop it (-StopOld) and run again"}
 
 
-def copy_declared(old: Path, new: Path, mig: Migration, report: MigrationReport, old_running: bool) -> list[str]:
-    """Copy each declared file or folder that is not here yet; returns the repo-relative files (to be) copied."""
+def copy_declared(old: Path, new: Path | None, mig: Migration, report: MigrationReport,
+                  old_running: bool) -> list[str]:
+    """Copy each declared file or folder that is not here yet; returns the repo-relative files (to be) copied.
+
+    ``new`` None is a clone that does not exist yet (``-InPlace -WhatIf``): every file would be copied.
+    Under ``-WhatIf`` each file a folder would copy gets its own row, by name.
+    """
     copied: list[str] = []
     for item in mig.copy:
         src = old / item
@@ -567,18 +510,23 @@ def copy_declared(old: Path, new: Path, mig: Migration, report: MigrationReport,
             continue
         files = [src] if src.is_file() else sorted(p for p in src.rglob("*") if p.is_file())
         counts: Counter[str] = Counter()
+        taken: list[str] = []
         for path in files:
             rel = path.relative_to(old).as_posix()
-            state = _copy_file(path, new / rel, old_running, report.what_if)
+            state = _copy_file(path, None if new is None else new / rel, old_running, report.what_if)
             counts[state] += 1
             if state in ("copied", "would copy"):
-                copied.append(rel)
+                taken.append(rel)
+        copied += taken
         if src.is_file():
             state = next(iter(counts))
             report.add("copy", state, item, COPY_NOTES.get(state, ""))
-        else:
-            report.add("copy", "copied" if counts["copied"] else "folder", item + "/",
-                       ", ".join(f"{state} {n}" for state, n in sorted(counts.items())) or "empty")
+            continue
+        report.add("copy", "copied" if counts["copied"] else "folder", item + "/",
+                   ", ".join(f"{state} {n}" for state, n in sorted(counts.items())) or "empty")
+        if report.what_if:
+            for rel in taken:
+                report.add("copy", "would copy", rel)
     return copied
 
 
@@ -690,45 +638,73 @@ def same_commit(served: str, head: str) -> bool:
                                                                        or served.startswith(head))
 
 
-def _wait_for_head(endpoint: Endpoint, head: str, fetch: Callable[[Endpoint], dict[str, Any] | None]) -> str | None:
-    """Poll until the endpoint serves ``head``; returns the last commit it served (None: it never answered)."""
-    deadline, served = time.monotonic() + VERIFY_TIMEOUT_S, None
+def _schemes(endpoint: Endpoint) -> list[Endpoint]:
+    """The declared scheme, then the other one, so a PC that serves plain http (or https) still answers.
+
+    The other https is asked with any certificate accepted: the host is always 127.0.0.1.
+    """
+    other = "https" if endpoint.scheme == "http" else "http"
+    return [endpoint, replace(endpoint, scheme=other, self_signed=other == "https")]
+
+
+def _url(endpoint: Endpoint) -> str:
+    return f"{endpoint.scheme}://127.0.0.1:{endpoint.port}{endpoint.version_path}"
+
+
+def _wait_for_head(endpoint: Endpoint, head: str,
+                   fetch: Callable[[Endpoint], dict[str, Any] | None]) -> tuple[str | None, Endpoint]:
+    """Poll until either scheme serves ``head``; the last commit served (None: no answer) and the scheme that said it."""
+    deadline, served, answered = time.monotonic() + VERIFY_TIMEOUT_S, None, endpoint
     # request-budget-exempt: a one-shot setup poll of loopback, capped by VERIFY_TIMEOUT_S, ends when HEAD is served
     while True:
-        body = fetch(endpoint)
-        if body is not None:
-            served = str(body.get("git_sha") or "")
-            if same_commit(served, head):
-                return served
+        for candidate in _schemes(endpoint):
+            body = fetch(candidate)
+            if body is not None:
+                served, answered = str(body.get("git_sha") or ""), candidate
+                if same_commit(served, head):
+                    return served, candidate
         if time.monotonic() >= deadline:
-            return served
+            return served, answered
         time.sleep(POLL_S)
 
 
 def verify(root: Path, old: Path | None, mig: Migration, report: MigrationReport, runner: Runner,
            snapshot_fn: Callable[[], Snapshot | None],
            fetch: Callable[[Endpoint], dict[str, Any] | None] = fetch_version) -> None:
-    """Pass only when the endpoint serves this clone's HEAD and the process on its port runs from this clone."""
-    if report.what_if:
-        report.add("verify", "would check", "endpoint", "serves this clone's HEAD from a process in this clone")
-        return
+    """Pass only when the endpoint serves this clone's HEAD and the process on its port runs from this clone.
+
+    The port is the one this PC's config sets (``port_config``), the declared one as fallback; the scheme
+    is whichever of http and https answers on it.
+    """
     endpoint = mig.endpoint
     if endpoint is None:
-        report.add("verify", UNKNOWN, "endpoint", "no [install.endpoint] declared, so nothing proves the clone serves")
+        report.add("verify", "would be unknown" if report.what_if else UNKNOWN, "endpoint",
+                   "no [install.endpoint] declared, so nothing proves the clone serves")
         return
-    where = f"{endpoint.scheme}://127.0.0.1:{endpoint.port}{endpoint.version_path}"
+    # Under -WhatIf the clone has no copied config yet; the old copy's is what it will get.
+    port, source = local_port(old if report.what_if and old is not None else root, endpoint)
+    if port is None:
+        report.add("verify", UNKNOWN, "endpoint port", source)
+        return
+    endpoint = replace(endpoint, port=port)
+    if report.what_if:
+        report.add("verify", "would check", _url(endpoint), f"port from {source}; serves this clone's HEAD "
+                   "from a process in this clone, on http or https")
+        return
     head = git(["rev-parse", "HEAD"], root, runner)
     if not head:
         report.add("verify", UNKNOWN, "this clone's HEAD", "git could not read it")
         return
-    served = _wait_for_head(endpoint, head, fetch)
+    served, answered = _wait_for_head(endpoint, head, fetch)
     if served is None:
-        report.add("verify", FAILED, where, f"no answer within {VERIFY_TIMEOUT_S} s")
+        report.add("verify", FAILED, _url(endpoint), f"no answer on http or https within {VERIFY_TIMEOUT_S} s "
+                   f"(port from {source})")
     elif not same_commit(served, head):
-        report.add("verify", FAILED, where, f"serves {served[:12] or 'no git_sha'}, this clone is {head[:12]}")
+        report.add("verify", FAILED, _url(answered), f"serves {served[:12] or 'no git_sha'}, "
+                   f"this clone is {head[:12]}")
     else:
-        report.add("verify", OK, where, f"serves {head[:12]}")
-    _verify_owner(root, old, endpoint.port, report, snapshot_fn)
+        report.add("verify", OK, _url(answered), f"serves {head[:12]} (port from {source})")
+    _verify_owner(root, old, port, report, snapshot_fn)
 
 
 def _verify_owner(root: Path, old: Path | None, port: int, report: MigrationReport,
@@ -811,7 +787,7 @@ def migrate(root: Path, old: Path, *, installer: ModuleType, what_if: bool, stop
         return report
     snap = snapshot_fn()
     inventory(old, report, runner, snap)
-    port = mig.endpoint.port if mig.endpoint else None
+    port = local_port(old, mig.endpoint)[0] if mig.endpoint else None
     if stop:
         stop_old(old, port, report, runner, snapshot_fn)
         if report.failed:

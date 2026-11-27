@@ -2,8 +2,8 @@
 
 Vendored verbatim (manifest key ``installer_inplace``), beside ``src/installer.py`` and
 ``src/installer_migrate.py`` (schema: project-scaffolding ``docs/installer.md``).
-``setup.bat -InPlace`` copies this file and ``installer_migrate.py`` to a temporary
-folder and runs this one from there with the system python, because Windows refuses
+``setup.bat -InPlace`` copies this file, ``installer_migrate.py`` and ``installer_declaration.py`` to a
+temporary folder and runs this one from there with the system python, because Windows refuses
 to rename a folder that a running process, or a process's current folder, is inside.
 
 One run, repeatable any number of times:
@@ -17,7 +17,8 @@ One run, repeatable any number of times:
 
 The path does not change, so whatever stores it (a launcher's app list, a Startup
 link) needs no edit. A failed clone renames the backup back when it can.
-``-WhatIf`` shows the backup name and every step, and changes nothing.
+``-WhatIf`` shows the backup name, every step and every file the migration would
+copy (by name, from this folder's declaration), and changes nothing.
 """
 
 from __future__ import annotations
@@ -62,12 +63,28 @@ def backup_path(folder: Path, today: datetime.date) -> Path:
         n += 1
 
 
-def _declared_port(folder: Path) -> int | None:
+def _declaration(folder: Path) -> tuple[Any, str]:
+    """The folder's own migration declaration, or (None, why): the fresh clone reads its own, normally the same."""
     try:
-        endpoint = m.parse_migration(m.read_fleet_toml(folder)).endpoint
-    except ValueError:
-        return None
-    return endpoint.port if endpoint else None
+        return m.parse_migration(m.read_fleet_toml(folder)), ""
+    except ValueError as exc:
+        return None, str(exc)
+
+
+def _port(folder: Path, mig: Any) -> int | None:
+    """The port the folder's app serves on this PC (its config first), to wait on after the stop."""
+    return m.local_port(folder, mig.endpoint)[0] if mig is not None and mig.endpoint else None
+
+
+def _preview_copy(folder: Path, mig: Any, why: str, report: Any) -> None:
+    """Every file the migration would copy from the backup into the empty clone, by name, never by value.
+
+    No rebind is listed: the configs name the original path, which is where the clone lands.
+    """
+    if mig is None:
+        report.add("copy", m.UNKNOWN, ".fleet.toml", f"the copy list cannot be shown: {why}")
+        return
+    m.copy_declared(folder, None, mig, report, old_running=False)  # the stop runs before the copy
 
 
 def guard_in_place(folder: Path, report: Any, runner: Runner) -> str | None:
@@ -143,15 +160,18 @@ def in_place(folder: Path, *, what_if: bool, as_json: bool, runner: Runner = sub
     if url is None:
         return report
     m.inventory(folder, report, runner, snapshot_fn())
-    m.stop_old(folder, _declared_port(folder), report, runner, snapshot_fn)
+    mig, why = _declaration(folder)
+    m.stop_old(folder, _port(folder, mig), report, runner, snapshot_fn)
     if report.failed:
         return report
     backup = backup_path(folder, today or datetime.date.today())
     if what_if:
+        _preview_copy(folder, mig, why, report)
         report.add("in place", "would rename", folder.name, f"to {backup.name}, kept as a working checkout")
         report.add("in place", "would clone", url, f"into {folder}")
-        report.add("in place", "would run", "setup.bat -MigrateFrom", f"{backup.name}: copy, rebind, secrets, "
-                   "install, start, verify, from the fresh clone's [install.migrate]")
+        report.add("in place", "would run", "setup.bat -MigrateFrom", f"{backup.name}: copy (as listed, from "
+                   "this folder's [install.migrate]; the clone's own is the one used), secrets, install, start, "
+                   "verify")
         return report
     try:
         os.rename(folder, backup)

@@ -191,8 +191,8 @@ def test_migration_declaration_carries_this_apps_local_files_and_nothing_tracked
 @pytest.mark.parametrize(
     "args, exit_code, banner",
     [([], 0, True), (["-WhatIf"], 0, True), (["-MigrateFrom", "old", "-Json"], 0, False),
-     (["--migrate-from=old"], 0, False), ([], 3, False)],
-    ids=["plain", "what-if", "migrate-json", "migrate-long", "failed"],
+     (["--migrate-from=old"], 0, False), (["-Json"], 0, False), (["-WhatIf", "--json"], 0, False), ([], 3, False)],
+    ids=["plain", "what-if", "migrate-json", "migrate-long", "json", "what-if-json-long", "failed"],
 )
 def test_setup_bat_adds_its_banner_to_a_plain_run_only(
     tmp_path: Path, args: list[str], exit_code: int, banner: bool
