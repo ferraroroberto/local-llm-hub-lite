@@ -85,7 +85,10 @@ windows_only_ratchet = { src = "scripts/windows_only_ratchet.py", sha = "48db213
 port_host_ratchet = { src = "scripts/port_host_ratchet.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/port_host_ratchet.py" }
 clean_tree_ratchet = { src = "scripts/clean_tree_ratchet.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/clean_tree_ratchet.py" }
 ratchet_baseline = { src = "scripts/ratchet_baseline.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/ratchet_baseline.py" }
-installer = { src = "src/installer.py", sha = "f774234582bc8fe2ce2e44804275b690b192f40d", dest = "src/installer.py" }
+installer = { src = "src/installer.py", sha = "886f342372f517b89c4b42f548c08347aef6e7e4", dest = "src/installer.py" }
+installer_migrate = { src = "src/installer_migrate.py", sha = "886f342372f517b89c4b42f548c08347aef6e7e4", dest = "src/installer_migrate.py", requires = ["installer"] }
+installer_inplace = { src = "src/installer_inplace.py", sha = "886f342372f517b89c4b42f548c08347aef6e7e4", dest = "src/installer_inplace.py", requires = ["installer_migrate"] }
+install_standard_ratchet = { src = "scripts/install_standard_ratchet.py", sha = "886f342372f517b89c4b42f548c08347aef6e7e4", dest = "scripts/install_standard_ratchet.py", requires = ["ratchet_baseline"] }
 
 # [static_ratchet] -- the scaffold's baseline-and-ratchet static analysis. The gate
 # (scripts/verify-before-ship.ps1) runs scripts/static_ratchet.py, which fails on a
@@ -105,6 +108,23 @@ ps_script = { src = "src/ps_script.py", sha = "2d786d295c9b8d545aaf3570388963809
 requirements = "requirements.txt"
 samples      = ["config"]
 settings     = ["config/webapp_config.json"]
+
+# [install.endpoint] and [install.migrate] -- what `setup.bat -MigrateFrom` and `-InPlace` read
+# (project-scaffolding docs/installer.md, "Migrating an existing install"). The port is the
+# top-level `port`, so it is not repeated here; the start command is the default `tray.bat --restart`.
+[install.endpoint]
+scheme       = "http"
+version_path = "/admin/api/version"
+self_signed  = false
+
+# `copy` is this PC's own ignored files: the two configs, the model overlay, and the downloaded
+# backend binaries and weights, which would otherwise be a multi-GB download. Logs stay behind.
+# config/models.yaml is tracked, so the clone brings its own. The usage database lives under
+# `shared` and is never copied.
+[install.migrate]
+copy    = ["config/webapp_config.json", "config/app_password.json", "config/models.local.yaml", "vendor", "models"]
+secrets = ["config/webapp_config.json", "config/app_password.json"]
+shared  = ["local-llm-hub-lite"]
 
 # The admin sign-in hash is set by the owner (python -m src.password set) and has no sample. The
 # probe reads what is stored, not whether a file exists: available for a usable hash or the old
@@ -500,6 +520,15 @@ baseline = ".ratchets/windows-only.json"
 [port_host_ratchet]
 enabled   = true
 resolvers = ["src/host_profile.py"]
+
+# [install_standard_ratchet] -- scripts/install_standard_ratchet.py fails when an installer
+# module is missing, undeclared or not the scaffold's current content, when [install.migrate]
+# does not parse, or when docs/install.md lacks an Install, Update or Migrate section, beyond
+# .ratchets/install-standard.json. Exit 3 is "not confirmed", never clean. Mechanism:
+# project-scaffolding docs/install-standard-ratchet.md.
+[install_standard_ratchet]
+enabled  = true
+baseline = ".ratchets/install-standard.json"
 
 # [clean_tree_ratchet] -- scripts/clean_tree_ratchet.py runs the smoke below once and fails when
 # it adds, changes or deletes a path in the work tree beyond .ratchets/clean-tree.json. The

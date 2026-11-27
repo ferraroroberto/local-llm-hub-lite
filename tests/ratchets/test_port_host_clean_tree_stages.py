@@ -41,6 +41,17 @@ def test_stages_run_the_scripts_directly_between_windows_only_and_the_probe() ->
         assert "||" not in body and "$null" not in body  # nothing folds a failure
 
 
+def test_install_standard_stage_runs_the_script_directly_after_port_host() -> None:
+    assert (
+        GATE.index('Step "port host ratchet"')
+        < GATE.index('Step "install standard ratchet"')
+        < GATE.index('Step "clean tree ratchet"')
+    )
+    body = _stage_body("install standard ratchet")
+    assert r"& $Python scripts\install_standard_ratchet.py" in body
+    assert "||" not in body and "$null" not in body
+
+
 def test_host_profile_prints_the_configured_hub_port() -> None:
     from src.host_profile import hub_port
 

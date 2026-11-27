@@ -18,7 +18,8 @@ from typing import Any
 
 import pytest
 
-from src import installer, password
+from src import installer, installer_migrate, password
+from src.host_profile import hub_port
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXED_NOW = datetime.datetime(2026, 1, 2, 3, 4, 5)
@@ -172,12 +173,44 @@ def test_password_item_counts_the_old_password_the_sign_in_still_accepts(passwor
     assert _password_state(password_clone) == "available"
 
 
-def test_playbook_names_this_apps_carry_over_files_and_the_readme_links_it() -> None:
+def test_migration_declaration_carries_this_apps_local_files_and_nothing_tracked() -> None:
+    migration = installer_migrate.parse_migration(installer_migrate.read_fleet_toml(REPO_ROOT))
+    assert migration.endpoint is not None
+    assert (migration.endpoint.port, migration.endpoint.version_path) == (hub_port(), "/admin/api/version")
+    assert set(migration.secrets) <= set(migration.copy)
+    assert migration.shared == ["local-llm-hub-lite"]
+    # An ignored file leaves the fresh clone clean; a tracked or unignored one would not.
+    for item in migration.copy:
+        path = item if (REPO_ROOT / item).suffix else f"{item}/probe"
+        ignored = subprocess.run(["git", "check-ignore", "-q", "--", path], cwd=REPO_ROOT, timeout=60,
+                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        assert ignored.returncode == 0, item
+
+
+@pytest.mark.windows_only
+@pytest.mark.parametrize(
+    "args, exit_code, banner",
+    [([], 0, True), (["-WhatIf"], 0, True), (["-MigrateFrom", "old", "-Json"], 0, False),
+     (["--migrate-from=old"], 0, False), ([], 3, False)],
+    ids=["plain", "what-if", "migrate-json", "migrate-long", "failed"],
+)
+def test_setup_bat_adds_its_banner_to_a_plain_run_only(
+    tmp_path: Path, args: list[str], exit_code: int, banner: bool
+) -> None:
+    shutil.copyfile(REPO_ROOT / "setup.bat", tmp_path / "setup.bat")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "installer.py").write_text(f"raise SystemExit({exit_code})\n", encoding="utf-8")
+    done = subprocess.run(["cmd.exe", "/d", "/c", str(tmp_path / "setup.bat"), *args], cwd=tmp_path, timeout=60,
+                          capture_output=True, text=True, errors="replace",
+                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    assert done.returncode == exit_code
+    assert ("Next steps" in done.stdout) is banner
+
+
+def test_playbook_names_what_the_migration_copies_and_the_readme_links_it() -> None:
     playbook = (REPO_ROOT / "docs" / "install.md").read_text(encoding="utf-8")
-    for heading in ("## Fresh PC", "## Update", "## Migrate from an existing install", "## Uninstall"):
-        assert heading in playbook
-    migrate = playbook.split("## Migrate from an existing install")[1].split("\n## ")[0]
-    for carried in ("config/webapp_config.json", "config/app_password.json", "config/models.yaml",
-                    "usage.sqlite3", "vendor/", "models/"):
+    migrate = playbook.split("\n## Migrate\n")[1]
+    declared = installer_migrate.parse_migration(installer_migrate.read_fleet_toml(REPO_ROOT)).copy
+    for carried in (*declared, "config/models.yaml", "usage.sqlite3"):
         assert carried in migrate
     assert "docs/install.md" in (REPO_ROOT / "README.md").read_text(encoding="utf-8")

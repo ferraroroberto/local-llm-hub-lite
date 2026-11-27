@@ -1,15 +1,15 @@
-# Install, update and move Local LLM Hub Lite
+# Install, update and migrate Local LLM Hub Lite
 
-Local LLM Hub Lite moves to another Windows PC the way any app in the toolbox does: clone it and run one `setup.bat`. An update is a pull plus a restart. Neither ever resets or overwrites what a PC has configured.
+Local LLM Hub Lite installs, updates and migrates the way any app in the toolbox does: clone it and run one `setup.bat`. An update is a pull plus a restart. A migration, onto a fresh clone on the same PC or on another one, is one `setup.bat` call. None of them ever resets or overwrites what a PC has configured.
 
-## What you need
+## Install
+
+You need:
 
 - Windows 10 or 11, `git`, and Python 3.12 or newer (the `py` launcher, or `python` on `PATH`).
 - Disk and bandwidth for the backends: `python -m src.install --fix` downloads the llama.cpp and whisper.cpp binaries into `vendor/` and the model weights into `models/` (several GB).
 - A GPU is optional. `src.install` reports what it finds.
 - Node.js is only for the pre-ship gate, never to run the hub.
-
-## Fresh PC
 
 ```powershell
 git clone https://github.com/ferraroroberto/local-llm-hub-lite
@@ -30,13 +30,22 @@ Setup has succeeded when it ends with `Setup complete` and exits 0; an optional 
 
 - **llama.cpp / whisper.cpp binaries and model weights:** `.\.venv\Scripts\python.exe -m src.install --fix` downloads them. It is `off` until they are there, and `unknown` on a first `-WhatIf` run because the venv does not exist yet.
 - **Admin sign-in password:** optional, only for callers that are not on this PC. Set it with `.\.venv\Scripts\python.exe -m src.password set` (it prompts twice and stores a salted hash in `config/app_password.json`). The item is `available` when a usable hash is stored or the old `auth_password` in `config/webapp_config.json` is set, `off` when there is neither (an empty or corrupt password file included), and `unknown` when a file it needs cannot be read or the venv does not exist yet.
-- The bearer token for non-loopback callers is minted in `config/webapp_config.json` the first time the tray boots; nothing to do.
-
 - **Foundry Local runtime** (Nemotron chat and ASR): `off` until this PC opts into the Nemotron roster with `.\.venv\Scripts\python.exe -m src.foundry setup` (installs the pinned SDK extra, fetches and verifies the exact ASR variant, writes the machine-local `config/models.local.yaml`); a PC that skips it keeps Qwen and Whisper. [foundry-local.md](foundry-local.md) has the details.
+
+The bearer token for non-loopback callers is minted in `config/webapp_config.json` the first time the tray boots; nothing to do.
 
 `.\setup.bat -WhatIf` lists every change it would make and makes none. This app has no log-on autostart of its own, so `-Startup` does nothing here; to start the hub at log on, put a shortcut to `tray.bat` in the Startup folder (`shell:startup`).
 
 The hub serves <http://127.0.0.1:8020/admin/> once `tray.bat` has started it; the port is `hub.port` in `config/models.yaml`.
+
+### Uninstall
+
+1. Quit the tray icon from its menu; that stops the hub and its backends.
+2. Remove the `tray.bat` shortcut from `shell:startup`, if you added one.
+3. Delete the usage log folder `C:\sqlite\local-llm-hub-lite\` if you do not want the history.
+4. Delete the repo folder. Keep a copy of the files listed under "Migrate" first if you may want them back.
+
+The app registers nothing outside its folder and `C:\sqlite\local-llm-hub-lite\`: no service, scheduled task, registry key or hook in another tool.
 
 ## Update
 
@@ -53,29 +62,43 @@ No tracked file is rewritten at runtime, so the pull always fast-forwards. `setu
 - `config/app_password.json` has no sample and is never written by `setup.bat`.
 - A second run reports `unchanged` and writes nothing.
 
-## Migrate from an existing install
+## Migrate
 
-Use this on a PC that already runs an older copy of Local LLM Hub Lite: one that may not be a git clone, and may live at another path. The old copy keeps running until the new one is verified, and it is deleted only when you say so.
+What moves is declared in `[install.migrate]` of `.fleet.toml`. The installer does the whole move; nothing here or in `setup.bat` deletes the old copy.
 
-1. **Clone fresh beside it.** Clone into a new folder next to the old one (`git clone https://github.com/ferraroroberto/local-llm-hub-lite <NEW FOLDER>`); never clone over the old folder.
-2. **Copy this PC's own files across.** From the old folder into the new one, copy only these, keeping their relative paths (all are gitignored except `config/models.yaml`, so nothing tracked is overwritten):
-   - configs: `config/webapp_config.json` (the bearer token, the legacy login password, the extra allowed IPs, the CORS origins and the Telegram alert settings) and `config/app_password.json` (the admin sign-in hash, when one was set). Move them as files; never paste their contents into a chat or an issue.
-   - the model overlay: `config/models.local.yaml` (gitignored), when the old copy had one; it carries this PC's roster, Nemotron included. A copy that instead edited `config/models.yaml` for Nemotron runs `python -m src.foundry setup` in the new folder rather than carrying the edit over.
-   - the model registry: `config/models.yaml` is tracked, so a copy of an old, edited one would be overwritten by or conflict with the new version. Compare the old file with the new one (`git diff --no-index <OLD FOLDER>\config\models.yaml config\models.yaml`) and carry over only the choices the old copy made on this PC: the `hosts.local.enabled` list, the `hub.port` and any backend port or `args` you changed.
-   - the backends and weights: `vendor/` (llama.cpp and whisper.cpp binaries) and `models/` (GGUF and BIN weights). Copying them saves the multi-GB download; skip them and `src.install --fix` downloads them again. Run `.\.venv\Scripts\python.exe -m src.install` afterwards: any binary or weight that is missing or from a layout the new copy does not expect is reported there.
-   - state: the usage log, `usage.sqlite3` (with its `-wal` and `-shm` files) in `C:\sqlite\local-llm-hub-lite\`. It lives outside the repo folder, so the new copy at any path finds it again unchanged; copy it only to a PC whose `C:\sqlite\local-llm-hub-lite\` is empty, and stop the old hub first so the file is not mid-write. `FLEET_DATA_ROOT` or `LOCAL_LLM_HUB_LITE_DATA_DIR` moves it elsewhere; use the same setting on the new PC.
-   - certificates and secrets: none. This app serves plain HTTP and keeps no certificate, `.env` or key file. Its logs (`data/logs/`, `webapp/auth.log`, `tray-crash.log`) are history, not configuration: leave them behind.
-3. **Top them up.** Run `.\setup.bat -WhatIf` in the new folder and read what it would change, then `.\setup.bat`. `config/webapp_config.json` gains only the keys it lacks; the values you copied stay as they were.
-4. **Stop the old copy.** Quit its tray icon from the tray menu; that stops the hub and its backends. Then confirm the hub and backend ports from `config/models.yaml` (`:8020`, `:8021` and `:8022` by default) are free: the Hub tab's install checks and `.\.venv\Scripts\python.exe -m src.install` mark a busy port `warn`. Remove the old copy's shortcut in `shell:startup`, if it had one.
-5. **Start the new one.** `.\tray.bat`, and put a shortcut to it in `shell:startup` if it should start at log on.
-6. **Verify it.** `GET http://127.0.0.1:8020/health` answers 200, `GET /admin/api/version` shows the new checkout's commit as `git_sha`, and the Models tab starts a backend. Send one real request from a client that used the old hub; a client with the old bearer token must still be accepted. If anything is wrong, quit the new tray and start the old one again: it is untouched.
-7. **Retire the old folder, only after you confirm.** Nothing in this playbook or in `setup.bat` deletes the old copy. When you are satisfied, rename it first (for example `<OLD FOLDER>.retired`) and run on the new copy for a while; delete it yourself once you are sure. An agent working through this playbook asks you before it deletes anything.
+| Copied | What it is |
+| --- | --- |
+| `config/webapp_config.json` | the bearer token, legacy login password, extra allowed IPs, CORS origins and Telegram alert settings (compared by hash as a secret) |
+| `config/app_password.json` | the admin sign-in hash, when one was set (compared by hash as a secret) |
+| `config/models.local.yaml` | this PC's roster overlay, Nemotron included, when the old copy had one |
+| `vendor/`, `models/` | the llama.cpp / whisper.cpp binaries and model weights, so nothing is downloaded again; it needs several GB of free disk |
 
-## Uninstall
+The usage database (`usage.sqlite3` in `C:\sqlite\local-llm-hub-lite\`) lives outside the repo folder and is shared: it stays where it is and the new copy finds it unchanged. Logs (`data/logs/`, `webapp/auth.log`, `tray-crash.log`) are history and are not copied.
 
-1. Quit the tray icon from its menu; that stops the hub and its backends.
-2. Remove the `tray.bat` shortcut from `shell:startup`, if you added one.
-3. Delete the usage log folder `C:\sqlite\local-llm-hub-lite\` if you do not want the history.
-4. Delete the repo folder. Keep a copy of the files listed under "Migrate" first (`config/webapp_config.json`, `config/app_password.json`, an edited `config/models.yaml`, and `models/` if the weights took long to download) if you may want them back.
+**Reinstall in the same folder (the usual case).** From a terminal whose current folder is outside the app:
 
-The app registers nothing outside its folder and `C:\sqlite\local-llm-hub-lite\`: no service, scheduled task, registry key or hook in another tool.
+```powershell
+cd <PARENT FOLDER>
+.\local-llm-hub-lite\setup.bat -InPlace -WhatIf    # read the backup name and every step; nothing changes
+.\local-llm-hub-lite\setup.bat -InPlace
+```
+
+It stops the hub and its backends, keeps the replaced copy as `local-llm-hub-lite.bak-YYYYMMDD-N`, clones the remote's default branch into the original path and passes only when that clone serves its own commit. The path is unchanged, so a Startup shortcut to `tray.bat` needs no edit.
+
+**Beside it (another folder, or an old copy that is not a git clone):**
+
+```powershell
+git clone https://github.com/ferraroroberto/local-llm-hub-lite <NEW FOLDER>
+cd <NEW FOLDER>
+.\setup.bat -MigrateFrom <OLD FOLDER> -StopOld
+```
+
+Only you can do these steps:
+
+- **Carry a registry edit.** `config/models.yaml` is tracked, so the new clone brings its own. If the old copy edited it, compare (`git diff --no-index <OLD OR BACKUP FOLDER>\config\models.yaml config\models.yaml`), carry over only this PC's own choices (the `hosts.local.enabled` list, `hub.port`, backend ports and `args`) and restart the hub. The installer's verify asks the top-level `port` of `.fleet.toml`, so on a PC whose old copy used another `hub.port` it can fail until the edit is carried.
+- **Reinstall Foundry Local**, on a PC that opted into Nemotron: the new `.venv` has no SDK extra, so run `.\.venv\Scripts\python.exe -m src.foundry setup`. It keeps the copied overlay.
+- **Move the usage history to another PC**, if you want it: the move above stays on one PC. With both hubs stopped, copy `usage.sqlite3` (with its `-wal` and `-shm` files) into the new PC's empty `C:\sqlite\local-llm-hub-lite\`. `FLEET_DATA_ROOT` or `LOCAL_LLM_HUB_LITE_DATA_DIR` moves that folder; use the same setting on both.
+- **Repoint** whatever stores the old path, after a `-MigrateFrom` into another folder, such as the Startup shortcut: the run lists what still points at it.
+- **Check a real client.** Send one request from a client that used the old hub; its bearer token must still be accepted, and the Models tab must start a backend.
+- **Fall back** if verify fails (the report names the step): stop the new copy, rename the new folder away and the backup to the original name, and start it; it is untouched.
+- **Retire the backup** once you are sure the new copy works, by deleting it yourself. An agent working through this playbook asks you before it deletes anything.
