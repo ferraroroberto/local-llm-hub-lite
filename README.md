@@ -146,7 +146,7 @@ models:
 roles:  { ... }                     # display card in the Models tab
 ```
 
-This PC's own choices go in the gitignored `config/models.local.yaml`, deep-merged over the registry (mappings merge, lists and values replace), so a pull never conflicts with them. A row that is both `virtual` and runtime-backed is refused (logged, left out of `/v1/models`, an error row in `src.install`) rather than served under the wrong id.
+This PC's own choices go in the gitignored `config/models.local.yaml`, deep-merged over the registry (mappings merge, lists and values replace), so a pull never conflicts with them. An optional `foundry.model_cache_dir` there (env `LOCAL_LLM_HUB_LITE_FOUNDRY_CACHE_DIR`) points the Foundry Local SDK at another [model cache folder](docs/foundry-local.md#model-cache-folder). A row that is both `virtual` and runtime-backed is refused (logged, left out of `/v1/models`, an error row in `src.install`) rather than served under the wrong id.
 
 To add a model: add a row, list its id in `hosts.local.enabled`, run `python -m src.install --fix` (or hit Fix in the admin), start it from the Models tab or `launchers\run_model.bat <id>`.
 

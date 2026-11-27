@@ -12,13 +12,34 @@ An optional model roster for a PC that opts in: **Nemotron 3 Nano 4B** for chat 
 `setup` does, in order:
 
 1. installs `requirements-foundry.txt` (the pinned SDK below) into `.venv`, skipped when that version is already there;
-2. downloads every `engine: foundry-local` row's exact `runtime_model` into the SDK's cache (`~/.local-llm-hub-lite/cache/models`) and checks that exact variant is cached;
+2. downloads every `engine: foundry-local` row's exact `runtime_model` into the [model cache](#model-cache-folder) (skipped when it is already there) and checks that exact variant is cached;
 3. copies `config/models.foundry.yaml` to the machine-local overlay `config/models.local.yaml`, unless one already exists (then it is left alone and the roster is merged by hand);
 4. runs `python -m src.install --fix`, which downloads the Nemotron chat GGUF and anything else the roster lacks.
 
 `setup --no-enable` does steps 1, 2 and 4 without enabling the roster. `python -m src.foundry status` exits 0 when a `foundry-local` row is enabled, the SDK installed and its variant cached, and 1 otherwise. `setup.bat`'s checklist runs it, so a PC that has not opted in reads `off` with the opt-in hint.
 
 The overlay enables `qwen35_4b`, `nemotron4b`, `nemotron_asr` and `whisper`, points the `audio_transcribe` role (and its alias) at `nemotron_asr`, and leaves every other row as shipped. Edit `config/models.local.yaml` for this PC's own changes (a row's `startup: on_demand` on a small GPU, say); `config/models.yaml` stays as pulled.
+
+## Model cache folder
+
+By default the SDK keeps models in Lite's own `~/.local-llm-hub-lite/cache/models`. A PC where that folder cannot get the model, but another folder already holds it, names that folder instead. Nothing assumes any other app's cache exists. The first setting found wins:
+
+| Setting | Where |
+| --- | --- |
+| `LOCAL_LLM_HUB_LITE_FOUNDRY_CACHE_DIR` | environment variable; the hub's backends inherit it, so set it where the tray will see it (a user variable), not only in one shell |
+| `foundry.model_cache_dir` | the gitignored `config/models.local.yaml` |
+| neither | Lite's own default |
+
+```yaml
+foundry:
+  model_cache_dir: "~/my-foundry-cache"
+```
+
+A relative path is read from the repo root; `~` and environment variables expand. A path that is a file is refused. A folder that does not exist yet is not: the SDK downloads into it, so check the spelling. The hub reads the setting at start, so restart it after a change.
+
+To opt in on a PC that already has such a folder, copy `config/models.foundry.yaml` to `config/models.local.yaml`, set the key there, then run `setup`: it leaves the existing overlay alone and fetches nothing the folder already holds.
+
+The worker's log and `src.foundry status` name the folder in use, and the worker's `/health` reports it as `model_cache`: `path`, `source` (`env`, `config` or `default`) and `state` (`present`, `missing`, `not_a_folder`, or `unknown` when the folder cannot be read).
 
 ## Without Foundry Local
 
@@ -32,9 +53,9 @@ Nothing in the hub imports the SDK at load. On a PC without it:
 
 `nemotron_asr` is `backend: whisper` (the OpenAI audio shape), `engine: foundry-local` and `runtime_model: nemotron-3.5-asr-streaming-0.6b-generic-cpu:3`. The hub's process manager spawns `python -m src.foundry.worker nemotron_asr` like any backend: same per-backend log, start, stop, adoption across a hub restart. The worker:
 
-- resolves exactly that catalog variant: an alias (no `:version`), an unknown id or a catalog that hands back another variant is refused;
+- resolves exactly that catalog variant: an alias (no `:version`), an unknown id or a catalog that hands back another variant is refused, with a message naming what was asked and what it resolved to;
 - loads it (reusing it when already loaded, downloading it when missing) before it opens the port, so a reachable port means ready;
-- serves `GET /health` with `engine` (`foundry-local`), `model` (the exact variant), `model_id`, `sdk_version` and `pid`; `GET /v1/models`; and `POST /v1/audio/transcriptions` taking 16-bit PCM WAV and answering `{"text": ...}` (`response_format` `json`, `text` or `verbose_json`; `task=translate` is refused).
+- serves `GET /health` with `engine` (`foundry-local`), `model` (the exact variant), `model_id`, `sdk_version`, `pid` and [`model_cache`](#model-cache-folder); `GET /v1/models`; and `POST /v1/audio/transcriptions` taking 16-bit PCM WAV and answering `{"text": ...}` (`response_format` `json`, `text` or `verbose_json`; `task=translate` is refused).
 
 The streaming Nemotron variants reject the SDK's file transcription ("not a registered multi-modal model type"), so the worker feeds the WAV through the SDK's live transcription session as PCM chunks and returns the final segments.
 

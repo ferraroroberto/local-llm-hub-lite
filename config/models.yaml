@@ -38,6 +38,12 @@
 #                  (caller-sent fields win) — the mechanism behind a
 #                  no-think alias
 #
+# Field reference (foundry block, optional; set it in models.local.yaml):
+#   foundry.model_cache_dir  folder the Foundry Local SDK keeps models in;
+#                  unset = Lite's own ~/.local-llm-hub-lite/cache/models.
+#                  Env override: LOCAL_LLM_HUB_LITE_FOUNDRY_CACHE_DIR
+#                  (docs/foundry-local.md)
+#
 # Field reference (hosts row):
 #   enabled        registry keys this host serves (autostarted/offered)
 #   vram_mb        discrete-GPU VRAM ceiling in MB; optional — unset disables

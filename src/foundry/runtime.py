@@ -8,13 +8,22 @@ entry point that needs the SDK raises :class:`FoundryError` carrying
 
 The SDK runs the model in-process (its native core ships in the wheel), so
 no Foundry Local CLI or service is required.
+
+The model cache is Lite's own per-app folder unless this PC names another one
+(:func:`model_cache`), e.g. a cache that already holds the variant.
 """
 
 from __future__ import annotations
 
 import importlib.metadata
 import logging
+import os
+import stat
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, Optional, Tuple
+
+from .. import host_profile
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +33,13 @@ SDK_PACKAGE = "foundry-local-sdk"
 # streaming Nemotron ASR variant needs. 2.x is a different in-process API.
 SDK_PIN = "1.2.4"
 # Names the SDK's per-app data folder (``~/.local-llm-hub-lite``), which
-# holds its model cache; the hub and its setup command share it.
+# holds its default model cache; the hub and its setup command share it.
 APP_NAME = "local-llm-hub-lite"
+# Overrides the ``foundry.model_cache_dir`` config key; a backend inherits it.
+CACHE_DIR_ENV = "LOCAL_LLM_HUB_LITE_FOUNDRY_CACHE_DIR"
+CACHE_SOURCE_ENV = "env"
+CACHE_SOURCE_CONFIG = "config"
+CACHE_SOURCE_DEFAULT = "default"
 NOT_INSTALLED = (
     "Foundry Local not installed: run `.venv\\Scripts\\python.exe -m src.foundry setup` "
     "(installs requirements-foundry.txt)"
@@ -66,12 +80,60 @@ def _sdk() -> Any:
     return foundry_local_sdk
 
 
+@dataclass(frozen=True)
+class ModelCache:
+    """The folder the SDK keeps models in, and which setting chose it."""
+
+    path: Path
+    source: str
+
+    def state(self) -> str:
+        """``present``, ``missing``, ``not_a_folder``, or ``unknown`` when it cannot be read."""
+        try:
+            mode = self.path.stat().st_mode
+        except FileNotFoundError:
+            return "missing"
+        except OSError:
+            return "unknown"
+        return "present" if stat.S_ISDIR(mode) else "not_a_folder"
+
+
+def model_cache() -> ModelCache:
+    """This PC's model cache: the env override, else the config key, else Lite's default.
+
+    A relative path is read from the repo root, like a row's ``model_path``.
+    """
+    raw, source = os.environ.get(CACHE_DIR_ENV, "").strip(), CACHE_SOURCE_ENV
+    if not raw:
+        section = host_profile._load_config().get("foundry") or {}
+        if not isinstance(section, dict):
+            raise FoundryError("config key `foundry` must be a mapping")
+        value = section.get("model_cache_dir")
+        if value is not None and not isinstance(value, str):
+            raise FoundryError(f"`foundry.model_cache_dir` must be a folder path, got {value!r}")
+        raw, source = (value or "").strip(), CACHE_SOURCE_CONFIG
+    if not raw:
+        # Where the SDK puts it when given only ``app_name``.
+        return ModelCache(Path.home() / f".{APP_NAME}" / "cache" / "models", CACHE_SOURCE_DEFAULT)
+    path = Path(os.path.expandvars(raw)).expanduser()
+    if not path.is_absolute():
+        path = host_profile.PROJECT_ROOT / path
+    return ModelCache(path, source)
+
+
 def open_catalog() -> Any:
     """The SDK catalog, initializing the process-wide manager on first use."""
     sdk = _sdk()
     manager = sdk.FoundryLocalManager.instance
     if manager is None:
-        sdk.FoundryLocalManager.initialize(sdk.Configuration(app_name=APP_NAME))
+        cache = model_cache()
+        state = cache.state()
+        if state == "not_a_folder":
+            raise FoundryError(f"model cache {cache.path} ({cache.source}) is a file, not a folder")
+        # The default is left to the SDK rather than passed back to it.
+        chosen = {} if cache.source == CACHE_SOURCE_DEFAULT else {"model_cache_dir": str(cache.path)}
+        logger.info("ℹ️ Foundry Local model cache: %s (%s, %s)", cache.path, cache.source, state)
+        sdk.FoundryLocalManager.initialize(sdk.Configuration(app_name=APP_NAME, **chosen))
         manager = sdk.FoundryLocalManager.instance
     return manager.catalog
 
@@ -84,8 +146,10 @@ def resolve_variant(catalog: Any, runtime_model: str) -> Any:
     catalog's preferred pick for an alias.
     """
     if not runtime_model or ":" not in runtime_model:
+        resolved = catalog.get_model(runtime_model) if runtime_model else None
+        also = f"; as an alias it resolves to {resolved.id!r}" if resolved is not None else ""
         raise FoundryError(
-            f"runtime model {runtime_model!r} is not an exact catalog variant id (name:version)"
+            f"runtime model {runtime_model!r} is not an exact catalog variant id (name:version){also}"
         )
     variant = catalog.get_model_variant(runtime_model)
     if variant is None:

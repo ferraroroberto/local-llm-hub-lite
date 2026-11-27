@@ -90,22 +90,29 @@ class FakeCatalog:
     def get_model_variant(self, model_id: str) -> Optional[FakeVariant]:
         return self.variants.get(self.redirect.get(model_id, model_id))
 
+    def get_model(self, alias: str) -> Optional[FakeVariant]:
+        """The variant an alias (the id without ``:version``) selects, as the SDK's ``get_model`` does."""
+        return next((v for key, v in self.variants.items() if key.split(":")[0] == alias), None)
+
 
 def install(monkeypatch, catalog: FakeCatalog) -> types.ModuleType:
     """Put a fake ``foundry_local_sdk`` serving ``catalog`` into ``sys.modules``."""
     module = types.ModuleType("foundry_local_sdk")
 
     class Configuration:
-        def __init__(self, app_name: str, **_: object) -> None:
+        def __init__(self, app_name: str, model_cache_dir: Optional[str] = None, **_: object) -> None:
             self.app_name = app_name
+            self.model_cache_dir = model_cache_dir
 
     class FoundryLocalManager:
         instance = None
         initialized_with: List[str] = []
+        cache_dirs: List[Optional[str]] = []
 
         @staticmethod
         def initialize(config: Configuration) -> None:
             FoundryLocalManager.initialized_with.append(config.app_name)
+            FoundryLocalManager.cache_dirs.append(config.model_cache_dir)
             FoundryLocalManager.instance = types.SimpleNamespace(catalog=catalog)
 
     module.Configuration = Configuration
