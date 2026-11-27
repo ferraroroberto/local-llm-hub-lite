@@ -22,6 +22,8 @@ Optional Nemotron roster, for a PC that opts in with `.venv\Scripts\python.exe -
 | `audio_transcribe` | `nemotron-3.5-asr` (exact variant `nemotron-3.5-asr-streaming-0.6b-generic-cpu:3`, CPU) | `foundry-local` | `:8090` |
 | by id, or the role when the overlay names it | `parakeet-tdt-0.6b-v2` (exact variant `parakeet-tdt-0.6b-v2-generic-cpu:1`, CPU; offline, not streaming; not in the roster) | `foundry-local` | `:8024` |
 
+To compare speech-to-text engines on one PC's own hardware (Foundry, sherpa-onnx Parakeet Unified, whisper.cpp quantized, faster-whisper), run `.\.venv\Scripts\python.exe -m src.audio.bench run --clips <folder>`; it measures load time, real-time factor, accuracy, CPU, RAM and GPU in disposable processes and writes one table: [docs/asr-benchmark.md](docs/asr-benchmark.md).
+
 Models can be `startup: eager` (autostart with the hub) or `startup: on_demand` (first request spawns the backend; optional `idle_unload_minutes` frees the VRAM again).
 
 ## Quick start
