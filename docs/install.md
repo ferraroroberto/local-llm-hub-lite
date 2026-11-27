@@ -75,16 +75,20 @@ What moves is declared in `[install.migrate]` of `.fleet.toml`. The installer do
 
 The usage database (`usage.sqlite3` in `C:\sqlite\local-llm-hub-lite\`) lives outside the repo folder and is shared: it stays where it is and the new copy finds it unchanged. Logs (`data/logs/`, `webapp/auth.log`, `tray-crash.log`) are history and are not copied.
 
-**Reinstall in the same folder (the usual case).** Run these in order in a PowerShell window whose current folder is the one above the app, never inside it:
+**Reinstall in the same folder (the usual case).** It works whatever version the installed copy is, because it runs from a fresh clone and none of the old copy's code runs. Run these in order in a PowerShell window from `<root>`, the folder that holds `local-llm-hub-lite`, never from inside the app:
 
 ```powershell
-cd <PARENT FOLDER>                                 # the folder that holds local-llm-hub-lite
-git -C local-llm-hub-lite pull --ff-only           # the next two commands run the installer in this folder
-.\local-llm-hub-lite\setup.bat -InPlace -WhatIf    # read the backup name, every step and every file; nothing changes
-.\local-llm-hub-lite\setup.bat -InPlace
+cd <root>
+git clone https://github.com/ferraroroberto/local-llm-hub-lite local-llm-hub-lite.incoming   # run nothing in it yet
+.\local-llm-hub-lite.incoming\setup.bat -Replace local-llm-hub-lite -WhatIf   # read the backup name, every step and every file; nothing changes
+.\local-llm-hub-lite.incoming\setup.bat -Replace local-llm-hub-lite
 ```
 
-It stops the hub and its backends, keeps the replaced copy as `local-llm-hub-lite.bak-YYYYMMDD-N`, clones the remote's default branch into the original path, copies the files above and passes only when that clone serves its own commit on the declared port (`port` in `.fleet.toml`), asking http first and https second. The path is unchanged, so a Startup shortcut to `tray.bat` needs no edit.
+It stops the hub and its backends, renames the installed copy to `local-llm-hub-lite.bak-YYYYMMDD-N` (uncommitted edits stay in it), moves the fresh clone to the original path, copies the files above and passes only when that clone serves its own commit on the declared port (`port` in `.fleet.toml`), asking http first and https second. The path is unchanged, so a Startup shortcut to `tray.bat` needs no edit.
+
+- The installed copy must be a git checkout with an `origin`, and the clone must come from the same URL: if `git -C local-llm-hub-lite remote get-url origin` prints another form of it (SSH, say), clone that one.
+- A run that is refused changes nothing. `local-llm-hub-lite.incoming` stays where it is: correct what the report names and run the same command again.
+- On an install whose `setup.bat` already has `-InPlace`, `.\local-llm-hub-lite\setup.bat -InPlace` does the same and makes the clone itself. An older one stops with `unrecognized arguments: -InPlace`; use `-Replace`.
 
 **Beside it (another folder, or an old copy that is not a git clone):**
 
