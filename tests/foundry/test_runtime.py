@@ -6,7 +6,12 @@ import pytest
 
 from src.foundry import runtime
 from tests.foundry import _fake_sdk as fake
-from tests.foundry._fake_sdk import ASR_VARIANT, OFFLINE_VARIANT, FakeCatalog, FakeVariant
+from tests.foundry._fake_sdk import (
+    ASR_VARIANT,
+    OFFLINE_VARIANT,
+    FakeCatalog,
+    FakeVariant,
+)
 
 
 def _catalog(monkeypatch, **variant_kw) -> FakeVariant:

@@ -11,7 +11,13 @@ from fastapi.testclient import TestClient
 
 from src.foundry import worker
 from src.model_registry import ASR_OFFLINE, ENGINE_FOUNDRY, Model
-from tests.foundry._fake_sdk import ASR_VARIANT, OFFLINE_VARIANT, FakeVariant, Part, Result
+from tests.foundry._fake_sdk import (
+    ASR_VARIANT,
+    OFFLINE_VARIANT,
+    FakeVariant,
+    Part,
+    Result,
+)
 
 ASR_ROW = Model(id="nemotron_asr", display_name="nemotron-3.5-asr", backend="whisper",
                 engine=ENGINE_FOUNDRY, port=18090, runtime_model=ASR_VARIANT)
