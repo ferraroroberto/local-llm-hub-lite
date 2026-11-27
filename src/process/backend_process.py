@@ -172,10 +172,10 @@ class _BackendState:
         # the per-backend log file (the child owns that fd), so ``log_lines``
         # returns its tail across a hub restart — see ``_log_path``.
         self.inherited_pid: Optional[int] = None
-        # (create_time, exe) of ``inherited_pid`` captured at adoption. A PID
-        # alone is not an identity: once the backend dies the OS may hand the
-        # number to an unrelated process, which ``stop`` would then kill.
-        self.inherited_identity: Optional[tuple[float, str]] = None
+        # Create time of ``inherited_pid`` captured at adoption. A PID alone
+        # is not an identity: once the backend dies the OS may hand the number
+        # to an unrelated process, which ``stop`` would then kill.
+        self.inherited_identity: Optional[float] = None
         # The current spawn (or inheritance), set by ``start`` /
         # ``inherit_running_backends`` and dropped only by a deliberate
         # ``stop``. A record whose process is gone is how "died on its own"
@@ -229,9 +229,13 @@ def pid(model_id: str) -> Optional[int]:
     return None
 
 
-def _process_identity(proc: "psutil.Process") -> tuple[float, str]:
-    """Create-time and lower-cased exe path: what makes a PID this process."""
-    return (proc.create_time(), (proc.exe() or "").lower())
+def _process_identity(proc: "psutil.Process") -> float:
+    """The process's create time: with the PID, what makes it this process.
+
+    Not the exe path, which one process can change: macOS framework Python
+    re-execs ``Python.app`` just after spawn, keeping its PID and start time.
+    """
+    return proc.create_time()
 
 
 def _inherited_alive(state: "_BackendState") -> bool:

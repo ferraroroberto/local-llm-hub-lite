@@ -47,19 +47,41 @@ def test_same_process_stays_alive(sleeper):
 
 def test_reused_pid_with_new_create_time_is_dropped(sleeper):
     state = _adopt("m", sleeper.pid)
-    create_time, exe = state.inherited_identity
-    state.inherited_identity = (create_time - 100.0, exe)
+    state.inherited_identity -= 100.0
 
     assert bp._inherited_alive(state) is False
     assert state.inherited_pid is None
     assert state.inherited_identity is None
 
 
-def test_reused_pid_with_other_exe_is_dropped(sleeper):
-    state = _adopt("m", sleeper.pid)
-    state.inherited_identity = (state.inherited_identity[0], "c:/other/llama-server.exe")
+_FRAMEWORK = "/Library/Frameworks/Python.framework/Versions/3.12"
+_STUB_EXE = f"{_FRAMEWORK}/bin/python3.12"
+_APP_EXE = f"{_FRAMEWORK}/Resources/Python.app/Contents/MacOS/Python"
 
-    assert bp._inherited_alive(state) is False
+
+@pytest.mark.parametrize(
+    ("exe_at_adoption", "exe_later"),
+    [
+        pytest.param(_STUB_EXE, _APP_EXE, id="macos-framework-python-re-execs"),
+        pytest.param("/usr/bin/python3.12", "/usr/bin/python3.12", id="exe-is-stable"),
+    ],
+)
+def test_a_process_keeps_its_identity_when_its_exe_path_changes(
+    exe_at_adoption, exe_later, monkeypatch
+):
+    """macOS framework Python replaces its own image just after spawn: same PID
+    and start time, another exe path. A fake probe pins that on every platform."""
+    exe = [exe_at_adoption]
+    probe = SimpleNamespace(
+        create_time=lambda: 1000.5, exe=lambda: exe[0], status=lambda: psutil.STATUS_RUNNING
+    )
+    monkeypatch.setattr(psutil, "pid_exists", lambda pid: True)
+    monkeypatch.setattr(psutil, "Process", lambda pid: probe)
+    state = _adopt("m", 4242)
+    exe[0] = exe_later
+
+    assert bp._inherited_alive(state) is True
+    assert state.inherited_pid == 4242
 
 
 def test_pid_without_recorded_identity_is_not_trusted(sleeper):
@@ -71,7 +93,7 @@ def test_pid_without_recorded_identity_is_not_trusted(sleeper):
 
 def test_stop_never_kills_a_reused_pid(sleeper, monkeypatch):
     state = _adopt("m", sleeper.pid)
-    state.inherited_identity = (0.0, "")
+    state.inherited_identity = 0.0
     killed: list[int] = []
     monkeypatch.setattr(bp, "kill_pid", lambda pid: (killed.append(pid), (True, "killed"))[1])
 
