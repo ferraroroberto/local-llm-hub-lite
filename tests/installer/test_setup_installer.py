@@ -128,8 +128,8 @@ def _password_state(root: Path) -> str:
         return subprocess.CompletedProcess(command, 0)
 
     report = installer.Report(what_if=False)
-    installer.build_checklist(root, installer.load_plan(root), report, runner)
-    return next(state for state, item, _ in report.checklist if "sign-in password" in item)
+    installer.build_checklist(root, installer.load_plan(root), report, runner, {})
+    return next(state for state, item, _ in report.optional if "sign-in password" in item)
 
 
 @pytest.fixture
@@ -151,25 +151,25 @@ def password_clone(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     [None, b"", b"{not json", b'{"password_hash": ""}', b'{"password_hash": "plain"}'],
     ids=["no-file", "empty", "corrupt", "no-hash", "not-a-hash"],
 )
-def test_password_item_is_missing_without_a_usable_hash(password_clone: Path, content: bytes | None) -> None:
+def test_password_item_is_off_without_a_usable_hash(password_clone: Path, content: bytes | None) -> None:
     if content is not None:
         (password_clone / "config" / "app_password.json").write_bytes(content)
-    assert _password_state(password_clone) == installer.MISSING
+    assert _password_state(password_clone) == "off"
 
 
 def test_password_item_is_unknown_when_the_file_cannot_be_read(password_clone: Path) -> None:
     (password_clone / "config" / "app_password.json").mkdir()  # reading a directory fails on every OS
-    assert _password_state(password_clone) == installer.UNKNOWN
+    assert _password_state(password_clone) == "unknown"
 
 
-def test_password_item_is_ok_with_a_stored_hash(password_clone: Path) -> None:
+def test_password_item_is_available_with_a_stored_hash(password_clone: Path) -> None:
     password.set_password("4321", path=password_clone / "config" / "app_password.json")
-    assert _password_state(password_clone) == installer.OK
+    assert _password_state(password_clone) == "available"
 
 
 def test_password_item_counts_the_old_password_the_sign_in_still_accepts(password_clone: Path) -> None:
     (password_clone / TARGET).write_text(json.dumps({"auth_password": "4321"}), encoding="utf-8")
-    assert _password_state(password_clone) == installer.OK
+    assert _password_state(password_clone) == "available"
 
 
 def test_playbook_names_this_apps_carry_over_files_and_the_readme_links_it() -> None:
