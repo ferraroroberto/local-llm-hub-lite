@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import logging
 import os
-import signal
 import subprocess
 import sys
 import time
@@ -70,11 +69,7 @@ LOG_TAIL_LINES = 400
 # machines go through the hub on :8020. A row's own ``args`` come later on
 # the command line, so ``--host`` there still overrides this.
 BACKEND_LISTEN_HOST = "127.0.0.1"
-# ``stop()`` timings. After CTRL_BREAK the child gets this long to exit on its
-# own, so a backend that handles the signal shuts down cleanly before
-# TerminateProcess is used.
-STOP_GRACE_S = 3.0
-# Wait for the process to disappear after TerminateProcess; a healthy exit is
+# ``stop()`` timings. Wait for the process to disappear after TerminateProcess; a healthy exit is
 # near-instant, so running past this means it is stuck and is killed outright.
 STOP_TERMINATE_WAIT_S = 8.0
 # Final wait after kill(); the process is gone unless the OS holds it in an
@@ -489,46 +484,51 @@ def start(model_id: str) -> Result:
 
 
 def stop(model_id: str) -> Result:
+    """Stop a backend this hub spawned or inherited, by PID.
+
+    No console control event is sent first: every backend runs in its own
+    hidden console (``WIN_NEW_GROUP``), which a ``CTRL_BREAK_EVENT`` from the
+    hub can never reach, and from a console-less hub (the pythonw tray) the
+    failed ``os.kill`` leaves an exception pending on CPython 3.12.3 / 3.13.0
+    that surfaces as ``<built-in function monotonic> returned a result with an
+    exception set``.
+
+    The launch record is dropped only once the process is gone, so a process
+    that survives a failed stop still reads as ours, never ``unknown``.
+    """
     state = _state_for(model_id)
     p = state.proc
-    # A deliberate stop (even of an already-dead process) ends the launch: what
-    # happens to the process afterwards is not a failure of ours.
-    state.launch = None
-    # Inherited backend: we don't hold a Popen handle, so polite shutdown
-    # isn't an option — taskkill the PID directly.
+    # Inherited backend: we hold no Popen handle — taskkill the PID directly.
     if p is None:
         if _inherited_alive(state):
-            pid_ = state.inherited_pid
+            pid_ = int(state.inherited_pid)
+            ok, msg = kill_pid(pid_)
+            if not ok:
+                logger.warning("⚠️ stop %s: inherited PID %s survived: %s", model_id, pid_, msg)
+                return Result(Outcome.STOP_FAILED, msg, pid_)
             state.forget_inherited()
-            ok, msg = kill_pid(int(pid_))
-            return Result(Outcome.STOPPED if ok else Outcome.STOP_FAILED, msg, int(pid_))
+            state.launch = None
+            return Result(Outcome.STOPPED, msg, pid_)
+        state.launch = None
         return Result(Outcome.NOT_RUNNING)
     if p.poll() is not None:
         state.proc = None
+        state.launch = None
         return Result(Outcome.NOT_RUNNING)
     try:
-        if sys.platform == "win32":
-            try:
-                p.send_signal(signal.CTRL_BREAK_EVENT)
-            except (OSError, ValueError):
-                pass
-            else:
-                try:
-                    p.wait(timeout=STOP_GRACE_S)
-                    state.proc = None
-                    return Result(Outcome.STOPPED)
-                except subprocess.TimeoutExpired:
-                    pass
         p.terminate()
         try:
             p.wait(timeout=STOP_TERMINATE_WAIT_S)
         except subprocess.TimeoutExpired:
             p.kill()
             p.wait(timeout=STOP_KILL_WAIT_S)
-    except Exception as e:
-        return Result(Outcome.STOP_FAILED, f"error stopping: {e}")
+    except Exception as e:  # noqa: BLE001 — any failure leaves the process ours
+        logger.warning("⚠️ stop %s: PID %s survived: %s", model_id, p.pid, e)
+        return Result(Outcome.STOP_FAILED, f"error stopping: {e}", p.pid)
+    logger.info("ℹ️ stopped %s (PID %s)", model_id, p.pid)
     state.proc = None
-    return Result(Outcome.STOPPED)
+    state.launch = None
+    return Result(Outcome.STOPPED, pid=p.pid)
 
 
 def inherit_running_backends() -> int:

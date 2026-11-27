@@ -28,7 +28,7 @@ A `failed` tile enables both Start and Stop because the state does not say wheth
 `backend_process.serving(model, reachable, listening)` gathers one `Observation` and `serving_state.derive()` maps it to a state; `derive` is pure. The observation holds:
 
 - whether a process of ours is alive (the `Popen` handle, or an adopted PID whose create time still matches), and its exit code once it died;
-- the **launch record**: the spawn time and whether the launch has ever answered. `start` and `inherit_running_backends` create it; only a deliberate `stop` drops it. That is what tells "died on its own" (`failed`) from "stopped" (`stopped`);
+- the **launch record**: the spawn time and whether the launch has ever answered. `start` and `inherit_running_backends` create it; only a deliberate `stop` that ends the process drops it, so a process that survives a failed stop stays ours instead of reading `unknown`. That is what tells "died on its own" (`failed`) from "stopped" (`stopped`);
 - the readiness probe, or `None` when it could not be run;
 - whether someone listens on the model's port, or `None` when the listening-port lookup failed (`snapshot_listening_pids` returns a `ListeningSnapshot` whose `known` is false in that case);
 - whether that port holder is this engine's binary (`holder_confirmed`): `True` confirmed, `False` another program, `None` could not be read.

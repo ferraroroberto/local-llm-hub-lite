@@ -40,11 +40,7 @@ import pystray
 from src.host_profile import CONFIG_PATH, _load_config, hub_port
 from src.model_registry import Model, enabled_models, is_spawnable
 from src.no_window import NO_WINDOW
-from src.process.backend_process import (
-    STOP_GRACE_S,
-    STOP_KILL_WAIT_S,
-    STOP_TERMINATE_WAIT_S,
-)
+from src.process.backend_process import STOP_KILL_WAIT_S, STOP_TERMINATE_WAIT_S
 from src.process.server_process import WIN_NEW_GROUP, lan_ip
 from src.process.serving_state import LOAD_DEADLINE_S
 from src.webapp_config import append_auth_token, ensure_auth_token
@@ -77,11 +73,9 @@ HUB_RESTART_PAUSE_S = 0.6
 # never calls a model unreachable while the hub still counts it as loading.
 MODEL_READY_WAIT_S = LOAD_DEADLINE_S + 10.0
 # Timeout for one tray -> hub admin call. The slowest is a model stop, which
-# can run the backend's full CTRL_BREAK -> terminate -> kill sequence, so the
-# budget covers that sequence plus a margin for the round trip.
-ADMIN_CALL_TIMEOUT_S = (
-    STOP_GRACE_S + STOP_TERMINATE_WAIT_S + STOP_KILL_WAIT_S + 5.0
-)
+# can run the backend's full terminate -> kill sequence, so the budget covers
+# that sequence plus a margin for the round trip.
+ADMIN_CALL_TIMEOUT_S = STOP_TERMINATE_WAIT_S + STOP_KILL_WAIT_S + 5.0
 
 
 # --------------------------------------------------------------- TrayConfig
