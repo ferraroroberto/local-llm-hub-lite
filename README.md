@@ -20,6 +20,7 @@ Optional Nemotron roster, for a PC that opts in with `.venv\Scripts\python.exe -
 |---|---|---|---|
 | chat, by id | `nemotron-3-nano-4b` (Q4_K_M, ~3.7 GB VRAM) | `llama-server` | `:8023` |
 | `audio_transcribe` | `nemotron-3.5-asr` (exact variant `nemotron-3.5-asr-streaming-0.6b-generic-cpu:3`, CPU) | `foundry-local` | `:8090` |
+| by id, or the role when the overlay names it | `parakeet-tdt-0.6b-v2` (exact variant `parakeet-tdt-0.6b-v2-generic-cpu:1`, CPU; offline, not streaming; not in the roster) | `foundry-local` | `:8024` |
 
 Models can be `startup: eager` (autostart with the hub) or `startup: on_demand` (first request spawns the backend; optional `idle_unload_minutes` frees the VRAM again).
 
@@ -126,7 +127,8 @@ models:
     backend: openai                 # openai (chat) | whisper (ASR)
     engine: llama-server            # llama-server | whisper-server | foundry-local
                                      # (foundry-local also takes runtime_model:,
-                                     # an exact catalog variant id name:version)
+                                     # an exact catalog variant id name:version,
+                                     # and asr_mode: streaming | offline)
     port: 8021
     model_path: "models/Qwen3.5-4B-Q4_K_M.gguf"
     hf_repo: "unsloth/Qwen3.5-4B-GGUF"   # where --fix downloads from

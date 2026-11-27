@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 ASR_VARIANT = "nemotron-3.5-asr-streaming-0.6b-generic-cpu:3"
+OFFLINE_VARIANT = "parakeet-tdt-0.6b-v2-generic-cpu:1"
 
 
 @dataclass
@@ -52,6 +53,14 @@ class FakeSession:
 class FakeAudioClient:
     def __init__(self, variant: "FakeVariant") -> None:
         self.variant = variant
+        self.settings = types.SimpleNamespace(language=None)
+
+    def transcribe(self, audio_file_path: str):
+        """File transcription, recording ``(path, bytes, language)``."""
+        with open(audio_file_path, "rb") as fh:
+            data = fh.read()
+        self.variant.files.append((audio_file_path, data, self.settings.language))
+        return types.SimpleNamespace(text=f" read {len(data)} bytes ")
 
     def create_live_transcription_session(self) -> FakeSession:
         return FakeSession(self.variant)
@@ -65,6 +74,7 @@ class FakeVariant:
     loads: int = 0
     downloads: int = 0
     sessions: List[FakeSession] = field(default_factory=list)
+    files: List[tuple] = field(default_factory=list)
 
     def load(self) -> None:
         self.loads += 1

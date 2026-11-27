@@ -8,9 +8,11 @@ from pathlib import Path
 import pytest
 
 from src import host_profile, install, model_registry
+from src.audio import server_audio_asr
+from src.foundry import __main__ as foundry_cli
 from src.foundry import runtime
-from src.model_registry import ENGINE_FOUNDRY, STARTUP_EAGER
-from tests.foundry._fake_sdk import ASR_VARIANT
+from src.model_registry import ASR_OFFLINE, ASR_STREAMING, ENGINE_FOUNDRY, STARTUP_EAGER
+from tests.foundry._fake_sdk import ASR_VARIANT, OFFLINE_VARIANT
 
 CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
 
@@ -70,6 +72,45 @@ def test_foundry_overlay_reproduces_the_migrated_roster(scratch_config) -> None:
     # Every name /v1/models lists resolves to the row that runs it.
     names = [n for m in model_registry.enabled_models() for n in m.all_names]
     assert len(names) == len(set(names))
+
+
+def _use_overlay(scratch_config, overlay: str) -> None:
+    scratch_config.write_text(overlay, encoding="utf-8")
+    host_profile._CONFIG_CACHE.clear()
+
+
+# No overlay change means today's routing: Whisper as shipped, Nemotron with the roster.
+@pytest.mark.parametrize("roster, expected", [(False, "whisper"), (True, "nemotron_asr")])
+def test_parakeet_changes_no_routing_until_an_overlay_names_it(scratch_config, roster, expected) -> None:
+    if roster:
+        shutil.copyfile(CONFIG_DIR / "models.foundry.yaml", scratch_config)
+        host_profile._CONFIG_CACHE.clear()
+    assert server_audio_asr._local_asr().id == expected
+    assert "parakeet_asr" not in host_profile.resolve().enabled
+
+
+def test_shipped_parakeet_row_is_an_exact_offline_variant(scratch_config) -> None:
+    rows = {m.id: m for m in model_registry.all_models()}
+    assert (rows["parakeet_asr"].runtime_model, rows["parakeet_asr"].asr_mode) == (OFFLINE_VARIANT, ASR_OFFLINE)
+    assert rows["nemotron_asr"].asr_mode == ASR_STREAMING
+    ports = [m.port for m in rows.values()]
+    assert len(ports) == len(set(ports))
+
+
+@pytest.mark.parametrize("overlay, expected", [
+    ("", [ASR_VARIANT]),
+    ("hosts: {local: {enabled: [parakeet_asr]}}", [ASR_VARIANT, OFFLINE_VARIANT]),
+])
+def test_setup_fetches_parakeet_only_where_the_overlay_names_it(
+    scratch_config, monkeypatch, overlay, expected
+) -> None:
+    shutil.copyfile(CONFIG_DIR / "models.foundry.yaml", scratch_config.with_name("models.foundry.yaml"))
+    _use_overlay(scratch_config, overlay)
+    fetched: list = []
+    monkeypatch.setattr(foundry_cli, "_install_sdk", lambda: None)
+    monkeypatch.setattr(runtime, "download", fetched.append)
+    foundry_cli.prepare()
+    assert fetched == expected
 
 
 def test_overlay_merges_mappings_and_replaces_lists() -> None:

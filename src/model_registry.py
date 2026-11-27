@@ -28,6 +28,13 @@ ENGINE_LLAMA = "llama-server"
 ENGINE_WHISPER = "whisper-server"
 ENGINE_FOUNDRY = "foundry-local"
 
+# ``asr_mode:`` values for a foundry-local row: how the worker hands audio to
+# the variant. A streaming recognizer takes PCM chunks in a live session, an
+# offline one takes the whole file.
+ASR_STREAMING = "streaming"
+ASR_OFFLINE = "offline"
+_ASR_MODES = (ASR_STREAMING, ASR_OFFLINE)
+
 
 class RegistryError(ValueError):
     """A models.yaml row that cannot be served as declared."""
@@ -76,6 +83,8 @@ class Model:
     # (``name:version``, e.g. ``nemotron-3.5-asr-streaming-0.6b-generic-cpu:3``).
     # The worker loads exactly this id and reports it on ``/health``.
     runtime_model: Optional[str] = None
+    # How a ``foundry-local`` row's variant takes audio (see ``_ASR_MODES``).
+    asr_mode: str = ASR_STREAMING
 
     @property
     def all_names(self) -> List[str]:
@@ -132,6 +141,11 @@ def _validate_row(model_id: str, row: Dict) -> None:
                 f"model {model_id!r}: engine {ENGINE_FOUNDRY} needs runtime_model set to an exact "
                 f"catalog variant id (name:version), got {runtime_model!r}"
             )
+        asr_mode = row.get("asr_mode", ASR_STREAMING)
+        if asr_mode not in _ASR_MODES:
+            raise RegistryError(
+                f"model {model_id!r}: asr_mode must be one of {_ASR_MODES}, got {asr_mode!r}"
+            )
 
 
 def _row_to_model(model_id: str, row: Dict) -> Model:
@@ -156,6 +170,7 @@ def _row_to_model(model_id: str, row: Dict) -> Model:
             if row.get("idle_unload_minutes") is not None else None
         ),
         runtime_model=str(row["runtime_model"]) if row.get("runtime_model") else None,
+        asr_mode=str(row.get("asr_mode", ASR_STREAMING)),
     )
 
 
