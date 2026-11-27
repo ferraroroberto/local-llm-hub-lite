@@ -76,7 +76,11 @@
 #      .ratchets/port-host.json. Whole tree, never routed. Any non-zero exit fails,
 #      so exit 3 (git unusable, a file that cannot be read or parsed) is NOT
 #      CONFIRMED and never a pass.
-#   9h. clean tree ratchet: a disposable hub boot (scripts/smoke_hub.py, on a free port
+#   9h. install standard ratchet: the three installer modules are vendored at the
+#      scaffold's content, [install.migrate] parses and docs/install.md has its Install,
+#      Update and Migrate sections, beyond .ratchets/install-standard.json. Any non-zero
+#      exit fails, so exit 3 (a file that cannot be read) is NOT CONFIRMED and never a pass.
+#   9i. clean tree ratchet: a disposable hub boot (scripts/smoke_hub.py, on a free port
 #      with a scratch models config, no backend) adds, changes or deletes no path in
 #      the work tree beyond .ratchets/clean-tree.json. Whole tree, never routed. Any
 #      non-zero exit fails, so exit 3 (the smoke failed to start, git unusable) is NOT
@@ -281,6 +285,13 @@ Step "port host ratchet" {
     # exit, so exit 3 (git unusable, a file that cannot be read or parsed) stops
     # the gate like a finding does.
     & $Python scripts\port_host_ratchet.py
+}
+
+Step "install standard ratchet" {
+    # Called directly, like the port host ratchet: Step fails on any non-zero
+    # exit, so exit 3 (an installer module or the playbook that cannot be read)
+    # stops the gate like a finding does. It reads files only.
+    & $Python scripts\install_standard_ratchet.py
 }
 
 Step "clean tree ratchet" {
