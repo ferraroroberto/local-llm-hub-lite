@@ -116,7 +116,7 @@ def transcribe_file(variant: Any, wav: bytes, *, language: Optional[str]) -> str
     # for the length of the call.
     with tempfile.TemporaryDirectory(prefix="foundry-asr-") as scratch:
         path = Path(scratch) / "upload.wav"
-        path.write_bytes(wav)
+        path.write_bytes(wav)  # runtime-write-exempt: temp folder, removed with the request
         return client.transcribe(str(path)).text.strip()
 
 
