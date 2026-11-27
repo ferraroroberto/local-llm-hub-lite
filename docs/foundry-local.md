@@ -47,7 +47,7 @@ roles:
 
 Then run `python -m src.install --fix`, which downloads the variant, and restart the hub. Leave `nemotron_asr` out of `enabled` to save its memory when no client asks for it by id.
 
-A client that checks `:8090/health` ([Voice Transcriber](#sharing-8090-with-voice-transcriber)) does not find Parakeet on `:8024`. To serve it on that port, drop `nemotron_asr` from `enabled` and set `models.parakeet_asr.port: 8090`; two rows cannot share a port.
+A client that checks `:8090/health` (Voice Transcriber, below) does not find Parakeet on `:8024`. To serve it on that port, drop `nemotron_asr` from `enabled` and set `models.parakeet_asr.port: 8090`; two rows cannot share a port.
 
 ## Model cache folder
 
