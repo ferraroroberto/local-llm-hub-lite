@@ -53,7 +53,7 @@ runtime_write_resolve = { src = "scripts/runtime_write_resolve.py", sha = "ce642
 no_window = { src = "src/no_window.py", sha = "fe8cc1bdbd038ed65947186248df13072eceb25a", dest = "src/no_window.py" }
 login_lockout = { src = "src/login_lockout.py", sha = "93208ab08bdc8591c678a08f55a0f46b3fc8a525", dest = "src/login_lockout.py" }
 login_alert = { src = "src/login_alert.py", sha = "ce64203b017ba636c82737ee7f768c9ef6f422cd", dest = "src/login_alert.py" }
-password = { src = "src/password.py", sha = "289455f1ad9aa9e3f346c495540cf0c210226265", dest = "src/password.py" }
+password = { src = "src/password.py", sha = "1dfb7afd31a2e7e536c91729c559438037b99ef0", dest = "src/password.py" }
 notify = { src = "src/notify", sha = "f911e1c5adc679fee1522e748d9f4fc4c140561d", dest = "src/notify" }
 single_instance = { src = "app/tray/single_instance.py", sha = "f911e1c5adc679fee1522e748d9f4fc4c140561d", dest = "tray/single_instance.py" }
 # Admin-SPA components, byte-identical to project-scaffolding at the recorded sha. icons/ is not
@@ -86,11 +86,11 @@ port_host_ratchet = { src = "scripts/port_host_ratchet.py", sha = "48db2132dab2d
 clean_tree_ratchet = { src = "scripts/clean_tree_ratchet.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/clean_tree_ratchet.py" }
 ratchet_baseline = { src = "scripts/ratchet_baseline.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/ratchet_baseline.py" }
 personal_data_ratchet = { src = "scripts/personal_data_ratchet.py", sha = "f911e1c5adc679fee1522e748d9f4fc4c140561d", dest = "scripts/personal_data_ratchet.py" }
-installer = { src = "src/installer.py", sha = "a40310fe47f82ed7af62835fbfb3ea7ba9e04f8d", dest = "src/installer.py" }
-installer_migrate = { src = "src/installer_migrate.py", sha = "87981135d4ea66f76621d9b2f400efc28b68d2d9", dest = "src/installer_migrate.py", requires = ["installer", "installer_declaration"] }
-installer_declaration = { src = "src/installer_declaration.py", sha = "87981135d4ea66f76621d9b2f400efc28b68d2d9", dest = "src/installer_declaration.py" }
-installer_inplace = { src = "src/installer_inplace.py", sha = "87981135d4ea66f76621d9b2f400efc28b68d2d9", dest = "src/installer_inplace.py", requires = ["installer_migrate"] }
-install_standard_ratchet = { src = "scripts/install_standard_ratchet.py", sha = "87981135d4ea66f76621d9b2f400efc28b68d2d9", dest = "scripts/install_standard_ratchet.py", requires = ["ratchet_baseline"] }
+installer = { src = "src/installer.py", sha = "1dfb7afd31a2e7e536c91729c559438037b99ef0", dest = "src/installer.py" }
+installer_migrate = { src = "src/installer_migrate.py", sha = "1dfb7afd31a2e7e536c91729c559438037b99ef0", dest = "src/installer_migrate.py", requires = ["installer", "installer_declaration"] }
+installer_declaration = { src = "src/installer_declaration.py", sha = "1dfb7afd31a2e7e536c91729c559438037b99ef0", dest = "src/installer_declaration.py" }
+installer_inplace = { src = "src/installer_inplace.py", sha = "1dfb7afd31a2e7e536c91729c559438037b99ef0", dest = "src/installer_inplace.py", requires = ["installer_migrate"] }
+install_standard_ratchet = { src = "scripts/install_standard_ratchet.py", sha = "1dfb7afd31a2e7e536c91729c559438037b99ef0", dest = "scripts/install_standard_ratchet.py", requires = ["ratchet_baseline"] }
 
 # [static_ratchet] -- the scaffold's baseline-and-ratchet static analysis. The gate
 # (scripts/verify-before-ship.ps1) runs scripts/static_ratchet.py, which fails on a

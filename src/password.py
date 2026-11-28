@@ -23,9 +23,11 @@ echoed or logged)::
     python -m src.password status          # is a password stored? prints no secret
 
 ``status`` is an installer probe (``src/installer.py``): exit 0 when a password
-is stored, 1 when none is, 2 when a file it needs cannot be read. An app still
-honouring its old plaintext value names where that value lives, a top-level key
-of a JSON file, so it counts as stored::
+is stored, 1 when none is, 2 when a file it needs cannot be read. A password
+file whose content holds no usable hash, unparseable included, is 1: it is
+logged and left as it is, and ``set`` replaces it. An app still honouring its
+old plaintext value names where that value lives, a top-level key of a JSON
+file, so it counts as stored (that file not parsing is 2)::
 
     python -m src.password status --legacy config/webapp_config.json auth_password
 
@@ -67,7 +69,7 @@ DEFAULT_PATH = Path(__file__).resolve().parent.parent / "config" / "app_password
 HASH_KEY = "password_hash"
 HASH_PREFIX = "pbkdf2_sha256"
 # 200k keeps one check near 0.3 s on the fleet PC, cheap enough per login, while
-# src/login_lockout.py bounds the guess rate; task-os stores hashes in this same format.
+# src/login_lockout.py bounds the guess rate; an adopter already stores hashes in this same format.
 ITERATIONS = 200_000
 SALT_BYTES = 16
 
@@ -105,7 +107,8 @@ def stored_hash(path: Path | None = None) -> str:
     """The stored hash, or "" when none is stored or the file cannot be read."""
     target = path or password_file()
     try:
-        raw = target.read_text(encoding="utf-8")
+        # utf-8-sig on every read: a Windows editor may save a JSON file with a byte-order mark.
+        raw = target.read_text(encoding="utf-8-sig")
     except FileNotFoundError:
         return ""
     except (OSError, UnicodeDecodeError) as exc:
@@ -173,13 +176,17 @@ def _read_new_password(from_stdin: bool) -> str | None:
 def _legacy_value(source: str, key: str) -> str | None:
     """The app's old plaintext value at ``key`` of the JSON file ``source``; None when it cannot be read."""
     try:
-        return str(json.loads(Path(source).read_text(encoding="utf-8")).get(key) or "")
+        return str(json.loads(Path(source).read_text(encoding="utf-8-sig")).get(key) or "")
     except (OSError, ValueError, AttributeError):
         return None
 
 
 def _unreadable(path: Path) -> bool:
-    """True when ``path`` is there but cannot be read, so what it holds is not known."""
+    """True when ``path`` is there but cannot be read, so what it holds is not known.
+
+    Content that holds no usable hash, one that does not parse included, is a known
+    answer: no login can use it. Adopters' installers read it as no password stored.
+    """
     try:
         path.read_bytes()
     except FileNotFoundError:
@@ -202,7 +209,7 @@ def _status(legacy: list[str] | None) -> int:
         return 0
     if old is None or _unreadable(target):
         unread = source if old is None else target
-        print(f"⚠️ Cannot tell whether a password is stored: {unread} could not be read.")
+        print(f"⚠️ Cannot tell whether a password is stored: {unread} could not be read or does not parse.")
         return 2
     print(f"ℹ️ No password stored: {target}")
     return 1
