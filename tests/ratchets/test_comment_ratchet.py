@@ -23,7 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
     ("line", "expect_hit"),
     [
         ("# fixed in issue #412, drop it", True),
-        ("# see home-automation#118 for the lesson", True),
+        ("# see repo-a#118 for the lesson", True),
         ("--ink: #1f2328; /* a hex color, not an issue */", False),
         ("return ({ 'x': '&#39;' }[c]);  // HTML entity, not an issue", False),
         ("<use href=\"#i-wrench\"></use>", False),
