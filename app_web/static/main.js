@@ -21,7 +21,7 @@ import { wirePlayground, fetchPlaygroundModels } from './playground.js';
 // --------------------------------------------------------------- theme toggle
 // The pre-paint boot script in index.html already stamped html[data-theme]
 // (localStorage override, prefers-color-scheme fallback); this block owns the
-// Hub-card sun/moon button. Same mechanism as home-automation/app-launcher.
+// Hub-card sun/moon button.
 function applyTheme(dark) {
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   // Show the glyph for the action: sun to switch to light, moon to switch to dark.

@@ -249,7 +249,7 @@ function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 // "Active only" toggle — lives in the card's own collapse-summary header
 // as an .icon-header-btn, same recipe as the Hub card's theme/restart
 // buttons, with the toggled-on state borrowed from .app-item .icon-btn.active.
-// Persisted like home-automation Plugs' show-hidden localStorage flag.
+// Persisted in localStorage so the choice survives a reload.
 function renderActiveToggle() {
   const btn = els.modelsActiveToggle;
   if (!btn) return;

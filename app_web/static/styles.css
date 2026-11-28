@@ -284,7 +284,7 @@ h2 { display: flex; align-items: center; gap: 8px; }
   margin-bottom: 10px;
 }
 /* One card-title scale app-wide: --font-body, matching the vendored
- * disclosure's .collapse-title and home-automation's card-identity scale.
+ * disclosure's .collapse-title.
  * The leading glyph is pinned to icons.size.title (18px) so plain card
  * headers match the disclosure summaries' icon size too. */
 .card-header h2 { margin: 0; font-size: var(--font-body); font-weight: 600; }
@@ -419,7 +419,7 @@ h2 { display: flex; align-items: center; gap: 8px; }
 .ghost-btn.danger:hover { background: var(--danger-soft); }
 /* Accent-tint variant — same size as .ghost-btn but the primary action
  * (Playground Send / Generate / Speak / Download). Transparent accent tint,
- * never a solid fill — home-automation's .range-tab.active recipe. */
+ * never a solid fill. */
 .ghost-btn.primary {
   background: var(--accent-soft);
   color: var(--accent);
@@ -453,7 +453,7 @@ h2 { display: flex; align-items: center; gap: 8px; }
 .icon-btn.danger:active { color: var(--danger); background: var(--danger-strong); }
 
 /* ---------- preset-tab row (Playground max tokens) ----------
- * Home-automation's ghost .range-tabs pattern: transparent container,
+ * Ghost range-tabs pattern: transparent container,
  * each option a card-off pill, the active one a subtle accent tint — never a
  * solid fill. The ::before extends the tap target to >=44px vertically.
  * Named apart from the vendored `_vendored/segmented/` component: this is a
